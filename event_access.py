@@ -125,8 +125,9 @@ def seed_guest(s):
     if not s.CFG.get('guest_password'):
         return
     db = auth_db(s)
-    if db.execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
-        return
+    with s.LOCK:
+        if db.execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
+            return
     with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
         if not db.execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
             create_credential(s, 'guest', 'Event guests', password=s.CFG['guest_password'], cid='guest', demo=_demo_passwords())
@@ -223,8 +224,9 @@ def seed_demo_roles(s):
         return
     roles = _demo_roles(s)
     db = auth_db(s)
-    if _demo_roles_current(s, roles):
-        return
+    with s.LOCK:
+        if _demo_roles_current(s, roles):
+            return
     with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
         if _demo_roles_current(s, roles):
             return

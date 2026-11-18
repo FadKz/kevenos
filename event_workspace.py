@@ -158,25 +158,28 @@ class Controller:
         finally:
             s.CONTENT = previous_content
         with db:
+            roster_rows = []
+            member_rows = []
             for pair in range(1, configuration['team_count'] + 1):
                 people = [{'id': member, 'name': seed_member(pair, member), 'coach': 0}
                           for member in range(1, event_config.member_capacity(configuration, pair) + 1)]
-                db.execute('INSERT INTO roster(pair,partner,p1,p2) VALUES(?,?,?,?)',
-                           (pair, seed_team(pair), people[0]['name'], people[1]['name'] if len(people)>1 else ''))
-                db.executemany('INSERT INTO roster_members(pair,member,name,coach) VALUES(?,?,?,?)',
-                               [(pair, person['id'], person['name'], 0) for person in people])
-            sheet_fixtures = {}
+                roster_rows.append((pair, seed_team(pair), people[0]['name'], people[1]['name'] if len(people)>1 else ''))
+                member_rows.extend((pair, person['id'], person['name'], 0) for person in people)
+            db.executemany('INSERT INTO roster(pair,partner,p1,p2) VALUES(?,?,?,?)', roster_rows)
+            db.executemany('INSERT INTO roster_members(pair,member,name,coach) VALUES(?,?,?,?)', member_rows)
+            sheets = []
             for station in range(1, min(configuration['judge_count'], configuration['team_count']) + 1):
                 sheet = seed_sheet(station)
                 sheet.update(created=time.time(), app_version=s.APP_VERSION, content_version=str(content.get('content_version', 1)))
                 for field in ('ticks', 'asked', 'raised'):
                     sheet[field] = json.dumps(sheet[field])
-                cursor = db.execute("""INSERT INTO sheets(kind,pair,station,round,judge,ticks,ai,spoke,notes,feedback,asked,raised,
-                              created,app_version,content_version)
-                              VALUES(:kind,:pair,:station,:round,:judge,:ticks,:ai,:spoke,:notes,:feedback,:asked,:raised,
-                              :created,:app_version,:content_version)""", sheet)
-                row = db.execute('SELECT * FROM sheets WHERE id=?', (cursor.lastrowid,)).fetchone()
-                sheet_fixtures[str(cursor.lastrowid)] = _digest(dict(row))
+                sheets.append(sheet)
+            db.executemany("""INSERT INTO sheets(kind,pair,station,round,judge,ticks,ai,spoke,notes,feedback,asked,raised,
+                          created,app_version,content_version)
+                          VALUES(:kind,:pair,:station,:round,:judge,:ticks,:ai,:spoke,:notes,:feedback,:asked,:raised,
+                          :created,:app_version,:content_version)""", sheets)
+            sheet_fixtures = {str(row['id']): _digest(dict(row)) for row in db.execute(
+                'SELECT * FROM sheets ORDER BY id DESC LIMIT ?', (len(sheets),)).fetchall()}
             fixtures = {'configuration': configuration, 'sheets': sheet_fixtures}
             values = {'mode':'desk','clock':dict(s._fresh_clock(),round=min(2,configuration['rounds'])),'program':{'i':0,'since':time.time(),'mode':'manual','announce':''},'public':'off','reveal':'hidden','workspace_seeded':True, 'rehearsal_fixtures': fixtures}
             db.executemany('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v', [(k,json.dumps(v)) for k,v in values.items()])

@@ -5,16 +5,21 @@ It runs the real application and branded UI from
 `Dockerfile.vercel`, always starts in Rehearsal, and contains only bundled
 synthetic content.
 
-## Deliberate boundary
+## Shared demo database
 
-Vercel Containers are stateless and can scale to multiple instances. KevenOS
-therefore stores this demo's SQLite database under `/tmp`. A cold start or new
-deployment can recreate sample data; scale-out can send requests to instances
-with different sessions and mutations, causing sign-out or inconsistent demo
-views. This target is for low-traffic, disposable evaluation only. Do not use it
-for an actual event, reliable multi-user testing, durable scoring or real
-attendee data. The regular container image with a persistent volume remains the
-supported event deployment.
+Vercel Containers are stateless and can scale to multiple instances. The
+production demo therefore selects the Supabase backend and keeps event context,
+sessions, synthetic rehearsal data and editable content in one shared database.
+The app serializes first-start schema migration and seeding, and CI starts two
+independent processes to prove that context, sessions and edits cross instances.
+The container binds its protected startup listener before database migration;
+`/healthz` waits for full readiness and returns a retryable 503 only if the
+one-time bootstrap exceeds two minutes. Current schemas use a constant-time
+validation path on later cold starts.
+
+This remains a public synthetic demonstration. Do not enter attendee data or
+use the role-named credentials for a real event. A persistent SQLite volume or a
+dedicated PostgreSQL/Supabase project is supported for real deployments.
 
 ## Git deployment
 
@@ -22,6 +27,8 @@ supported event deployment.
 - Production URL: `https://kevenos-demo.vercel.app`
 - Production branch: `main`
 - Container target: `Dockerfile.vercel`
+- Compute region: `bom1` (the nearest currently available Vercel region to the
+  Dubai Supabase project; static assets remain on Vercel's global CDN)
 - Health route: `/healthz`
 - Optional integrations: disabled
 
@@ -33,11 +40,19 @@ never committed:
 - `KEVENOS_GUEST_PASSWORD`
 - `KEVENOS_VIEW_KEY`
 - `KEVENOS_SESSION_SECRET`
+- `KEVENOS_DB_BACKEND=supabase`
+- `POSTGRES_URL` (injected by the Supabase Marketplace integration)
+- `KEVENOS_DB_SCHEMA_PREFIX` (use distinct Preview and Production prefixes)
 
 `tools/vercel_entrypoint.py` validates all four values before writing anything,
 projects them into mode-0600 files under `/tmp`, removes the values from the
 application environment, adopts Vercel's assigned `$PORT`, and starts the app
 in hosted Rehearsal mode.
+
+The synthetic demo passwords are deliberately simple and equal to the selected
+role: `admin`, `organizer`, `scoring`, `registration`, `judge`, `participant`
+and `guest`. This behavior requires `KEVENOS_DEMO_ROLE_PASSWORDS=1`, which the
+Vercel entrypoint sets; normal deployments retain the stronger password rules.
 
 ## Verify
 
@@ -52,6 +67,8 @@ in hosted Rehearsal mode.
 ## Rollback
 
 Use Vercel's deployment history to promote the preceding healthy deployment.
-Because the demo is disposable, rollback does not preserve data created in a
-newer deployment. If the Git source is faulty, revert the offending merge on
-GitHub and let `main` produce a replacement production deployment.
+The shared database is retained during an application rollback. Use the
+Supabase backup/recovery controls for database recovery; never point an older
+application at a newer schema without verifying compatibility. If the Git
+source is faulty, revert the offending merge on GitHub and let `main` produce a
+replacement production deployment.

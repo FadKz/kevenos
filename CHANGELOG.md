@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.1.0 — 2026-11-18
+
+- Add selectable SQLite, PostgreSQL and Supabase storage backends while keeping
+  SQLite as the zero-configuration default.
+- Keep Live and Rehearsal isolated in provider-neutral database schemas and
+  persist editable content and history in the shared server database.
+- Serialize schema setup, demo seeding and workspace changes across processes;
+  add a two-process PostgreSQL qualification to CI.
+- Stabilize scaled Vercel sessions and event context to prevent Safari reload
+  loops caused by instance-local state.
+- Add synthetic role-named demo passwords for Admin, Organizer, Scoring,
+  Registration, Judge, Participant and Guest.
+
 ## 1.0.1 — 2026-11-18
 
 - Upgrade the supported runtime baseline to Python 3.15 and Node.js 26 LTS.

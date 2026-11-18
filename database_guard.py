@@ -10,6 +10,8 @@ from pathlib import Path
 import sqlite3
 import sys
 
+import database
+
 
 def check(source: Path, data: Path) -> None:
     tree=ast.parse(source.read_text())
@@ -17,6 +19,8 @@ def check(source: Path, data: Path) -> None:
               and any(isinstance(t,ast.Name) and t.id=='SCHEMA_VERSION' for t in n.targets)
               and isinstance(n.value,ast.Constant) and type(n.value.value) is int]
     if len(versions)!=1:raise RuntimeError('Cannot verify application schema compatibility.')
+    if database.resolve_backend().server:
+        return
     for path in (data/'judging.db', data/'rehearsal'/'judging.db'):
         if not path.exists():continue
         with sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True) as db:

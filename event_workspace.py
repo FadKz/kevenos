@@ -2,14 +2,28 @@
 from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
+import sys
 import threading
 import time
 import uuid
 
+import database
 import event_access
 import event_config
+
+
+def initial_context(s):
+    configured = os.environ.get('KEVENOS_WORKSPACE_CONTEXT', '').strip()
+    if configured:
+        if not all(c in '0123456789abcdef' for c in configured.lower()) or len(configured) != 32:
+            raise RuntimeError('KEVENOS_WORKSPACE_CONTEXT must be 32 hexadecimal characters.')
+        return configured.lower()
+    if os.environ.get('KEVENOS_STABLE_DEMO_CONTEXT') == '1':
+        return hashlib.sha256(('kevenos-demo:'+s.CFG['secret']).encode()).hexdigest()[:32]
+    return uuid.uuid4().hex
 
 
 class RequestGuard:
@@ -90,7 +104,7 @@ class Controller:
         import event_transition
         event_transition.recover(self)
         row = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
-        control = json.loads(row['v']) if row else {'mode':'live', 'context':uuid.uuid4().hex}
+        control = json.loads(row['v']) if row else {'mode':'live', 'context':initial_context(s)}
         if control.get('mode') not in ('live','rehearsal') or not isinstance(control.get('context'),str) or not control['context']:
             raise RuntimeError('Invalid saved event workspace. Restore the control record before starting.')
         self.mode = control['mode']
@@ -106,6 +120,24 @@ class Controller:
     def _refresh_context(self):
         epoch = self.s.kv_get('rehearsal_resize_epoch') if self.mode == 'rehearsal' else None
         self.context = self.rehearsal_context(epoch) if epoch else self._selection_context
+
+    def sync(self):
+        """Refresh cached workspace selection after another process changes it."""
+        row = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
+        if not row:
+            return
+        control = json.loads(row['v'])
+        if control.get('mode') == self.mode and control.get('context') == self._selection_context:
+            self._refresh_context()
+            return
+        with self.write(), self.s.LOCK:
+            row = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
+            if not row:
+                return
+            control = json.loads(row['v'])
+            self._activate(control['mode'])
+            self.mode, self._selection_context = control['mode'], control['context']
+            self._refresh_context()
 
     def _persist(self, control, invalidate=True):
         # Selection and session invalidation are one durable SQLite transaction.
@@ -126,49 +158,53 @@ class Controller:
             configuration = event_config.initialize_db(s, db, self.seed_configuration or self.defaults)
         finally:
             s.CONTENT = previous_content
+        if s.hosted(): print('Startup rehearsal-config-ready', file=sys.stderr, flush=True)
         with db:
+            roster_rows = []
+            member_rows = []
             for pair in range(1, configuration['team_count'] + 1):
                 people = [{'id': member, 'name': seed_member(pair, member), 'coach': 0}
                           for member in range(1, event_config.member_capacity(configuration, pair) + 1)]
-                db.execute('INSERT INTO roster(pair,partner,p1,p2) VALUES(?,?,?,?)',
-                           (pair, seed_team(pair), people[0]['name'], people[1]['name'] if len(people)>1 else ''))
-                db.executemany('INSERT INTO roster_members(pair,member,name,coach) VALUES(?,?,?,?)',
-                               [(pair, person['id'], person['name'], 0) for person in people])
-            sheet_fixtures = {}
+                roster_rows.append((pair, seed_team(pair), people[0]['name'], people[1]['name'] if len(people)>1 else ''))
+                member_rows.extend((pair, person['id'], person['name'], 0) for person in people)
+            db.executemany('INSERT INTO roster(pair,partner,p1,p2) VALUES(?,?,?,?)', roster_rows)
+            db.executemany('INSERT INTO roster_members(pair,member,name,coach) VALUES(?,?,?,?)', member_rows)
+            if s.hosted(): print('Startup rehearsal-roster-ready', file=sys.stderr, flush=True)
+            sheets = []
             for station in range(1, min(configuration['judge_count'], configuration['team_count']) + 1):
                 sheet = seed_sheet(station)
                 sheet.update(created=time.time(), app_version=s.APP_VERSION, content_version=str(content.get('content_version', 1)))
                 for field in ('ticks', 'asked', 'raised'):
                     sheet[field] = json.dumps(sheet[field])
-                cursor = db.execute("""INSERT INTO sheets(kind,pair,station,round,judge,ticks,ai,spoke,notes,feedback,asked,raised,
-                              created,app_version,content_version)
-                              VALUES(:kind,:pair,:station,:round,:judge,:ticks,:ai,:spoke,:notes,:feedback,:asked,:raised,
-                              :created,:app_version,:content_version)""", sheet)
-                row = db.execute('SELECT * FROM sheets WHERE id=?', (cursor.lastrowid,)).fetchone()
-                sheet_fixtures[str(cursor.lastrowid)] = _digest(dict(row))
+                sheets.append(sheet)
+            db.executemany("""INSERT INTO sheets(kind,pair,station,round,judge,ticks,ai,spoke,notes,feedback,asked,raised,
+                          created,app_version,content_version)
+                          VALUES(:kind,:pair,:station,:round,:judge,:ticks,:ai,:spoke,:notes,:feedback,:asked,:raised,
+                          :created,:app_version,:content_version)""", sheets)
+            sheet_fixtures = {str(row['id']): _digest(dict(row)) for row in db.execute(
+                'SELECT * FROM sheets ORDER BY id DESC LIMIT ?', (len(sheets),)).fetchall()}
+            if s.hosted(): print('Startup rehearsal-sheets-ready', file=sys.stderr, flush=True)
             fixtures = {'configuration': configuration, 'sheets': sheet_fixtures}
             values = {'mode':'desk','clock':dict(s._fresh_clock(),round=min(2,configuration['rounds'])),'program':{'i':0,'since':time.time(),'mode':'manual','announce':''},'public':'off','reveal':'hidden','workspace_seeded':True, 'rehearsal_fixtures': fixtures}
             db.executemany('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v', [(k,json.dumps(v)) for k,v in values.items()])
+        if s.hosted(): print('Startup rehearsal-seed-ready', file=sys.stderr, flush=True)
 
     def _practice(self):
         if self.rehearsal is None:
             folder = self.root/'rehearsal'
             folder.mkdir(parents=True, exist_ok=True)
             self.rehearsal = self.s.open_db(str(folder/'judging.db'))
-            if not self.rehearsal.execute("SELECT 1 FROM kv WHERE k='workspace_seeded'").fetchone():
-                self._seed(self.rehearsal)
+            if self.s.hosted(): print('Startup rehearsal-database-ready', file=sys.stderr, flush=True)
+            with database.named_lock(self.rehearsal, 'rehearsal-seed'):
+                if not self.rehearsal.execute("SELECT 1 FROM kv WHERE k='workspace_seeded'").fetchone():
+                    self._seed(self.rehearsal)
         return self.rehearsal
 
     def _activate(self, mode):
         s = self.s
         target_db = self.live if mode == 'live' else self._practice()
         target_data = str(self.root if mode == 'live' else self.root/'rehearsal')
-        old_data = s.DATA
-        try:
-            s.DATA = target_data
-            content = s.load_content()
-        finally:
-            s.DATA = old_data
+        content = s.load_content(target_db, target_data)
         s.DB, s.DATA, s.CONTENT = target_db, target_data, content
         event_config.activate(s, self.defaults)
         s.CFG['rehearsal'] = mode == 'rehearsal'
@@ -177,8 +213,13 @@ class Controller:
     def switch(self, mode, confirm):
         if mode not in ('live','rehearsal') or confirm != mode.upper():
             raise ValueError('Confirm LIVE or REHEARSAL to select the event workspace.')
-        with self.write(), self.s.LOCK:
-            if mode == self.mode:
+        with self.write(), self.s.LOCK, database.named_lock(self.live, 'workspace-switch'):
+            saved = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
+            control = json.loads(saved['v']) if saved else None
+            if control and control.get('mode') == mode:
+                self._activate(mode)
+                self.mode, self._selection_context = mode, control['context']
+                self._refresh_context()
                 return self.status()
             old_mode = self.mode
             self._activate(mode)
@@ -209,6 +250,22 @@ class Controller:
                 self._persist(control, invalidate=False)
             self._selection_context = control['context']
             self._refresh_context()
+            if database.is_server(self.rehearsal):
+                with database.named_lock(self.rehearsal, 'rehearsal-reset'), self.rehearsal:
+                    database.clear_schema(self.rehearsal)
+                    self.rehearsal.execute("INSERT INTO kv(k,v) VALUES('schema_version',?)", (json.dumps(self.s.SCHEMA_VERSION),))
+                    self._seed(self.rehearsal)
+                self._activate('rehearsal')
+                with self.live:
+                    self.live.execute("DELETE FROM access_credentials WHERE dataset='rehearsal' AND role='participant' AND NOT EXISTS (SELECT 1 FROM account_grants g WHERE g.account_id=access_credentials.account_id AND NOT (g.role='participant' AND g.dataset='rehearsal'))")
+                    affected=[r[0] for r in self.live.execute("SELECT account_id FROM account_grants WHERE dataset='rehearsal' AND role='participant'")]
+                    self.live.execute("DELETE FROM account_grants WHERE dataset='rehearsal' AND role='participant'")
+                    for aid in affected:
+                        self.live.execute('UPDATE person_accounts SET revision=revision+1 WHERE id=?',(aid,))
+                        event_access.event_roles.revoke_sessions(self.live,aid)
+                self.seed_configuration = None
+                self._refresh_context()
+                return self.status()
             self.rehearsal.commit()
             self.rehearsal.close()
             self.rehearsal = None

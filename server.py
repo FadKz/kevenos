@@ -12,6 +12,7 @@ still works and the feedback falls back to a template.
 import argparse, csv, hashlib, hmac, html, io, json, math, os, re, secrets, socket, sqlite3, subprocess
 import http.client
 import event_roles
+import database
 import event_access
 import event_mail
 import event_workspace
@@ -32,7 +33,7 @@ import sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-APP_VERSION = "1.0.1"        # bump with every change to the app; list it in CHANGELOG.md
+APP_VERSION = "1.1.0"        # bump with every change to the app; list it in CHANGELOG.md
 SCHEMA_VERSION = 14          # bump when the database layout changes (open_db migrates)
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -50,6 +51,8 @@ CFG = {}
 DB = None
 AUTH_DB = None
 WORKSPACE = None
+STARTING = False
+READY = threading.Event()
 LIVE = {}                    # station -> last heartbeat
 AI_SLOTS = threading.Semaphore(2)
 INVITE_TTL = 48 * 3600
@@ -125,16 +128,22 @@ def load_config(path):
 
 
 def open_db(path):
-    db = sqlite3.connect(path, check_same_thread=False)
-    db.row_factory = sqlite3.Row
-    # Refuse future schemas before changing journal mode or creating tables.
-    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='kv'").fetchone():
-        row=db.execute("SELECT v FROM kv WHERE k='schema_version'").fetchone()
-        if row and int(json.loads(row[0]))>SCHEMA_VERSION:
-            db.close()
-            raise RuntimeError('Database schema is newer than this application. Use the matching release.')
-    db.execute("PRAGMA journal_mode=WAL")
-    db.executescript("""
+    db = database.connect(path)
+    with database.migration_lock(db):
+        # Refuse future schemas before changing journal mode or creating tables.
+        if database.table_exists(db, "kv"):
+            row=db.execute("SELECT v FROM kv WHERE k='schema_version'").fetchone()
+            current_version = int(json.loads(row[0])) if row else 0
+            if current_version>SCHEMA_VERSION:
+                db.close()
+                raise RuntimeError('Database schema is newer than this application. Use the matching release.')
+            # Managed PostgreSQL cold starts must not replay every historical
+            # migration. A schema version is written only after all migrations
+            # complete, so an exact match is a safe constant-time fast path.
+            if database.is_server(db) and current_version == SCHEMA_VERSION:
+                return db
+        db.execute("PRAGMA journal_mode=WAL")
+        db.executescript("""
     CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
     CREATE TABLE IF NOT EXISTS roster (pair INTEGER PRIMARY KEY, partner TEXT, p1 TEXT, p2 TEXT, coach1 INTEGER DEFAULT 0, coach2 INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS sheets (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, pair INTEGER, station INTEGER, round INTEGER,
@@ -145,21 +154,21 @@ def open_db(path):
       station INTEGER PRIMARY KEY, digest TEXT NOT NULL, judge TEXT NOT NULL, expires REAL NOT NULL, used INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS role_sessions (
       digest TEXT PRIMARY KEY, role TEXT NOT NULL, station INTEGER NOT NULL, judge TEXT NOT NULL, expires REAL NOT NULL);
-    """)
-    agent_api.migrate(db)
-    event_assistant.migrate(db)
-    event_access.migrate(db)
-    event_mail.migrate(db)
-    event_config.migrate(db)
-    final_event.migrate(db)
-    participant_workspace.migrate(db)
-    registration_desk.migrate(db)
-    cols = {r["name"] for r in db.execute("PRAGMA table_info(sheets)")}
-    for col in ("app_version", "content_version"):       # schema 2: every sheet records the app and content it was scored on
-        if col not in cols:
-            db.execute("ALTER TABLE sheets ADD COLUMN %s TEXT" % col)
-    db.execute("INSERT INTO kv(k,v) VALUES('schema_version',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (json.dumps(SCHEMA_VERSION),))
-    db.commit()
+        """)
+        agent_api.migrate(db)
+        event_assistant.migrate(db)
+        event_access.migrate(db)
+        event_mail.migrate(db)
+        event_config.migrate(db)
+        final_event.migrate(db)
+        participant_workspace.migrate(db)
+        registration_desk.migrate(db)
+        cols = {r["name"] for r in db.execute("PRAGMA table_info(sheets)")}
+        for col in ("app_version", "content_version"):       # schema 2: every sheet records the app and content it was scored on
+            if col not in cols:
+                db.execute("ALTER TABLE sheets ADD COLUMN %s TEXT" % col)
+        db.execute("INSERT INTO kv(k,v) VALUES('schema_version',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (json.dumps(SCHEMA_VERSION),))
+        db.commit()
     return db
 
 
@@ -994,9 +1003,21 @@ def content_path():
     return os.path.join(DATA, "content.json")
 
 
-def load_content():
+def load_content(db=None, data=None):
     """The edited copy in the data folder wins over the content.json baked into the app."""
-    p = content_path()
+    selected_db = db or DB
+    if database.is_server(selected_db):
+        row = selected_db.execute("SELECT v FROM kv WHERE k='content_current'").fetchone()
+        if row:
+            c = json.loads(row[0])
+            c.setdefault("content_version", 1)
+            c["_source"] = "database"
+            return c
+        c = bundled_content()
+        c.setdefault("content_version", 1)
+        c["_source"] = "bundled"
+        return c
+    p = os.path.join(data or DATA, "content.json")
     src = p if os.path.exists(p) else os.path.join(HERE, "content.json")
     with open(src, encoding="utf-8") as source:
         c = json.load(source)
@@ -1064,11 +1085,54 @@ def validate_content(new):
     return errs
 
 
+def content_version(version):
+    if version == CONTENT.get("content_version", 1):
+        return CONTENT
+    if database.is_server(DB):
+        row = DB.execute("SELECT v FROM kv WHERE k=?", ("content_history:%d" % version,)).fetchone()
+        if row:
+            return json.loads(row[0])
+        if version == 1:
+            return bundled_content()
+        raise FileNotFoundError("The content version was not found.")
+    path = os.path.join(DATA, "content-history", "content-v%d.json" % version)
+    if version == 1 and not os.path.isfile(path):
+        return bundled_content()
+    with open(path, encoding="utf-8") as source:
+        return json.load(source)
+
+
+def refresh_content():
+    """Pick up an edit committed by another server process."""
+    global CONTENT
+    if not database.is_server(DB):
+        return CONTENT
+    latest = load_content(DB, DATA)
+    if latest.get("content_version", 1) != CONTENT.get("content_version", 1):
+        CONTENT = latest
+    return CONTENT
+
+
 def save_content(new, note, actor="desk"):
     global CONTENT
     new = {k: v for k, v in new.items() if not k.startswith("_")}
-    new["content_version"] = int(CONTENT.get("content_version", 1)) + 1
+    expected = int(CONTENT.get("content_version", 1))
     new["content_saved"] = time.time(); new["content_note"] = str(note or "")[:300]
+    if database.is_server(DB):
+        with database.named_lock(DB, "content"), DB:
+            current = load_content(DB, DATA)
+            if int(current.get("content_version", 1)) != expected:
+                CONTENT = current
+                raise ValueError("The event content changed. Reload the latest version before saving.")
+            new["content_version"] = expected + 1
+            txt = json.dumps(new, ensure_ascii=False, separators=(",", ":"))
+            DB.execute("INSERT INTO kv(k,v) VALUES('content_current',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (txt,))
+            DB.execute("INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v",
+                       ("content_history:%d" % new["content_version"], txt))
+        CONTENT = load_content(DB, DATA)
+        audit(actor, "content", "v%d %s" % (new["content_version"], new["content_note"]))
+        return new["content_version"]
+    new["content_version"] = expected + 1
     os.makedirs(os.path.join(DATA, "content-history"), exist_ok=True)
     txt = json.dumps(new, ensure_ascii=False, indent=1)
     tmp = content_path() + ".tmp"
@@ -1084,7 +1148,17 @@ def save_content(new, note, actor="desk"):
 
 
 def history_list():
-    d = os.path.join(DATA, "content-history"); out = []
+    out = []
+    if database.is_server(DB):
+        for row in DB.execute("SELECT k,v FROM kv WHERE k LIKE 'content_history:%'"):
+            try:
+                version = int(row["k"].split(":", 1)[1])
+                value = json.loads(row["v"])
+                out.append({"version": version, "saved": value.get("content_saved"), "note": value.get("content_note", "")})
+            except (ValueError, TypeError, json.JSONDecodeError):
+                pass
+        return sorted(out, key=lambda x: -x["version"])
+    d = os.path.join(DATA, "content-history")
     if os.path.isdir(d):
         for f in sorted(os.listdir(d)):
             m = re.match(r"content-v(\d+)\.json$", f)
@@ -1573,8 +1647,28 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     # ---- routing ----
+    def startup_response(self):
+        if not STARTING:
+            return False
+        if urlparse(self.path).path == '/healthz' and READY.wait(timeout=120):
+            return False
+        data = b'{"ok":false,"status":"initializing"}'
+        self.send_response(503)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Retry-After', '2')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        if self.command != 'HEAD':
+            self.wfile.write(data)
+        return True
+
     def do_GET(self):
+        if self.startup_response():
+            return
         try:
+            if WORKSPACE:
+                WORKSPACE.sync()
             if WORKSPACE and WORKSPACE.guard.blocked:
                 return self.send(503, {'error':'Event recovery is required. Contact the event administrator.'})
             return self._guarded_GET()
@@ -1590,6 +1684,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         with WORKSPACE.read() if WORKSPACE else nullcontext():
             try:
+                refresh_content()
                 self._dispatch_GET()
             finally:
                 REQUEST_AUTH.identity = None
@@ -1731,8 +1826,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/desk/content":
                 v = (q.get("v") or [""])[0]
                 if v:
-                    f = os.path.join(DATA, "content-history", "content-v%d.json" % int(v))
-                    return self.send(200, {"content": json.load(open(f, encoding="utf-8"))}) if os.path.exists(f) else self.send(404, {"error": "no such version"})
+                    try:
+                        return self.send(200, {"content": content_version(int(v))})
+                    except (FileNotFoundError, ValueError):
+                        return self.send(404, {"error": "no such version"})
                 return self.send(200, {"content": {k: x for k, x in CONTENT.items() if not k.startswith("_")}, "versions": version_info(), "history": history_list(),
                                        "bundled": {k: x for k, x in bundled_content().items()}})
             if path == "/api/desk/content.json":
@@ -1773,7 +1870,11 @@ class Handler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_POST(self):
+        if self.startup_response():
+            return
         try:
+            if WORKSPACE:
+                WORKSPACE.sync()
             if WORKSPACE and WORKSPACE.guard.blocked:
                 return self.send(503, {'error':'Event recovery is required. Contact the event administrator.'})
             return self._guarded_POST()
@@ -1796,6 +1897,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         guard = (WORKSPACE.write() if path in ("/api/admin/live-transition","/api/admin/workspace","/api/admin/configuration","/api/assistant/confirm", "/api/admin/agenda") else WORKSPACE.read()) if WORKSPACE else nullcontext()
         with guard:
+            refresh_content()
             if not event_access.same_origin(self):
                 return self.send(403, {'error': 'Use this site to submit changes.'})
             if hosted() and 'application/json' not in self.headers.get('Content-Type', ''):
@@ -2098,7 +2200,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global CONTENT, CFG, DB, WORKSPACE
+    global CONTENT, CFG, DB, WORKSPACE, STARTING
+    STARTING = True
+    READY.clear()
+    startup_started = time.monotonic()
+    def startup_trace(stage):
+        if hosted():
+            print('Startup %s %.2fs' % (stage, time.monotonic() - startup_started), file=sys.stderr, flush=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int)
     ap.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = reachable from the judge solution devices; 127.0.0.1 = this solution device only")
@@ -2122,19 +2230,29 @@ def main():
         CFG["rehearsal"] = True
     if a.mode:
         CFG["mode"] = a.mode
-    CONTENT = load_content()
+    startup_trace('configuration')
+    srv = EventHTTPServer((a.host, CFG["port"]), Handler)
+    srv.daemon_threads = True
+    server_thread = threading.Thread(target=srv.serve_forever, name='kevenos-http', daemon=True)
+    server_thread.start()
+    startup_trace('listening')
     DB = open_db(a.db)
+    startup_trace('live-database')
+    CONTENT = load_content()
     WORKSPACE = event_workspace.initialize(sys.modules[__name__], a.db, DATA)
+    startup_trace('workspace')
     if a.rehearsal:
         WORKSPACE.switch("rehearsal", "REHEARSAL")
+    startup_trace('workspace-selection')
     event_access.seed_guest(sys.modules[__name__])
+    event_access.seed_demo_roles(sys.modules[__name__])
+    startup_trace('demo-access')
     event_assistant.recover(sys.modules[__name__])
     event_push.start(sys.modules[__name__])
+    startup_trace('services')
     ip, host = ("", "") if hosted() else lan_info()
     if a.mode:
         kv_set("mode", a.mode)
-    srv = EventHTTPServer((a.host, CFG["port"]), Handler)
-    srv.daemon_threads = True
     if os.environ.get("KEVENOS_AGENT_PRINCIPALS_FILE"):
         import agent_mcp
         threading.Thread(target=agent_mcp.start_remote, kwargs={"api_base":"http://127.0.0.1:%d" % CFG["port"], "port":int(os.environ.get("KEVENOS_MCP_PORT", "8081"))}, daemon=True, name="kevenos-mcp").start()
@@ -2147,10 +2265,15 @@ def main():
         print("  Local access codes are in the configuration file.")
     print("  Mode      %s" % ("judges start and end their own sessions" if mode() == "self" else "one shared clock run by the desk"))
     print("  AI        %s" % ("OpenAI-compatible AI service (%s)" % GATEWAY_ROLE if gateway_enabled() else "Templates"))
+    print("  Database  %s" % database.resolve_backend().name)
+    STARTING = False
+    READY.set()
     try:
-        srv.serve_forever()
+        server_thread.join()
     except KeyboardInterrupt:
         print("\nstopped")
+        srv.shutdown()
+        server_thread.join()
 
 
 if __name__ == "__main__":

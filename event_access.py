@@ -149,9 +149,24 @@ def _demo_roles(s):
 
 def _demo_roles_current(s, roles):
     db = auth_db(s)
+    role_ids = tuple('demo-' + role for role, _, _ in roles)
+    placeholders = ','.join('?' for _ in role_ids)
+    rows = db.execute(
+        '''SELECT c.id,c.label,c.role,c.pair,c.member,c.station,c.dataset,c.lookup,
+                  c.active,c.account_id,a.label AS account_label,a.active AS account_active,
+                  g.station AS grant_station,g.pair AS grant_pair,g.member AS grant_member,
+                  g.subject AS grant_subject
+             FROM access_credentials c
+             LEFT JOIN person_accounts a ON a.id=c.account_id
+             LEFT JOIN account_grants g ON g.account_id=c.account_id
+                  AND g.role=c.role AND g.dataset=c.dataset
+            WHERE c.id IN (''' + placeholders + ')',
+        role_ids,
+    ).fetchall()
+    existing_by_id = {row['id']: row for row in rows}
     for role, label, fields in roles:
         cid = 'demo-' + role
-        existing = db.execute('SELECT * FROM access_credentials WHERE id=?', (cid,)).fetchone()
+        existing = existing_by_id.get(cid)
         dataset = credential_dataset(s, role)
         pair, member, station = fields.get('pair', 0), fields.get('member', 0), fields.get('station', 0)
         if role == 'participant':
@@ -164,14 +179,9 @@ def _demo_roles_current(s, roles):
             return False
         if not s.match_secret(existing['lookup'], lookup(s, role)):
             return False
-        account = db.execute('SELECT label,active FROM person_accounts WHERE id=?', (existing['account_id'],)).fetchone()
-        grant = db.execute(
-            'SELECT station,pair,member,subject FROM account_grants WHERE account_id=? AND role=? AND dataset=?',
-            (existing['account_id'], role, dataset),
-        ).fetchone()
-        if not account or not account['active'] or account['label'] != label or not grant:
+        if not existing['account_active'] or existing['account_label'] != label or existing['grant_station'] is None:
             return False
-        if (grant['station'], grant['pair'], grant['member'], grant['subject']) != (
+        if (existing['grant_station'], existing['grant_pair'], existing['grant_member'], existing['grant_subject']) != (
                 station, pair, member, label if role == 'participant' else ''):
             return False
     return True

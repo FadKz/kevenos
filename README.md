@@ -51,8 +51,9 @@ deployment. The separate public landing page builds from `Dockerfile.website`.
 ## Disposable Vercel demo
 
 `Dockerfile.vercel` runs the real application as a branded synthetic rehearsal
-on Vercel Containers. It is intentionally stateless: a cold start or scale-out
-may replace its sample data. Use the normal container deployment for durable
+on Vercel Containers. It is intentionally a low-traffic, disposable demo: a
+cold start can reset sample data and scale-out can split sessions and changes
+between instances. Use the normal container deployment for reliable or durable
 events. Setup, verification and rollback are documented in
 [`docs/VERCEL-DEMO.md`](docs/VERCEL-DEMO.md).
 

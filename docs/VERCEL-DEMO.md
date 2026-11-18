@@ -1,15 +1,18 @@
 # Vercel demo deployment
 
-The Vercel project is a public, production-quality demonstration of the
-sanitized KevenOS package. It runs the real application and branded UI from
+The Vercel project is a public demonstration of the sanitized KevenOS package.
+It runs the real application and branded UI from
 `Dockerfile.vercel`, always starts in Rehearsal, and contains only bundled
 synthetic content.
 
 ## Deliberate boundary
 
-Vercel Containers are stateless. KevenOS therefore stores this demo's SQLite
-database under `/tmp` and may recreate it after a cold start, deployment or
-scale-out. Do not use this target for an actual event, durable scoring or real
+Vercel Containers are stateless and can scale to multiple instances. KevenOS
+therefore stores this demo's SQLite database under `/tmp`. A cold start or new
+deployment can recreate sample data; scale-out can send requests to instances
+with different sessions and mutations, causing sign-out or inconsistent demo
+views. This target is for low-traffic, disposable evaluation only. Do not use it
+for an actual event, reliable multi-user testing, durable scoring or real
 attendee data. The regular container image with a persistent volume remains the
 supported event deployment.
 

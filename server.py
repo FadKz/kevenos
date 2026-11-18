@@ -2179,6 +2179,10 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     global CONTENT, CFG, DB, WORKSPACE
+    startup_started = time.monotonic()
+    def startup_trace(stage):
+        if hosted():
+            print('Startup %s %.2fs' % (stage, time.monotonic() - startup_started), file=sys.stderr, flush=True)
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int)
     ap.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = reachable from the judge solution devices; 127.0.0.1 = this solution device only")
@@ -2202,19 +2206,26 @@ def main():
         CFG["rehearsal"] = True
     if a.mode:
         CFG["mode"] = a.mode
+    startup_trace('configuration')
     DB = open_db(a.db)
+    startup_trace('live-database')
     CONTENT = load_content()
     WORKSPACE = event_workspace.initialize(sys.modules[__name__], a.db, DATA)
+    startup_trace('workspace')
     if a.rehearsal:
         WORKSPACE.switch("rehearsal", "REHEARSAL")
+    startup_trace('workspace-selection')
     event_access.seed_guest(sys.modules[__name__])
     event_access.seed_demo_roles(sys.modules[__name__])
+    startup_trace('demo-access')
     event_assistant.recover(sys.modules[__name__])
     event_push.start(sys.modules[__name__])
+    startup_trace('services')
     ip, host = ("", "") if hosted() else lan_info()
     if a.mode:
         kv_set("mode", a.mode)
     srv = EventHTTPServer((a.host, CFG["port"]), Handler)
+    startup_trace('listening')
     srv.daemon_threads = True
     if os.environ.get("KEVENOS_AGENT_PRINCIPALS_FILE"):
         import agent_mcp

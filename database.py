@@ -198,12 +198,29 @@ class PostgresConnection:
                 from psycopg.pq import TransactionStatus
                 if self._connection.info.transaction_status != TransactionStatus.IDLE:
                     return MemoryCursor([])
+                self.begin()
+                return MemoryCursor([])
             returning = bool(re.match(r"^\s*INSERT\s+INTO\s+sheets\b", sql, re.I)) and " returning " not in sql.lower()
             if returning:
                 sql += " RETURNING id"
             cursor = self._connection.cursor()
             values = parameters if isinstance(parameters, Mapping) else tuple(parameters)
-            cursor.execute(sql, values)
+            standalone = self._context_depth == 0 and not self._manual_transaction
+            if standalone:
+                self._connection.execute("BEGIN")
+            try:
+                cursor.execute('SET LOCAL search_path TO "' + self.schema + '"')
+                cursor.execute(sql, values)
+                if standalone:
+                    columns = tuple(column.name for column in (cursor.description or ()))
+                    rows = [Row(columns, row) for row in cursor.fetchall()] if columns else []
+                    rowcount = cursor.rowcount
+                    self._connection.commit()
+                    return MemoryCursor(rows, rowcount=rowcount, lastrowid=rows[0][0] if returning and rows else None)
+            except BaseException:
+                if standalone:
+                    self._connection.rollback()
+                raise
             if returning:
                 values = cursor.fetchone()
                 return PostgresCursor(cursor, lastrowid=values[0] if values else None)
@@ -213,8 +230,21 @@ class PostgresConnection:
         sql = postgres_sql(statement)
         with self._lock:
             cursor = self._connection.cursor()
-            cursor.executemany(sql, list(rows))
-            return PostgresCursor(cursor)
+            standalone = self._context_depth == 0 and not self._manual_transaction
+            if standalone:
+                self._connection.execute("BEGIN")
+            try:
+                cursor.execute('SET LOCAL search_path TO "' + self.schema + '"')
+                cursor.executemany(sql, list(rows))
+                rowcount = cursor.rowcount
+                if standalone:
+                    self._connection.commit()
+                    return MemoryCursor([], rowcount=rowcount)
+                return PostgresCursor(cursor)
+            except BaseException:
+                if standalone:
+                    self._connection.rollback()
+                raise
 
     def executescript(self, script: str):
         cursor = None
@@ -225,6 +255,8 @@ class PostgresConnection:
 
     def commit(self):
         with self._lock:
+            if self._context_depth:
+                return
             self._connection.commit()
             if self._manual_transaction:
                 self._manual_transaction = False
@@ -271,10 +303,10 @@ class PostgresConnection:
 
 
 class MemoryCursor:
-    def __init__(self, rows: Sequence[Row]):
+    def __init__(self, rows: Sequence[Row], rowcount: int | None = None, lastrowid=None):
         self._rows = list(rows)
-        self.rowcount = len(self._rows)
-        self.lastrowid = None
+        self.rowcount = len(self._rows) if rowcount is None else rowcount
+        self.lastrowid = lastrowid
 
     def fetchone(self):
         return self._rows.pop(0) if self._rows else None
@@ -302,13 +334,13 @@ def connect(path: str | os.PathLike[str], config: BackendConfig | None = None):
 
     schema = schema_for_path(path, selected.schema_prefix)
     raw = psycopg.connect(postgres_client_url(selected.url, schema), prepare_threshold=None, connect_timeout=10, autocommit=True)
-    with raw.cursor() as cursor:
-        cursor.execute("SELECT pg_advisory_lock(hashtext(%s))", ("kevenos:schema:" + schema,))
+    with raw.transaction(), raw.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ("kevenos:schema:" + schema,))
         try:
             cursor.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema)))
-            cursor.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
-        finally:
-            cursor.execute("SELECT pg_advisory_unlock(hashtext(%s))", ("kevenos:schema:" + schema,))
+        except BaseException:
+            raw.close()
+            raise
     return PostgresConnection(raw, schema, selected.name)
 
 
@@ -350,12 +382,9 @@ def migration_lock(connection):
         with nullcontext():
             yield
         return
-    connection.execute("SELECT pg_advisory_lock(hashtext(?))", ("kevenos:migrate:" + connection.schema,))
-    try:
+    with connection:
+        connection.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("kevenos:migrate:" + connection.schema,))
         yield
-    finally:
-        connection.execute("SELECT pg_advisory_unlock(hashtext(?))", ("kevenos:migrate:" + connection.schema,))
-        connection.commit()
 
 
 @contextmanager
@@ -366,12 +395,9 @@ def named_lock(connection, name: str):
             yield
         return
     lock_name = f"kevenos:{connection.schema}:{name}"
-    connection.execute("SELECT pg_advisory_lock(hashtext(?))", (lock_name,))
-    try:
+    with connection:
+        connection.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (lock_name,))
         yield
-    finally:
-        connection.execute("SELECT pg_advisory_unlock(hashtext(?))", (lock_name,))
-        connection.commit()
 
 
 def begin_immediate(connection) -> None:

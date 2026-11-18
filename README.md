@@ -41,12 +41,20 @@ when AI is unavailable.
 ## Container
 
 ```bash
-docker build -t kevenos:1.0.0 .
-docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.0.0
+docker build -t kevenos:1.0.1 .
+docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.0.1
 ```
 
 Open `http://localhost:8080`. Use a reverse proxy with HTTPS for a hosted
 deployment. The separate public landing page builds from `Dockerfile.website`.
+
+## Disposable Vercel demo
+
+`Dockerfile.vercel` runs the real application as a branded synthetic rehearsal
+on Vercel Containers. It is intentionally stateless: a cold start or scale-out
+may replace its sample data. Use the normal container deployment for durable
+events. Setup, verification and rollback are documented in
+[`docs/VERCEL-DEMO.md`](docs/VERCEL-DEMO.md).
 
 ## Verify
 
@@ -56,7 +64,7 @@ PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'test_*.py'
 npm ci
 npm run lint
 npm test
-docker build --platform linux/amd64 -t kevenos:1.0.0 .
+docker build --platform linux/amd64 -t kevenos:1.0.1 .
 ```
 
 Bundled content and quiz files are synthetic examples. Replace them for each

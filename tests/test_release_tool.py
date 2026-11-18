@@ -30,6 +30,9 @@ class ReleaseToolTests(unittest.TestCase):
         (root / "Dockerfile").write_text(
             f'FROM scratch\nLABEL org.opencontainers.image.version="{package_version}"\n'
         )
+        (root / "Dockerfile.vercel").write_text(
+            f'FROM scratch\nLABEL org.opencontainers.image.version="{package_version}"\n'
+        )
         (root / "compose.yaml").write_text(f"services:\n  app:\n    image: kevenos:{package_version}\n")
         (root / "CHANGELOG.md").write_text(
             f"# Changelog\n\n## {package_version} — 2026-11-18\n\n- Release notes.\n\n## 1.0.0 — 2026-01-01\n\n- Earlier.\n"
@@ -56,6 +59,17 @@ class ReleaseToolTests(unittest.TestCase):
             root = Path(tmp)
             self.make_repo(root, app_version="1.2.2")
             with self.assertRaisesRegex(ValueError, "server.py"):
+                release.validate_version(root, "v1.2.3")
+
+    def test_version_validation_rejects_vercel_image_mismatch(self):
+        release = load_release_tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_repo(root)
+            (root / "Dockerfile.vercel").write_text(
+                'FROM scratch\nLABEL org.opencontainers.image.version="1.2.2"\n'
+            )
+            with self.assertRaisesRegex(ValueError, "Dockerfile.vercel"):
                 release.validate_version(root, "v1.2.3")
 
     def test_build_creates_archives_manifest_notes_and_checksums(self):

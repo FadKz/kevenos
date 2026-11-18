@@ -431,4 +431,3 @@ def export_snapshot(connection, target: Path) -> None:
             rows.append(values)
         payload["tables"][table] = rows
     target.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")), encoding="utf-8")
-

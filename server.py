@@ -2231,14 +2231,14 @@ def main():
     if a.mode:
         CFG["mode"] = a.mode
     startup_trace('configuration')
-    DB = open_db(a.db)
-    startup_trace('live-database')
-    CONTENT = load_content()
     srv = EventHTTPServer((a.host, CFG["port"]), Handler)
     srv.daemon_threads = True
     server_thread = threading.Thread(target=srv.serve_forever, name='kevenos-http', daemon=True)
     server_thread.start()
     startup_trace('listening')
+    DB = open_db(a.db)
+    startup_trace('live-database')
+    CONTENT = load_content()
     WORKSPACE = event_workspace.initialize(sys.modules[__name__], a.db, DATA)
     startup_trace('workspace')
     if a.rehearsal:

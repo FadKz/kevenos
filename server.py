@@ -51,6 +51,7 @@ CFG = {}
 DB = None
 AUTH_DB = None
 WORKSPACE = None
+STARTING = False
 LIVE = {}                    # station -> last heartbeat
 AI_SLOTS = threading.Semaphore(2)
 INVITE_TTL = 48 * 3600
@@ -1645,7 +1646,23 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     # ---- routing ----
+    def startup_response(self):
+        if not STARTING:
+            return False
+        data = b'{"ok":false,"status":"initializing"}'
+        self.send_response(503)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Retry-After', '2')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        if self.command != 'HEAD':
+            self.wfile.write(data)
+        return True
+
     def do_GET(self):
+        if self.startup_response():
+            return
         try:
             if WORKSPACE:
                 WORKSPACE.sync()
@@ -1850,6 +1867,8 @@ class Handler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_POST(self):
+        if self.startup_response():
+            return
         try:
             if WORKSPACE:
                 WORKSPACE.sync()
@@ -2178,7 +2197,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global CONTENT, CFG, DB, WORKSPACE
+    global CONTENT, CFG, DB, WORKSPACE, STARTING
+    STARTING = True
     startup_started = time.monotonic()
     def startup_trace(stage):
         if hosted():
@@ -2210,6 +2230,11 @@ def main():
     DB = open_db(a.db)
     startup_trace('live-database')
     CONTENT = load_content()
+    srv = EventHTTPServer((a.host, CFG["port"]), Handler)
+    srv.daemon_threads = True
+    server_thread = threading.Thread(target=srv.serve_forever, name='kevenos-http', daemon=True)
+    server_thread.start()
+    startup_trace('listening')
     WORKSPACE = event_workspace.initialize(sys.modules[__name__], a.db, DATA)
     startup_trace('workspace')
     if a.rehearsal:
@@ -2224,9 +2249,6 @@ def main():
     ip, host = ("", "") if hosted() else lan_info()
     if a.mode:
         kv_set("mode", a.mode)
-    srv = EventHTTPServer((a.host, CFG["port"]), Handler)
-    startup_trace('listening')
-    srv.daemon_threads = True
     if os.environ.get("KEVENOS_AGENT_PRINCIPALS_FILE"):
         import agent_mcp
         threading.Thread(target=agent_mcp.start_remote, kwargs={"api_base":"http://127.0.0.1:%d" % CFG["port"], "port":int(os.environ.get("KEVENOS_MCP_PORT", "8081"))}, daemon=True, name="kevenos-mcp").start()
@@ -2240,10 +2262,13 @@ def main():
     print("  Mode      %s" % ("judges start and end their own sessions" if mode() == "self" else "one shared clock run by the desk"))
     print("  AI        %s" % ("OpenAI-compatible AI service (%s)" % GATEWAY_ROLE if gateway_enabled() else "Templates"))
     print("  Database  %s" % database.resolve_backend().name)
+    STARTING = False
     try:
-        srv.serve_forever()
+        server_thread.join()
     except KeyboardInterrupt:
         print("\nstopped")
+        srv.shutdown()
+        server_thread.join()
 
 
 if __name__ == "__main__":

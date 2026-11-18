@@ -12,6 +12,10 @@ production demo therefore selects the Supabase backend and keeps event context,
 sessions, synthetic rehearsal data and editable content in one shared database.
 The app serializes first-start schema migration and seeding, and CI starts two
 independent processes to prove that context, sessions and edits cross instances.
+The container binds its protected startup listener before database migration;
+`/healthz` waits for full readiness and returns a retryable 503 only if the
+one-time bootstrap exceeds two minutes. Current schemas use a constant-time
+validation path on later cold starts.
 
 This remains a public synthetic demonstration. Do not enter attendee data or
 use the role-named credentials for a real event. A persistent SQLite volume or a
@@ -23,6 +27,8 @@ dedicated PostgreSQL/Supabase project is supported for real deployments.
 - Production URL: `https://kevenos-demo.vercel.app`
 - Production branch: `main`
 - Container target: `Dockerfile.vercel`
+- Compute region: `bom1` (the nearest currently available Vercel region to the
+  Dubai Supabase project; static assets remain on Vercel's global CDN)
 - Health route: `/healthz`
 - Optional integrations: disabled
 
@@ -36,7 +42,7 @@ never committed:
 - `KEVENOS_SESSION_SECRET`
 - `KEVENOS_DB_BACKEND=supabase`
 - `POSTGRES_URL` (injected by the Supabase Marketplace integration)
-- `KEVENOS_DB_SCHEMA_PREFIX=kevenos_demo`
+- `KEVENOS_DB_SCHEMA_PREFIX` (use distinct Preview and Production prefixes)
 
 `tools/vercel_entrypoint.py` validates all four values before writing anything,
 projects them into mode-0600 files under `/tmp`, removes the values from the

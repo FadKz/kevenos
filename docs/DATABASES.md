@@ -43,6 +43,12 @@ workspace selection, content publication and synthetic demo-account seeding.
 Editable content and its version history live in the selected server database,
 so every process observes the same agenda and event text.
 
+On managed container platforms, KevenOS opens a guarded listener before the
+one-time migration. All normal routes remain unavailable until Live,
+Rehearsal and demo access are ready; health checks wait for readiness and can
+return `503` with `Retry-After` during a long first bootstrap. Once the schema
+version matches, later cold starts skip historical migrations.
+
 Before deploying a new release, run the normal test suite and the two-process
 qualification against a disposable database:
 

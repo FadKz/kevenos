@@ -19,6 +19,7 @@ supported event deployment.
 ## Git deployment
 
 - Git source: `https://github.com/FadKz/kevenos`
+- Production URL: `https://kevenos-demo.vercel.app`
 - Production branch: `main`
 - Container target: `Dockerfile.vercel`
 - Health route: `/healthz`

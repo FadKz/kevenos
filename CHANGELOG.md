@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.0 — 2026-11-19
+
 - Improve cold-start asset delivery and reduce database work for public assets and health checks.
 - Add a small-event self-hosted configuration with HTTPS and PostgreSQL. (#25)
 

@@ -15,7 +15,7 @@ services:
       - app
   app:
     build: .
-    image: kevenos:1.1.1
+    image: kevenos:1.2.0
     restart: unless-stopped
     environment:
       KEVENOS_HOSTED: "1"

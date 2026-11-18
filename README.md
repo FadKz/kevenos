@@ -41,8 +41,8 @@ when AI is unavailable.
 ## Container
 
 ```bash
-docker build -t kevenos:1.1.1 .
-docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.1.1
+docker build -t kevenos:1.2.0 .
+docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.2.0
 ```
 
 Open `http://localhost:8080`. Use a reverse proxy with HTTPS for a hosted
@@ -79,7 +79,7 @@ PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'test_*.py'
 npm ci
 npm run lint
 npm test
-docker build --platform linux/amd64 -t kevenos:1.1.1 .
+docker build --platform linux/amd64 -t kevenos:1.2.0 .
 ```
 
 Bundled content and quiz files are synthetic examples. Replace them for each
@@ -94,7 +94,7 @@ GitHub Actions artifact for 14 days.
 
 To prepare a public release, update the version in `package.json`, `server.py`,
 `package-lock.json`, `Dockerfile`, `compose.yaml`, and `CHANGELOG.md`, merge the green change, then
-push the matching tag (for example `v1.1.1`). GitHub reruns the complete
+push the matching tag (for example `v1.2.0`). GitHub reruns the complete
 qualification suite and prepares a 90-day release candidate containing:
 
 - the complete source archive;
@@ -111,8 +111,8 @@ a release or pushes a container image automatically.
 Prepare and inspect the same artifacts locally:
 
 ```bash
-python tools/release.py validate --tag v1.1.1
-python tools/release.py build --tag v1.1.1 --output dist
+python tools/release.py validate --tag v1.2.0
+python tools/release.py build --tag v1.2.0 --output dist
 sha256sum --check dist/SHA256SUMS
 ```
 

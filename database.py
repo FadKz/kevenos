@@ -47,15 +47,19 @@ def resolve_backend(environment: Mapping[str, str] | None = None) -> BackendConf
     return BackendConfig(name=name, url=url, schema_prefix=prefix)
 
 
-def postgres_client_url(url: str) -> str:
-    """Remove provider metadata that is not a libpq connection option.
+def postgres_client_url(url: str, schema: str) -> str:
+    """Prepare a managed-provider URL for a schema-scoped libpq client.
 
     Vercel's Supabase Marketplace appends ``supa`` to identify the selected
     pooler.  The parameter belongs to the integration, not PostgreSQL, and
-    psycopg correctly rejects it as an unknown libpq option.
+    psycopg correctly rejects it as an unknown libpq option.  The startup
+    ``options`` value is required because transaction poolers do not preserve
+    a session-level ``SET search_path`` between transactions.
     """
     parts = urlsplit(url)
-    query = urlencode([(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key != "supa"])
+    query_values = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key not in {"supa", "options"}]
+    query_values.append(("options", f"-csearch_path={schema}"))
+    query = urlencode(query_values)
     return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
 
 
@@ -297,7 +301,7 @@ def connect(path: str | os.PathLike[str], config: BackendConfig | None = None):
         raise RuntimeError("Install psycopg[binary] to use PostgreSQL or Supabase.") from error
 
     schema = schema_for_path(path, selected.schema_prefix)
-    raw = psycopg.connect(postgres_client_url(selected.url), prepare_threshold=None, connect_timeout=10, autocommit=True)
+    raw = psycopg.connect(postgres_client_url(selected.url, schema), prepare_threshold=None, connect_timeout=10, autocommit=True)
     with raw.cursor() as cursor:
         cursor.execute("SELECT pg_advisory_lock(hashtext(%s))", ("kevenos:schema:" + schema,))
         try:

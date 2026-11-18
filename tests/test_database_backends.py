@@ -58,8 +58,11 @@ class DatabaseBackendConfigurationTests(unittest.TestCase):
         from database import postgres_client_url
 
         self.assertEqual(
-            postgres_client_url("postgresql://user:secret@pooler.example/app?sslmode=require&supa=base-pooler.x"),
-            "postgresql://user:secret@pooler.example/app?sslmode=require",
+            postgres_client_url(
+                "postgresql://user:secret@pooler.example/app?sslmode=require&supa=base-pooler.x&options=discarded",
+                "kevenos_live",
+            ),
+            "postgresql://user:secret@pooler.example/app?sslmode=require&options=-csearch_path%3Dkevenos_live",
         )
 
 

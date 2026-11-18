@@ -115,3 +115,7 @@ sha256sum --check dist/SHA256SUMS
 
 KevenOS is released under the [MIT License](LICENSE). The KevenOS name and
 logo identify this project; forks should avoid implying endorsement.
+
+KevenOS has been developed with assistance from AI coding tools. Design,
+implementation, review and release decisions remain the responsibility of the
+project's human contributors.

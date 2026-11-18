@@ -6,7 +6,7 @@
 for registration, participant preparation, judged sessions, audience
 interaction, results, announcements and room displays.
 
-[Website](https://kevenos.hostme.fyi) · [Brand assets](brand/README.md) ·
+[Website](https://kevenos.hostme.fyi) · [Disposable demo](https://kevenos-demo.vercel.app) · [Brand assets](brand/README.md) ·
 [Agent API and MCP guide](docs/AGENT-GUIDE.md) · [Security](SECURITY.md)
 
 ## Roles

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sys
 import threading
 import time
 import uuid
@@ -157,6 +158,7 @@ class Controller:
             configuration = event_config.initialize_db(s, db, self.seed_configuration or self.defaults)
         finally:
             s.CONTENT = previous_content
+        if s.hosted(): print('Startup rehearsal-config-ready', file=sys.stderr, flush=True)
         with db:
             roster_rows = []
             member_rows = []
@@ -167,6 +169,7 @@ class Controller:
                 member_rows.extend((pair, person['id'], person['name'], 0) for person in people)
             db.executemany('INSERT INTO roster(pair,partner,p1,p2) VALUES(?,?,?,?)', roster_rows)
             db.executemany('INSERT INTO roster_members(pair,member,name,coach) VALUES(?,?,?,?)', member_rows)
+            if s.hosted(): print('Startup rehearsal-roster-ready', file=sys.stderr, flush=True)
             sheets = []
             for station in range(1, min(configuration['judge_count'], configuration['team_count']) + 1):
                 sheet = seed_sheet(station)
@@ -180,15 +183,18 @@ class Controller:
                           :created,:app_version,:content_version)""", sheets)
             sheet_fixtures = {str(row['id']): _digest(dict(row)) for row in db.execute(
                 'SELECT * FROM sheets ORDER BY id DESC LIMIT ?', (len(sheets),)).fetchall()}
+            if s.hosted(): print('Startup rehearsal-sheets-ready', file=sys.stderr, flush=True)
             fixtures = {'configuration': configuration, 'sheets': sheet_fixtures}
             values = {'mode':'desk','clock':dict(s._fresh_clock(),round=min(2,configuration['rounds'])),'program':{'i':0,'since':time.time(),'mode':'manual','announce':''},'public':'off','reveal':'hidden','workspace_seeded':True, 'rehearsal_fixtures': fixtures}
             db.executemany('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v', [(k,json.dumps(v)) for k,v in values.items()])
+        if s.hosted(): print('Startup rehearsal-seed-ready', file=sys.stderr, flush=True)
 
     def _practice(self):
         if self.rehearsal is None:
             folder = self.root/'rehearsal'
             folder.mkdir(parents=True, exist_ok=True)
             self.rehearsal = self.s.open_db(str(folder/'judging.db'))
+            if self.s.hosted(): print('Startup rehearsal-database-ready', file=sys.stderr, flush=True)
             with database.named_lock(self.rehearsal, 'rehearsal-seed'):
                 if not self.rehearsal.execute("SELECT 1 FROM kv WHERE k='workspace_seeded'").fetchone():
                     self._seed(self.rehearsal)

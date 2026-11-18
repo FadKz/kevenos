@@ -1,0 +1,55 @@
+services:
+  proxy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      KEVENOS_DOMAIN: ${KEVENOS_DOMAIN:?Set KEVENOS_DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+  app:
+    build: .
+    image: kevenos:1.1.1
+    restart: unless-stopped
+    environment:
+      KEVENOS_HOSTED: "1"
+      KEVENOS_PUBLIC_URL: https://${KEVENOS_DOMAIN:?Set KEVENOS_DOMAIN}
+      KEVENOS_DB_BACKEND: postgres
+      KEVENOS_DATABASE_URL: ${KEVENOS_DATABASE_URL:?Set KEVENOS_DATABASE_URL}
+      KEVENOS_SECRETS_DIR: /run/secrets/kevenos
+    volumes:
+      - kevenos_data:/data
+      - ${KEVENOS_SECRETS_PATH:?Set KEVENOS_SECRETS_PATH}:/run/secrets/kevenos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kevenos
+      POSTGRES_USER: kevenos
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kevenos -d kevenos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres_data:
+  kevenos_data:
+  caddy_data:
+  caddy_config:
+secrets:
+  postgres_password:
+    file: ${KEVENOS_POSTGRES_PASSWORD_FILE:?Set KEVENOS_POSTGRES_PASSWORD_FILE}

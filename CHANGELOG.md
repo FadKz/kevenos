@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Improve cold-start asset delivery and reduce database work for public assets and health checks.
+- Add a small-event self-hosted configuration with HTTPS and PostgreSQL. (#25)
+
 ## 1.1.1 — 2026-11-18
 
 - Fix managed Vercel cold starts by avoiding global workspace and demo-access

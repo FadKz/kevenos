@@ -6,7 +6,7 @@ const html=fs.readFileSync('static/registration.html','utf8');
 const script=fs.readFileSync('static/registration.js','utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 async function fixture(){
- const dom=new JSDOM(html,{url:'https://event.example.com/registration',runScripts:'outside-only'});
+ const dom=new JSDOM(html,{url:'https://event.example.com/registration#participants',runScripts:'outside-only'});
  const w=dom.window;w.setInterval=()=>0;w.scrollTo=()=>{};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
  w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};

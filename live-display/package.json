@@ -6,15 +6,15 @@
     "build": "esbuild player.jsx --bundle --minify --outfile=../static/live-player.js && esbuild prep-player.jsx --bundle --minify --outfile=../static/participant-prep-player.js && esbuild event-quiz.tsx --bundle --minify --outfile=../static/event-quiz.js"
   },
   "dependencies": {
-    "@remotion/player": "4.0.543",
+    "@remotion/player": "4.0.544",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "remotion": "4.0.543"
+    "remotion": "4.0.544"
   },
   "devDependencies": {
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "esbuild": "0.28.1",
-    "typescript": "5.9.3"
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
   }
 }

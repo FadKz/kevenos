@@ -1,0 +1,938 @@
+{
+  "event": {
+    "name": "KevenOS",
+    "headline": "Configure this event before use.",
+    "date": "Sample date",
+    "time": "Sample schedule",
+    "venue": "Sample venue",
+    "layout": "Configure the venue layout.",
+    "goal": "Practise a structured customer pitch.",
+    "who": "Synthetic teams and judges."
+  },
+  "steps": [
+    {
+      "n": "1",
+      "name": "Discover",
+      "minutes": 2,
+      "line": "Ask questions. Find the trigger, the users, the apps and who decides. Name the type."
+    },
+    {
+      "n": "2",
+      "name": "Solution at Work",
+      "minutes": 3,
+      "line": "One point each for users, IT and business, with on-device AI where it fits. The right solution device for two roles."
+    },
+    {
+      "n": "3",
+      "name": "Solve",
+      "minutes": 3,
+      "line": "Take one IT and one business objection: the solution device answer, then the implementation partner service."
+    },
+    {
+      "n": "4",
+      "name": "Close",
+      "minutes": 2,
+      "line": "Ask for a free, no-obligation Discovery meeting with their IT and the implementation partner Technical team. Say why it helps: their pain from Discover. Agree a date."
+    }
+  ],
+  "rubric": [
+    {
+      "name": "1  Discover",
+      "points": 30,
+      "ticks": [
+        {
+          "id": "D1",
+          "text": "Asked about the people: how many use laptops, and who uses a solution device or mobile device (Q1, Q2)",
+          "points": 10,
+          "counts": "Both: how many laptop users, and who already uses a solution device or mobile device.",
+          "short": "Asked how many use laptops, and who uses a solution device or mobile device"
+        },
+        {
+          "id": "D2",
+          "text": "Found why now: what changed, or the refresh date (Q3 or Q13)",
+          "points": 10,
+          "counts": "They ask what changed, or when laptops are due to be replaced.",
+          "short": "Found why now: what changed, or the refresh date"
+        },
+        {
+          "id": "D3",
+          "text": "Named the type, A or B, and gave a reason",
+          "points": 10,
+          "counts": "You ask in the feedback: 'Which type, and why?' Right type and one reason.",
+          "short": "Named the type, A or B, with a reason"
+        }
+      ]
+    },
+    {
+      "name": "2  Solution at Work",
+      "points": 20,
+      "ticks": [
+        {
+          "id": "M1",
+          "text": "A point for users, one for IT and one for business, each linked to this customer",
+          "points": 10,
+          "counts": "All three points, each using something the customer said. Two of three is no tick.",
+          "short": "A point for users, IT and business, tied to this customer"
+        },
+        {
+          "id": "M2",
+          "text": "Named the right solution device for two roles",
+          "points": 10,
+          "counts": "Two roles, each with a solution device that fits. Any fitting solution device counts.",
+          "short": "Named the right solution device for two roles"
+        }
+      ]
+    },
+    {
+      "name": "3  Solve",
+      "points": 30,
+      "ticks": [
+        {
+          "id": "S1",
+          "text": "IT worry: understood it and gave the solution device answer",
+          "points": 10,
+          "counts": "Both: they say they understand the worry, then give a solution device fact.",
+          "short": "IT worry: understood it and gave the solution device answer"
+        },
+        {
+          "id": "S2",
+          "text": "Business worry: understood it and gave the solution device answer",
+          "points": 10,
+          "counts": "Both: they say they understand the worry, then give a solution device fact.",
+          "short": "Business worry: understood it and gave the solution device answer"
+        },
+        {
+          "id": "S3",
+          "text": "Named a implementation partner service that answers each worry",
+          "points": 10,
+          "counts": "Both worries have a service named, from the cheat sheet. One of two is no tick.",
+          "short": "Named a implementation partner service for each worry"
+        }
+      ]
+    },
+    {
+      "name": "4  Close",
+      "points": 20,
+      "ticks": [
+        {
+          "id": "C1",
+          "text": "Asked for a Discovery meeting with the customer's IT and the implementation partner Technical team, and said why it helps",
+          "points": 10,
+          "counts": "Both: their IT and the implementation partner Technical team join, and a reason tied to the pain they found in Discover.",
+          "short": "Asked for a Discovery meeting: customer IT and the implementation partner Technical team"
+        },
+        {
+          "id": "C2",
+          "text": "Agreed a date for the meeting, and who from IT joins (Q24)",
+          "points": 10,
+          "counts": "A named date, and a named person from the customer's IT.",
+          "short": "Agreed a date and a named person from the customer's IT"
+        }
+      ]
+    }
+  ],
+  "bonus_tick": {
+    "text": "Positioned solution device as built for on-device AI (judge-only: do not announce)",
+    "points": 2,
+    "counts": "A point about AI that runs on the solution device itself (fast, private, data stays on the device), tied to the customer."
+  },
+  "bonus_note": "product vendor Sales Coach, Succeed level: +2 points per eligible team member, capped at +4 per team regardless of team size. implementation partner prints it as a sticker on each badge.",
+  "questions": [
+    {
+      "group": "Start here",
+      "items": [
+        {
+          "id": "Q1",
+          "text": "Synthetic question Q1.",
+          "core": true
+        },
+        {
+          "id": "Q2",
+          "text": "Synthetic question Q2.",
+          "core": true
+        },
+        {
+          "id": "Q3",
+          "text": "Synthetic question Q3.",
+          "core": true
+        },
+        {
+          "id": "Q4",
+          "text": "Synthetic question Q4.",
+          "core": true
+        },
+        {
+          "id": "Q5",
+          "text": "Synthetic question Q5.",
+          "core": true
+        },
+        {
+          "id": "Q6",
+          "text": "Synthetic question Q6.",
+          "core": true
+        },
+        {
+          "id": "Q7",
+          "text": "Synthetic question Q7.",
+          "core": true
+        },
+        {
+          "id": "Q8",
+          "text": "Synthetic question Q8.",
+          "core": true
+        },
+        {
+          "id": "Q9",
+          "text": "Synthetic question Q9.",
+          "core": true
+        }
+      ]
+    },
+    {
+      "group": "Their people and laptops",
+      "items": [
+        {
+          "id": "Q10",
+          "text": "Synthetic question Q10.",
+          "core": false
+        },
+        {
+          "id": "Q11",
+          "text": "Synthetic question Q11.",
+          "core": false
+        },
+        {
+          "id": "Q12",
+          "text": "Synthetic question Q12.",
+          "core": false
+        },
+        {
+          "id": "Q13",
+          "text": "Synthetic question Q13.",
+          "core": false
+        }
+      ]
+    },
+    {
+      "group": "Their IT",
+      "items": [
+        {
+          "id": "Q14",
+          "text": "Synthetic question Q14.",
+          "core": false
+        },
+        {
+          "id": "Q15",
+          "text": "Synthetic question Q15.",
+          "core": false
+        },
+        {
+          "id": "Q16",
+          "text": "Synthetic question Q16.",
+          "core": false
+        },
+        {
+          "id": "Q17",
+          "text": "Synthetic question Q17.",
+          "core": false
+        },
+        {
+          "id": "Q18",
+          "text": "Synthetic question Q18.",
+          "core": false
+        }
+      ]
+    },
+    {
+      "group": "The next step",
+      "items": [
+        {
+          "id": "Q19",
+          "text": "Synthetic question Q19.",
+          "core": false
+        },
+        {
+          "id": "Q20",
+          "text": "Synthetic question Q20.",
+          "core": false
+        },
+        {
+          "id": "Q21",
+          "text": "Synthetic question Q21.",
+          "core": false
+        },
+        {
+          "id": "Q22",
+          "text": "Synthetic question Q22.",
+          "core": false
+        },
+        {
+          "id": "Q23",
+          "text": "Synthetic question Q23.",
+          "core": false
+        },
+        {
+          "id": "Q24",
+          "text": "Synthetic question Q24.",
+          "core": false
+        }
+      ]
+    }
+  ],
+  "objections": [
+    {
+      "kind": "IT",
+      "worry": "Synthetic concern 1.",
+      "mac": "Synthetic product response 1.",
+      "service": "Synthetic service response 1."
+    },
+    {
+      "kind": "IT",
+      "worry": "Synthetic concern 2.",
+      "mac": "Synthetic product response 2.",
+      "service": "Synthetic service response 2."
+    },
+    {
+      "kind": "IT",
+      "worry": "Synthetic concern 3.",
+      "mac": "Synthetic product response 3.",
+      "service": "Synthetic service response 3."
+    },
+    {
+      "kind": "IT",
+      "worry": "Synthetic concern 4.",
+      "mac": "Synthetic product response 4.",
+      "service": "Synthetic service response 4."
+    },
+    {
+      "kind": "IT",
+      "worry": "Synthetic concern 5.",
+      "mac": "Synthetic product response 5.",
+      "service": "Synthetic service response 5."
+    },
+    {
+      "kind": "Business",
+      "worry": "Synthetic concern 6.",
+      "mac": "Synthetic product response 6.",
+      "service": "Synthetic service response 6."
+    },
+    {
+      "kind": "Business",
+      "worry": "Synthetic concern 7.",
+      "mac": "Synthetic product response 7.",
+      "service": "Synthetic service response 7."
+    },
+    {
+      "kind": "Business",
+      "worry": "Synthetic concern 8.",
+      "mac": "Synthetic product response 8.",
+      "service": "Synthetic service response 8."
+    },
+    {
+      "kind": "Business",
+      "worry": "Synthetic concern 9.",
+      "mac": "Synthetic product response 9.",
+      "service": "Synthetic service response 9."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "stations": [
+        1,
+        2
+      ],
+      "type": "A",
+      "name": "Scenario A",
+      "line": "Synthetic customer scenario.",
+      "card": [
+        "Synthetic organization profile.",
+        "Replace this content before use."
+      ],
+      "persona": "Synthetic customer contact.",
+      "reveals": {
+        "Q1": "Synthetic answer for Q1.",
+        "Q2": "Synthetic answer for Q2.",
+        "Q3": "Synthetic answer for Q3.",
+        "Q4": "Synthetic answer for Q4.",
+        "Q5": "Synthetic answer for Q5.",
+        "Q6": "Synthetic answer for Q6.",
+        "Q7": "Synthetic answer for Q7.",
+        "Q8": "Synthetic answer for Q8.",
+        "Q9": "Synthetic answer for Q9.",
+        "Q14": "Synthetic answer for Q14.",
+        "Q15": "Synthetic answer for Q15.",
+        "Q18": "Synthetic answer for Q18.",
+        "Q19": "Synthetic answer for Q19.",
+        "Q23": "Synthetic answer for Q23.",
+        "Q24": "Synthetic answer for Q24."
+      },
+      "objections": [
+        [
+          "IT",
+          "Synthetic technical concern.",
+          "Synthetic technical detail."
+        ],
+        [
+          "Business",
+          "Synthetic business concern.",
+          "Synthetic business detail."
+        ]
+      ],
+      "lean_in": "Synthetic engagement cue.",
+      "model": {
+        "discover": "Synthetic discovery example.",
+        "maw": "Synthetic solution example.",
+        "solve": "Synthetic objection response.",
+        "close": "Synthetic next step."
+      },
+      "bonus": {
+        "ai": "Synthetic optional bonus.",
+        "package": "Synthetic package."
+      }
+    },
+    {
+      "id": "S2",
+      "stations": [
+        3,
+        4
+      ],
+      "type": "A",
+      "name": "Scenario B",
+      "line": "Synthetic customer scenario.",
+      "card": [
+        "Synthetic organization profile.",
+        "Replace this content before use."
+      ],
+      "persona": "Synthetic customer contact.",
+      "reveals": {
+        "Q1": "Synthetic answer for Q1.",
+        "Q2": "Synthetic answer for Q2.",
+        "Q3": "Synthetic answer for Q3.",
+        "Q4": "Synthetic answer for Q4.",
+        "Q5": "Synthetic answer for Q5.",
+        "Q6": "Synthetic answer for Q6.",
+        "Q7": "Synthetic answer for Q7.",
+        "Q8": "Synthetic answer for Q8.",
+        "Q9": "Synthetic answer for Q9.",
+        "Q11": "Synthetic answer for Q11.",
+        "Q13": "Synthetic answer for Q13.",
+        "Q14": "Synthetic answer for Q14.",
+        "Q15": "Synthetic answer for Q15.",
+        "Q18": "Synthetic answer for Q18.",
+        "Q19": "Synthetic answer for Q19.",
+        "Q24": "Synthetic answer for Q24."
+      },
+      "objections": [
+        [
+          "IT",
+          "Synthetic technical concern.",
+          "Synthetic technical detail."
+        ],
+        [
+          "Business",
+          "Synthetic business concern.",
+          "Synthetic business detail."
+        ]
+      ],
+      "lean_in": "Synthetic engagement cue.",
+      "model": {
+        "discover": "Synthetic discovery example.",
+        "maw": "Synthetic solution example.",
+        "solve": "Synthetic objection response.",
+        "close": "Synthetic next step."
+      },
+      "bonus": {
+        "ai": "Synthetic optional bonus.",
+        "package": "Synthetic package."
+      }
+    },
+    {
+      "id": "S3",
+      "stations": [
+        5,
+        6
+      ],
+      "type": "B",
+      "name": "Scenario C",
+      "line": "Synthetic customer scenario.",
+      "card": [
+        "Synthetic organization profile.",
+        "Replace this content before use."
+      ],
+      "persona": "Synthetic customer contact.",
+      "reveals": {
+        "Q1": "Synthetic answer for Q1.",
+        "Q2": "Synthetic answer for Q2.",
+        "Q3": "Synthetic answer for Q3.",
+        "Q4": "Synthetic answer for Q4.",
+        "Q5": "Synthetic answer for Q5.",
+        "Q6": "Synthetic answer for Q6.",
+        "Q7": "Synthetic answer for Q7.",
+        "Q8": "Synthetic answer for Q8.",
+        "Q9": "Synthetic answer for Q9.",
+        "Q14": "Synthetic answer for Q14.",
+        "Q15": "Synthetic answer for Q15.",
+        "Q16": "Synthetic answer for Q16.",
+        "Q18": "Synthetic answer for Q18.",
+        "Q19": "Synthetic answer for Q19.",
+        "Q24": "Synthetic answer for Q24."
+      },
+      "objections": [
+        [
+          "IT",
+          "Synthetic technical concern.",
+          "Synthetic technical detail."
+        ],
+        [
+          "Business",
+          "Synthetic business concern.",
+          "Synthetic business detail."
+        ]
+      ],
+      "lean_in": "Synthetic engagement cue.",
+      "model": {
+        "discover": "Synthetic discovery example.",
+        "maw": "Synthetic solution example.",
+        "solve": "Synthetic objection response.",
+        "close": "Synthetic next step."
+      },
+      "bonus": {
+        "ai": "Synthetic optional bonus.",
+        "package": "Synthetic package."
+      }
+    },
+    {
+      "id": "S4",
+      "stations": [
+        7,
+        8
+      ],
+      "type": "B",
+      "name": "Scenario D",
+      "line": "Synthetic customer scenario.",
+      "card": [
+        "Synthetic organization profile.",
+        "Replace this content before use."
+      ],
+      "persona": "Synthetic customer contact.",
+      "reveals": {
+        "Q1": "Synthetic answer for Q1.",
+        "Q2": "Synthetic answer for Q2.",
+        "Q3": "Synthetic answer for Q3.",
+        "Q4": "Synthetic answer for Q4.",
+        "Q5": "Synthetic answer for Q5.",
+        "Q6": "Synthetic answer for Q6.",
+        "Q7": "Synthetic answer for Q7.",
+        "Q8": "Synthetic answer for Q8.",
+        "Q9": "Synthetic answer for Q9.",
+        "Q11": "Synthetic answer for Q11.",
+        "Q13": "Synthetic answer for Q13.",
+        "Q15": "Synthetic answer for Q15.",
+        "Q16": "Synthetic answer for Q16.",
+        "Q18": "Synthetic answer for Q18.",
+        "Q19": "Synthetic answer for Q19.",
+        "Q24": "Synthetic answer for Q24."
+      },
+      "objections": [
+        [
+          "IT",
+          "Synthetic technical concern.",
+          "Synthetic technical detail."
+        ],
+        [
+          "Business",
+          "Synthetic business concern.",
+          "Synthetic business detail."
+        ]
+      ],
+      "lean_in": "Synthetic engagement cue.",
+      "model": {
+        "discover": "Synthetic discovery example.",
+        "maw": "Synthetic solution example.",
+        "solve": "Synthetic objection response.",
+        "close": "Synthetic next step."
+      },
+      "bonus": {
+        "ai": "Synthetic optional bonus.",
+        "package": "Synthetic package."
+      }
+    }
+  ],
+  "demo": {
+    "id": "DEMO",
+    "stations": [],
+    "type": "A",
+    "name": "Demo scenario",
+    "line": "Synthetic customer scenario.",
+    "card": [
+      "Synthetic organization profile.",
+      "Replace this content before use."
+    ],
+    "persona": "Synthetic customer contact.",
+    "reveals": {
+      "Q1": "Synthetic answer for Q1.",
+      "Q2": "Synthetic answer for Q2.",
+      "Q3": "Synthetic answer for Q3.",
+      "Q4": "Synthetic answer for Q4.",
+      "Q5": "Synthetic answer for Q5.",
+      "Q6": "Synthetic answer for Q6.",
+      "Q7": "Synthetic answer for Q7.",
+      "Q8": "Synthetic answer for Q8.",
+      "Q9": "Synthetic answer for Q9.",
+      "Q24": "Synthetic answer for Q24."
+    },
+    "objections": [
+      [
+        "IT",
+        "Synthetic technical concern.",
+        "Synthetic technical detail."
+      ],
+      [
+        "Business",
+        "Synthetic business concern.",
+        "Synthetic business detail."
+      ]
+    ],
+    "lean_in": "Synthetic engagement cue.",
+    "model": {
+      "discover": "Synthetic discovery example.",
+      "maw": "Synthetic solution example.",
+      "solve": "Synthetic objection response.",
+      "close": "Synthetic next step."
+    },
+    "bonus": {
+      "ai": "Synthetic optional bonus.",
+      "package": "Synthetic package."
+    }
+  },
+  "tiebreak": "If two teams are level: the higher Solve score wins, then the higher Discover score. If still level, the panel decides.",
+  "final_rule": "In the Final, each team pitches its original scenario. Every assigned panel judge submits their own sheet. The Desk confirms all expected receipts, resolves remaining ties and publishes the reviewed results.",
+  "bells": [
+    {
+      "at": "10 minutes",
+      "what": "One bell: stop pitching, feedback starts."
+    },
+    {
+      "at": "13 minutes",
+      "what": "One bell: feedback is over, write your tick count."
+    },
+    {
+      "at": "15 minutes",
+      "what": "Two bells: change over. The next team sits down."
+    }
+  ],
+  "judge_rules": [
+    "Play the customer on your card, friendly and realistic. Reveal a detail only when the team asks the matching question. Anything not on your card, answer sensibly; the decision is always made in the UAE (Q21).",
+    "Raise your two objections once the team starts positioning solution device. Don't add others.",
+    "Tick what you hear, not what you think they meant. A tick with two parts needs both parts, or no tick. No half points. The line under each tick says what counts. All team members should speak: if one stays silent, say so in the feedback.",
+    "Start the feedback by asking: 'Which type, and why?' Then give one thing that worked and one to add.",
+    "Write three numbers only: the ticks (out of 10), the AI bonus tick (0 or 1), and the bonus on the badge sticker. The scorer does the arithmetic: ticks × 10, plus the AI tick × 2, plus the badge bonus."
+  ],
+  "agenda": [
+    {
+      "time": "09:30",
+      "title": "Registration and coffee",
+      "line": "Collect your badge and your pack",
+      "min": 30,
+      "who": "Event team",
+      "do": [
+        "Collect your badge and your pack.",
+        "Find your table: the team number is on your badge.",
+        "Enjoy a coffee. We start at 10:00."
+      ],
+      "scene": "info"
+    },
+    {
+      "time": "10:00",
+      "title": "Welcome: what today is about",
+      "line": "Synthetic schedule item",
+      "min": 10,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "info"
+    },
+    {
+      "time": "10:10",
+      "title": "Solution at Work",
+      "line": "Synthetic schedule item",
+      "min": 15,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "info"
+    },
+    {
+      "time": "10:25",
+      "title": "The pitch in four steps",
+      "line": "Synthetic schedule item",
+      "min": 15,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "info"
+    },
+    {
+      "time": "10:40",
+      "title": "Live pitch",
+      "line": "Synthetic schedule item",
+      "min": 10,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "info"
+    },
+    {
+      "time": "10:50",
+      "title": "Briefing, then prepare",
+      "line": "Synthetic schedule item",
+      "min": 50,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "prep"
+    },
+    {
+      "time": "11:40",
+      "title": "Pitch rounds",
+      "line": "Synthetic schedule item",
+      "min": 60,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "pitch"
+    },
+    {
+      "time": "12:40",
+      "title": "Break while scores are tallied",
+      "line": "Synthetic schedule item",
+      "min": 10,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "scores"
+    },
+    {
+      "time": "12:50",
+      "title": "The final",
+      "line": "Synthetic schedule item",
+      "min": 35,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "final"
+    },
+    {
+      "time": "13:25",
+      "title": "Awards and your next three customers",
+      "line": "Synthetic schedule item",
+      "min": 35,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "awards"
+    },
+    {
+      "time": "14:00",
+      "title": "Lunch",
+      "line": "Synthetic schedule item",
+      "min": 0,
+      "who": "Event team",
+      "do": [
+        "Replace this sample instruction before use."
+      ],
+      "scene": "message"
+    }
+  ],
+  "mock": {
+    "intro": "Synthetic calibration pitch.",
+    "lines": [
+      {
+        "step": "1 Discover",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 1.",
+        "tick": "D1"
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 2.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 3.",
+        "tick": "D1"
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 4.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 5.",
+        "tick": "D2"
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 6.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 7.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 8.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 9.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 10.",
+        "tick": ""
+      },
+      {
+        "step": "2 Solution at Work",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 11.",
+        "tick": "M1"
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 12.",
+        "tick": "M1"
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 13.",
+        "tick": "M2"
+      },
+      {
+        "step": "3 Solve",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 14.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 15.",
+        "tick": "S1"
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 16.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 17.",
+        "tick": "S2"
+      },
+      {
+        "step": "4 Close",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 18.",
+        "tick": "C1"
+      },
+      {
+        "step": "",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 19.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 20.",
+        "tick": "C2"
+      },
+      {
+        "step": "Feedback",
+        "who": "Speaker A",
+        "line": "Synthetic rehearsal line 21.",
+        "tick": ""
+      },
+      {
+        "step": "",
+        "who": "Speaker B",
+        "line": "Synthetic rehearsal line 22.",
+        "tick": "D3"
+      }
+    ],
+    "key": {
+      "D1": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for D1."
+      },
+      "D2": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for D2."
+      },
+      "D3": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for D3."
+      },
+      "M1": {
+        "earned": false,
+        "why": "Synthetic scoring explanation for M1."
+      },
+      "M2": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for M2."
+      },
+      "S1": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for S1."
+      },
+      "S2": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for S2."
+      },
+      "S3": {
+        "earned": false,
+        "why": "Synthetic scoring explanation for S3."
+      },
+      "C1": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for C1."
+      },
+      "C2": {
+        "earned": true,
+        "why": "Synthetic scoring explanation for C2."
+      }
+    },
+    "feedback": "“One thing that worked: you asked what changed and found the lease ending in January. That gave Faisal a real reason to act. One to add: when you handle the price worry, name a implementation partner service such as trade-in or buy-back, so Faisal hears something concrete. And add a business point in Solution at Work, such as resale value.”"
+  },
+  "content_version": 3
+}

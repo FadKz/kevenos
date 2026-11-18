@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Judge stations | KevenOS</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/event.css">
+</head><body>
+<main class="event-shell event-main">
+  <header class="event-heading"><h1>Judge stations</h1><p id="sub" role="status">Loading stations…</p></header>
+  <div class="event-stations" id="grid"></div>
+</main>
+<div class="modal" id="m" role="dialog" aria-modal="true" aria-labelledby="mt" hidden><div>
+  <h2 id="mt">Station</h2><p class="mut" id="ms">Enter your name to start judging.</p><p class="pill warn" id="mw" hidden></p>
+  <label class="event-field" for="nm">Your name<input type="text" id="nm" placeholder="Your name" autocomplete="name"></label>
+  <div class="event-actions"><button class="btn" id="go" type="button">Start judging</button><button class="btn ghost" id="cancel" type="button">Cancel</button></div>
+  <p class="event-form-error" id="err" role="alert"></p>
+</div></div>
+<script src="/static/common.js"></script>
+<script>
+const $ = id => document.getElementById(id), esc = KEV.esc;
+const scoped = document.body.dataset.scoped === '1';
+let list = [], pick = 0;
+const mine = st => !scoped && !!localStorage[KEV.tokenKey('judge', st)];
+async function load() {
+  if(scoped){
+    if(!KEV.profile.active)return;
+    try{
+      const me=await KEV.profile.session();
+      if(me.authenticated && me.role==='judge'){location.replace('/judge/'+me.station);return;}
+      $('sub').textContent='Sign in with your event password to open your assigned station. Ask the Event Desk if you need help with Judge access.';
+      $('grid').innerHTML='<a class="btn" href="/">Sign in</a>';
+    }catch(error){
+      $('sub').textContent=error.message;
+      $('grid').innerHTML='<a class="btn" href="/home">Open Home</a>';
+    }
+    return;
+  }
+  try {
+    const r = await KEV.api('/api/stations'); list = r.stations; $('sub').textContent = scoped ? 'Choose the station on your invitation.' : r.event + ' · choose your station and sign in with your name.';
+    $('grid').innerHTML = list.map(s => '<button class="st event-station' + (s.online ? ' on' : '') + (mine(s.station) ? ' mine' : '') + '" data-s="' + s.station + '"><span class="dot"></span><small>Station</small><b>' + s.station + '</b><div class="who">' +
+      (mine(s.station) ? 'You · tap to continue' : s.judge ? esc(s.judge) + (s.online ? ' · online' : '') : scoped ? 'Invitation required' : 'Free') + '</div></button>').join('');
+    document.querySelectorAll('.event-station').forEach(b => b.onclick = () => choose(+b.dataset.s));
+  } catch (e) { $('sub').textContent = list.length ? 'Could not refresh the station list. Retrying…' : 'Cannot reach the scoring desk. Retrying…'; }
+}
+function choose(st) {
+  pick = st; const s = list.find(x => x.station === st) || {};
+  if (scoped || mine(st)) { location.href = '/judge/' + st; return; }
+  $('mt').textContent = 'Station ' + st; $('nm').value = localStorage['kevenos:judgeName'] || ''; $('err').textContent = '';
+  $('mw').hidden = !(s.online && s.judge); $('mw').textContent = s.online && s.judge ? s.judge + ' is already judging here. Continue only if you are taking over.' : '';
+  $('m').hidden = false; $('nm').focus();
+}
+$('cancel').onclick = () => $('m').hidden = true;
+$('go').onclick = async () => {
+  const name = $('nm').value.trim(); if (!name) { $('err').textContent = 'Please enter your name.'; return; }
+  try {
+    const r = await KEV.api('/api/login', {body: {role: 'judge', station: pick, name}});
+    localStorage[KEV.tokenKey('judge', pick)] = r.token; localStorage['kevenos:judgeName'] = name; location.href = '/judge/' + pick;
+  } catch (e) { $('err').textContent = e.message; }
+};
+$('nm').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+if(scoped)KEV.profile.mount({onEnd:message=>{$('grid').replaceChildren();$('m').hidden=true;$('nm').value='';$('sub').textContent=message;}});
+load(); setInterval(() => { if ($('m').hidden) load(); }, 5000);
+</script></body></html>

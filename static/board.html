@@ -1,0 +1,88 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Board | KevenOS</title><link rel="stylesheet" href="/static/app.css">
+<style>
+html,body{min-height:100%}body{background:radial-gradient(ellipse at 10% 0%,var(--navy),var(--bg) 70%);color:var(--ink);display:flex;flex-direction:column;min-height:100dvh}
+:root{--stage-muted:var(--mut);--stage-blue:var(--blue);--stage-surface:var(--blue2);--stage-line:var(--line)}
+#wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2vh 4vw}
+.ev{font-size:2.2vw;color:var(--stage-muted);letter-spacing:.08em;text-transform:uppercase}
+.rd{font-size:3vw;font-weight:600;margin-top:1vh}
+.time{font-size:20vw;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;margin:1vh 0}
+.phase{font-size:4vw;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.phase.pitch{color:var(--stage-blue)}.phase.feedback{color:#ffc472}.phase.change,.phase.over{color:#ff9aa8}
+.sub{font-size:2.2vw;color:var(--stage-muted);margin-top:2vh}
+.bar{width:60vw;height:1.2vh;background:var(--stage-line);border-radius:99px;margin-top:3vh;overflow:hidden}.bar i{display:block;height:100%;background:var(--stage-blue)}
+.pod{display:flex;gap:3vw;align-items:flex-end;margin-top:4vh}
+.pod>div{background:var(--stage-surface);border-radius:2vw;padding:3vh 3vw;min-width:22vw}
+.pod .n{font-size:6vw;font-weight:700}.pod .p{font-size:2.6vw;font-weight:600}.pod .m{font-size:1.8vw;color:var(--stage-muted)}
+.pod .r1{background:#293444;border:.4vw solid #ffdc75}.pod .r1 .n{color:#ffdc75}
+h1{font-size:6vw;margin:0 0 2vh}
+.grid8{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:2vw;margin-top:4vh;width:90vw}
+.cell{background:var(--stage-surface);border-radius:1.6vw;padding:2.4vh 1.5vw}.cell .t{font-size:5vw;font-weight:700;font-variant-numeric:tabular-nums}.cell .m{font-size:1.6vw;color:var(--stage-muted)}
+.phase.s{font-size:1.8vw}
+#board-status{margin:12px auto 0;padding:9px 13px;border:1px solid var(--stage-line);border-radius:9px;background:var(--stage-surface);color:#f5f9ff;text-align:center}
+@media(max-aspect-ratio:1/1){
+  .ev,.sub{font-size:1rem}.rd,.phase{font-size:1.5rem}.time{font-size:clamp(5rem,19vw,13rem)}
+  .grid8{grid-template-columns:repeat(2,minmax(0,1fr))}.cell .t{font-size:2rem}.cell .m,.phase.s{font-size:.9rem}
+  .pod{flex-direction:column;align-items:stretch;width:90vw}.pod .p{font-size:1.5rem}.pod .m{font-size:1rem}
+}
+</style></head><body><p id="board-status" role="status">Connecting to the scoreboard…</p><main id="wrap"></main>
+<script src="/static/common.js"></script>
+<script>
+let B = null, recv = 0, connected = false, profileStopped = false;
+const boardStatus = document.getElementById('board-status');
+if(KEV.staff.hosted && KEV.nav.trackProfile)KEV.profile.mount({onEnd:message=>{profileStopped=true;B=null;connected=false;document.getElementById('wrap').replaceChildren();boardStatus.hidden=false;boardStatus.textContent=message;}});
+async function poll() {
+  if(profileStopped)return;
+  try {
+    B = await KEV.api('/api/board');
+    recv = Date.now();
+    connected = true;
+    boardStatus.hidden = true;
+  } catch (error) {
+    connected = false;
+    boardStatus.hidden = false;
+    boardStatus.textContent = B ? 'Connection lost. Showing the last update.' : 'Scoreboard unavailable. Retrying…';
+  }
+}
+function el() { return B.clock.elapsed + (B.clock.running && connected ? (Date.now() - recv) / 1000 : 0); }
+function draw() {
+  if (!B || KEV.workspaceChanging) return; const w = document.getElementById('wrap'), c = B.clock, e = el();
+  if (KEV.finalStatus(B.final) === 'completed' && B.reveal === 'winners' && B.podium) {
+    w.innerHTML = '<h1>Congratulations</h1><div class="pod">' + B.podium.map(p => '<div class="r' + p.rank + '"><div class="n">' + p.rank + '</div><div class="p">' + KEV.esc(p.partner) + '</div><div class="m">' + KEV.esc(KEV.members(p)) + '</div></div>').join('') + '</div>';
+    return;
+  }
+  if (!['ready','pitch','collecting','review'].includes(KEV.finalStatus(B.final)) && B.reveal === 'top3' && B.podium) {
+    w.innerHTML = '<div class="ev">Top three after the rounds</div><div class="pod">' + B.podium.map(p => '<div class="r' + p.rank + '"><div class="n">' + p.rank + '</div><div class="p">' + KEV.esc(p.partner) + '</div><div class="m">Team ' + p.pair + (KEV.members(p) ? ' · ' + KEV.esc(KEV.members(p)) : '') + '</div></div>').join('') + '</div><div class="sub">Heading to the final</div>';
+    return;
+  }
+  if (['ready','pitch','collecting','review'].includes(KEV.finalStatus(B.final))) {
+    const f = B.final, phase = KEV.finalStatus(f), selected = f.pairs[f.current], p = typeof selected === 'object' ? selected?.pair : selected;
+    const final = KEV.finalClock(c, connected ? (Date.now() - recv) / 1000 : 0);
+    w.innerHTML = '<div class="ev">' + KEV.esc(B.event) + '</div><h1 style="margin-top:3vh">The Final</h1>' + (phase === 'review' ? '<div class="rd">Judges are confirming results</div><div class="sub">The winners will appear when results are published.</div>' : '<div class="rd">On stage: Team ' + KEV.esc(p) + ' · finalist ' + (f.current + 1) + ' of ' + f.pairs.length + '</div>' + (phase === 'collecting' ? '' : '<div class="time">' + final.time + '</div>') + '<div class="phase ' + (final.ended ? 'over' : 'pitch') + '">' + KEV.finalLabel(f) + '</div>' + (f.case_name ? '<div class="sub">Original scenario · ' + KEV.esc(f.case_name) + '</div>' : ''));
+    return;
+  }
+  if (KEV.finalStatus(B.final) === 'completed') {
+    w.innerHTML = '<div class="ev">' + KEV.esc(B.event) + '</div><h1>Final complete</h1><div class="sub">Thank you to every team. The Desk controls when results appear here.</div>';
+    return;
+  }
+  if (B.mode === 'self' && B.station_clocks) {
+    w.innerHTML = '<div class="ev">' + KEV.esc(B.event) + '</div><div class="rd">Pitches in progress</div><div class="grid8">' + B.station_clocks.map(r => {
+      const c2 = r.clock, e2 = c2.elapsed + (c2.running && connected ? (Date.now() - recv) / 1000 : 0), idle2 = !c2.started_any && !c2.running;
+      const ph2 = e2 < 600 ? 'pitch' : e2 < 780 ? 'feedback' : e2 < 900 ? 'change' : 'over';
+      const left2 = ph2 === 'pitch' ? 600 - e2 : ph2 === 'feedback' ? 780 - e2 : ph2 === 'change' ? 900 - e2 : 0;
+      const nm = {pitch: 'Pitch', feedback: 'Feedback', change: 'Change over', over: 'Time is up'};
+      return '<div class="cell"><div class="m">Station ' + r.station + '</div>' + (r.pair ? '<div class="t">' + (idle2 ? '--:--' : KEV.mmss(left2)) + '</div><div class="phase s ' + ph2 + '">' + (idle2 ? 'Get ready' : c2.ended ? 'Finished' : c2.running ? nm[ph2] : 'Paused') + '</div><div class="m">Team ' + r.pair + '</div>' : '<div class="t">-</div><div class="m">Done</div>') + '</div>';
+    }).join('') + '</div><div class="sub">Scores are kept private until the break</div>';
+    return;
+  }
+  const idle = !c.started_any && !c.running;
+  const ph = e < 600 ? 'pitch' : e < 780 ? 'feedback' : e < 900 ? 'change' : 'over';
+  const left = ph === 'pitch' ? 600 - e : ph === 'feedback' ? 780 - e : ph === 'change' ? 900 - e : 0;
+  const names = {pitch: 'Pitch', feedback: 'Judge feedback', change: 'Change over', over: 'Time is up'};
+  w.innerHTML = '<div class="ev">' + KEV.esc(B.event) + '</div><div class="rd">Round ' + c.round + ' of ' + (B.config?.rounds || B.configuration?.rounds || B.rounds || 1) + '</div>' +
+    '<div class="time">' + (idle ? '--:--' : KEV.mmss(left)) + '</div><div class="phase ' + ph + '">' + (idle ? 'Get ready' : (c.running ? names[ph] : 'Paused')) + '</div>' +
+    '<div class="bar"><i style="width:' + (idle ? 0 : Math.min(100, e / 9)) + '%"></i></div>' +
+    '<div class="sub">' + (ph === 'change' && !idle ? 'Change over when the next team is called' : ph === 'feedback' ? 'Judges are giving feedback' : 'Scores are kept private until the break') + '</div>';
+}
+setInterval(poll, 1500); setInterval(draw, 250); poll().then(draw);
+</script></body></html>

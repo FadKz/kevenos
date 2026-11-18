@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Event Desk | KevenOS</title>
+<link href="/static/app.css" rel="stylesheet"/>
+<link href="/static/assistant.css" rel="stylesheet"/>
+<link href="/static/event-quiz.css" rel="stylesheet"/>
+<link href="/static/audience-questions.css" rel="stylesheet"/>
+<link href="/static/judging-operations.css" rel="stylesheet"/>
+<link href="/static/role-home.css" rel="stylesheet"/><link href="/static/event-operations.css" rel="stylesheet"/></head>
+<body class="role-home-page">
+<main class="login" hidden="" id="login">
+<h1>Event Desk</h1>
+<div class="card">
+<p hidden="" id="access-help">The Organizer runs live judging. Sign in with your Organizer or Admin password.</p>
+<p id="err" role="alert"></p>
+<a class="btn" hidden="" href="/?access=desk" id="signin">Organizer sign-in</a>
+<form hidden="" id="local-login" method="post">
+<label for="pin">Organiser PIN</label>
+<input autocomplete="off" id="pin" inputmode="numeric" required="" type="password"/>
+<p><button class="btn" type="submit">Open Desk</button></p>
+</form>
+</div>
+</main>
+<div class="workspace desk-workspace" hidden="" id="app">
+<header class="desk-top">
+<div class="desk-top-inner">
+<p class="ops-nav-title" hidden id="ops-nav-title">Event Operations</p>
+<nav aria-label="Desk sections" class="workspace-nav" id="nav"></nav>
+<div class="desk-links row">
+<button class="btn ghost sm" data-nav-help="" id="desk-help" type="button">Desk guide</button>
+<button class="btn ghost sm" data-nav-signout="" hidden="" id="desk-out" type="button">Sign out</button>
+</div>
+</div>
+</header>
+<div class="desk-clock" hidden="" id="head">
+<div class="desk-clock-inner row">
+<span class="pill" id="hr"></span>
+<span class="small mut" id="hph"></span><span class="tt" id="htt">--:--</span>
+<button class="btn sm" id="cstart">Start</button><button class="btn alt sm" id="cpause">Pause</button>
+<button class="btn alt sm" hidden="" id="cfinish">Finish pitch · collect sheets</button><button class="btn ghost sm" id="creset">Reset round clock</button>
+<div class="grow"></div><span class="small" id="connection" role="status"></span>
+<button class="btn ghost sm" id="cmode" title="Switch between judge-paced sessions and one shared Desk clock"></button>
+</div>
+</div>
+<main class="workspace-page">
+<header class="page-heading"><h1 id="heading" tabindex="-1"></h1><p id="description"></p></header>
+<p id="desk-status" role="alert"></p>
+<p id="ops-connection" class="ops-connection" role="status" hidden></p>
+<nav id="scoring-subnav" class="ops-subnav" aria-label="Scoring tools" hidden></nav>
+<div id="main"></div>
+<div hidden="" id="desk-documents"></div>
+</main>
+<dialog aria-labelledby="sheet-title" id="modal"><div id="mbody"></div></dialog>
+</div>
+<script src="/static/common.js"></script>
+<script src="/static/event-operations.js"></script>
+<script src="/static/event-quiz.js"></script>
+<script src="/static/audience-questions.js"></script>
+<script src="/static/assistant.js"></script>
+<script src="/static/participant-desk.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const get = path => KEV.api(path, null, KEV.staff.token);
+const post = (path, body = {}) => KEV.api(path, {body}, KEV.staff.token);
+const TABS = {
+  home: ['Today', 'Your event control centre. Check the room, then choose the next action.'],
+  run: ['Run', 'Station timers, assignments and incoming score sheets.'],
+  scores: ['Scores', 'Review submitted sheets, scoring flags and the event debrief.'],
+  quiz: ['Quiz', 'Run the optional attendee quiz and control what appears on the hall screen.'],
+  audience: ['Audience questions', 'Create and send optional questions and share results with attendees.'],
+  participants: ['Participants', 'Post updates, release team feedback and review customer nominations.'],
+  display: ['Live View', 'Control the audience screen and check what it shows before sharing.'],
+  final: ['Final', 'Select finalists and manage the stage order.'],
+  calib: ['Calibration', 'Run the mock pitch and compare judge scores against the answer key.']
+};
+const dashboard = location.pathname === '/organizer' ? 'organizer' : location.pathname === '/scoring' ? 'scoring' : 'desk';
+const PARTICIPANT_VIEWS = {
+  compose: ['Send a message', 'messages', 'messages'],
+  updates: ['Event feed', 'participants', 'messages'],
+  delivery: ['Delivery', 'participant-delivery', 'messages'],
+  help: ['Help inbox', 'participant-help', 'attendees'],
+  nominations: ['Nominations', 'participant-nominations', 'attendees']
+};
+if (dashboard === 'organizer') {
+  for (const key of ['run','scores','final','calib']) delete TABS[key];
+  $('app').dataset.workspace = 'organizer';
+  $('ops-nav-title').hidden = false;
+  TABS.home=['Today','See the programme, room screen and venue readiness at a glance.'];
+  TABS.display=['Run of show','Move through cues and check what the room is seeing.'];
+  TABS.quiz=['Quiz','Prepare questions, run the scored quiz and review results.'];
+  TABS.audience=['Audience questions','Send unscored polls and feedback questions.'];
+  delete TABS.participants;
+  TABS.messages=['Messages','Choose where your message should appear and check delivery.'];
+  TABS.attendees=['Attendee support','Answer private help requests and manage customer nominations.'];
+}
+const scoringNav = ['home','run','scores','final'];
+if (dashboard === 'scoring') {
+  for (const key of ['quiz','display','audience']) delete TABS[key];
+  $('app').dataset.workspace = 'scoring';
+  $('ops-nav-title').hidden = false;
+  $('ops-nav-title').textContent = 'Judging Operations';
+  const tools = document.createElement('details');
+  tools.className = 'judging-clock-tools';
+  tools.innerHTML = '<summary>Clock settings</summary><div class="row"></div>';
+  $('cmode').after(tools);
+  tools.querySelector('div').append($('creset'), $('cmode'));
+  TABS.home = ['Today', 'Check stations and practice scoring before the first team.'];
+  TABS.run = ['Stations', 'Run the round, collect sheets and help stations that need attention.'];
+  TABS.scores = ['Scores & Feedback', 'Review scores or release judge-approved feedback to teams.'];
+  TABS.participants = ['Feedback release', 'Review approved comments and choose which teams receive them.'];
+}
+let tab = 'home', quizEditor = false, participantView = 'updates', C, DS, SC, calib, recv = 0, sequence = 0, active = false;
+let lastSig = '', summary = '', finalistDraft = null;
+let syncInFlight = false;
+
+function login(message, switching = false) {
+  KEV.assistant?.unmount();
+  active = false;
+  syncInFlight = false;
+  sequence++;
+  $('app').hidden = true;
+  $('desk-out').hidden = true;
+  KEV.nav.render();
+  KEV.closeHelp();
+  $('head').hidden = true;
+  DS = SC = calib = C = null;
+  summary = '';
+  finalistDraft = null;
+  if ($('modal').open) $('modal').close();
+  $('main').replaceChildren();
+  window.ParticipantDesk?.clear();
+  window.EventQuiz?.clear();
+  window.AudienceQuestions?.clear();
+  $('desk-documents').replaceChildren();
+  $('err').textContent = message;
+  $('access-help').hidden = !KEV.staff.hosted;
+  $('signin').textContent = switching ? 'Switch profile' : 'Organizer sign-in';
+  $('signin').hidden = !KEV.staff.hosted;
+  $('local-login').hidden = KEV.staff.hosted;
+  $('login').hidden = false;
+}
+
+async function start() {
+  try {
+    const session = await KEV.staff.session();
+    if (!session.authenticated) return login('');
+    if (KEV.staff.hosted && location.pathname === '/desk') {
+      const key = location.hash.slice(1), target = ['run','scores','final','calib'].includes(key) ? 'scoring' : ['display','quiz','quiz-editor','audience','attendees',...Object.values(PARTICIPANT_VIEWS).map(([,anchor])=>anchor)].includes(key) ? 'organizer' : null;
+      const allowed = (session.dashboards || []).some(item => item.id === target || item.role === target);
+      location.replace(target && allowed ? '/' + target + location.hash : '/home');
+      return;
+    }
+    if (!['admin', 'desk'].includes(session.role)) return login('This account does not have Desk access.', true);
+    C = await get('/api/content');
+    $('desk-out').hidden = KEV.staff.hosted;
+    if (KEV.staff.hosted) {
+      await KEV.profile.mount({onEnd:message=>login(message)});
+      const readOnlyControls = dashboard === 'organizer' ?
+        ':not([data-home-tab], [data-participant-view], [data-pack-filter], [role="tab"], #present-toggle, #open-room-message)' : '';
+      KEV.profile.previewControls($('app'),'.workspace-page button:not([data-resource])'+readOnlyControls+
+        ', .workspace-page input:not([type="search"]), .workspace-page select, .workspace-page textarea, .desk-clock button');
+    }
+    $('login').hidden = true;
+    $('app').hidden = false;
+    KEV.nav.render();
+    active = true;
+    KEV.assistant?.mount($('app'), session.role, () => refresh(true));
+    select(location.hash.slice(1), false);
+    if (KEV.staff.hosted) loadDocuments();
+  } catch (e) {
+    if (!KEV.staff.hosted && e.status === 401) await KEV.staff.signOut();
+    login(e.message);
+  }
+}
+
+$('local-login').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await KEV.staff.localLogin($('pin').value.trim());
+    $('pin').value = '';
+    await start();
+  } catch (error) { $('err').textContent = error.message; }
+};
+$('desk-out').onclick = async () => {
+  try {
+    await KEV.staff.signOut();
+    login('Signed out of the Event Desk.');
+  } catch (e) { $('desk-status').textContent = e.message; }
+};
+KEV.bindHelp($('desk-help'), () => KEV.staff.token, '/api/help?context=desk');
+
+const organizerNav = [
+  ['Event day', [['home','Current cue & readiness'],['display','Programme & projector'],['messages','Announcements & delivery']]],
+  ['Engagement', [['quiz','Scored questions'],['audience','Polls & feedback']]],
+  ['Participants', [['attendees','Help & nominations']]]
+];
+$('nav').innerHTML = dashboard === 'organizer'
+  ? organizerNav.map(([group, items]) => '<div class="ops-nav-group"><p>'+group+'</p>'+
+    items.map(([key, hint]) => '<button type="button" data-t="'+key+'"><strong>'+TABS[key][0]+
+      '</strong><small aria-hidden="true">'+hint+'</small></button>').join('')+'</div>').join('')
+  : Object.entries(TABS).filter(([key]) => dashboard !== 'scoring' || scoringNav.includes(key)).map(([key, [label]]) => '<button type="button" data-t="'+key+'">'+label+'</button>').join('');
+$('nav').addEventListener('click', e => {
+  const button = e.target.closest('[data-t]');
+  if (button) select(button.dataset.t, true);
+});
+window.addEventListener('hashchange', () => { if (active) select(location.hash.slice(1), false); });
+
+function select(key, focus) {
+  const participantDestination = dashboard === 'organizer' &&
+    (key === 'attendees' ? 'help' : Object.keys(PARTICIPANT_VIEWS).find(view => PARTICIPANT_VIEWS[view][1] === key));
+  const participantSection = participantDestination && PARTICIPANT_VIEWS[participantDestination][2];
+  if (participantSection && tab === participantSection && $('participant-tools')) {
+    showParticipantView(participantDestination, focus);
+    return;
+  }
+  window.ParticipantDesk?.clear();
+  window.EventQuiz?.clear();
+  window.AudienceQuestions?.clear();
+  KEV.operations?.clear?.();
+  quizEditor = key === 'quiz-editor' && Object.hasOwn(TABS, 'quiz');
+  participantView = participantDestination || 'updates';
+  tab = quizEditor ? 'quiz' : participantSection || (Object.hasOwn(TABS, key) ? key : 'home');
+  const anchor = quizEditor ? 'quiz-editor' : participantDestination ? PARTICIPANT_VIEWS[participantDestination][1] : tab;
+  if (focus && location.hash !== '#' + anchor) history.replaceState(null, '', '#' + anchor);
+  $('heading').textContent = TABS[tab][0];
+  $('description').textContent = TABS[tab][1];
+  for (const b of $('nav').querySelectorAll('button')) {
+    const selected = b.dataset.t === tab || (dashboard === 'scoring' &&
+      ((tab === 'participants' && b.dataset.t === 'scores') || (tab === 'calib' && b.dataset.t === 'home')));
+    b.classList.toggle('on', selected);
+    if (selected) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  }
+  const subnav = $('scoring-subnav');
+  subnav.hidden = dashboard !== 'scoring' || !['scores','participants','calib'].includes(tab);
+  subnav.replaceChildren();
+  if (!subnav.hidden) {
+    const items = tab === 'calib' ? [['home','Readiness'],['calib','Calibration']] :
+      [['scores','Score review'],['participants','Feedback release']];
+    for (const [key, label] of items) {
+      const button = document.createElement('button');
+      button.className = 'btn ghost';
+      button.textContent = label;
+      button.setAttribute('aria-pressed', String(tab === key));
+      button.onclick = () => select(key, true);
+      subnav.append(button);
+    }
+  }
+  $('desk-status').textContent = '';
+  $('desk-documents').hidden = tab !== 'run' || !$('desk-documents').children.length;
+  $('main').replaceChildren();
+  $('main').dataset.section = tab;
+  lastSig = '';
+  if (focus) {
+    $('heading').focus({preventScroll: dashboard !== 'organizer'});
+    if (KEV.staff.hosted && !KEV.profile.isPreview) post('/api/activity', {action: 'navigation', page: '/desk', section: tab}).catch(() => {});
+  }
+  if (DS) draw(true);
+  refresh(true);
+}
+
+async function loadDocuments() {
+  try {
+    const {resources} = await get('/api/event');
+    if (!active || !resources?.length) return;
+    $('desk-documents').innerHTML = '<details class="card"><summary><b>Desk documents</b></summary><ul>' +
+      resources.map(file => '<li><button type="button" class="btn ghost sm" data-resource="' + KEV.esc(file.id) + '">' + KEV.esc(file.title) + '</button></li>').join('') + '</ul></details>';
+    $('desk-documents').hidden = tab !== 'run';
+  } catch {
+    // The Desk clock and score workflows remain available when documents fail to load.
+  }
+}
+
+async function refresh(force = false) {
+  if (!active || (syncInFlight && !force)) return false;
+  const request = ++sequence;
+  const section = tab;
+  syncInFlight = true;
+  try {
+    const [state, scores, calibration, participants] = await Promise.all([
+      get('/api/desk/state'),
+      ['scores', 'final'].includes(section) ? get('/api/desk/scores') : null,
+      section === 'calib' ? get('/api/desk/calib') : null,
+      ['participants','messages','attendees'].includes(section) ? get('/api/desk/participant-workspace') : null
+    ]);
+    if (request !== sequence || !active) return false;
+    if (!DS) $('desk-status').textContent = '';
+    DS = state;
+    recv = Date.now();
+    if (scores) SC = scores;
+    if (calibration) calib = calibration;
+    $('connection').textContent = '';
+    $('ops-connection').hidden = true;
+    draw(force);
+    if (participants) window.ParticipantDesk?.render(dashboard === 'organizer' ? $('participant-tools') : $('main'), participants, force);
+    return true;
+  } catch (e) {
+    if (request !== sequence || !active) return false;
+    if (e.status === 401 || e.status === 403) {
+      if (!KEV.staff.hosted) await KEV.staff.signOut();
+      login('Your session ended. Sign in again.');
+    } else {
+      $('connection').textContent = 'Desk disconnected. Reconnecting…';
+      if (dashboard === 'organizer') {
+        $('ops-connection').textContent = 'Connection interrupted. Showing the last update while the Desk reconnects.';
+        $('ops-connection').hidden = false;
+      }
+      if (!DS) $('desk-status').textContent = e.message;
+    }
+    return false;
+  } finally {
+    if (request === sequence) syncInFlight = false;
+  }
+}
+
+async function act(path, body, button, done) {
+  if(KEV.profile.isPreview){$('desk-status').textContent='Preview is read-only. Return to Admin to make changes.';return;}
+  $('desk-status').textContent = '';
+  if (button) button.disabled = true;
+  try {
+    const result = await post('/api/desk/' + path, body);
+    if (done) done(result);
+    await refresh(true);
+  } catch (e) {
+    if (e.code === 'preliminary_sheets_missing' && e.details?.review_token && !body.review_token) {
+      showPreliminaryException(path, body, e.details, done);
+      return;
+    }
+    const status = $('modal').open ? ($('sheet-status') || $('desk-status')) : $('desk-status');
+    status.textContent = e.message;
+    if ([401,403,409].includes(e.status) && !$('modal').open) await refresh(true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function showPreliminaryException(path, body, review, done) {
+  const dialog = $('modal');
+  const byRound = new Map();
+  for (const row of review.missing) {
+    if (!byRound.has(row.round)) byRound.set(row.round, []);
+    byRound.get(row.round).push('Station ' + row.station + ' · Team ' + row.pair);
+  }
+  $('mbody').innerHTML = '<form id="prelim-exception"><h2 id="sheet-title">Outstanding score sheets</h2>' +
+    '<p class="mut">Wait for these sheets, or record why the event needs to continue. An exception does not create a score.</p>' +
+    '<ul class="judging-exception-list">' + [...byRound].map(([round, teams]) =>
+      '<li><strong>Round ' + round + '</strong>: ' + KEV.esc(teams.join(', ')) + '</li>').join('') + '</ul>' +
+    '<label class="field">Reason to continue<textarea id="prelim-reason" minlength="8" maxlength="500" required></textarea></label>' +
+    '<p id="sheet-status" role="alert"></p><div class="row"><button type="button" class="btn ghost" id="prelim-cancel">Keep waiting</button>' +
+    '<button type="submit" class="btn bad" id="prelim-continue">Record exception and continue</button></div></form>';
+  dialog.showModal();
+  $('prelim-cancel').focus();
+  $('prelim-cancel').onclick = () => dialog.close();
+  $('prelim-exception').onsubmit = e => {
+    e.preventDefault();
+    act(path, {...body, override_reason:$('prelim-reason').value.trim(), review_token:review.review_token},
+      $('prelim-continue'), result => { dialog.close(); done?.(result); });
+  };
+}
+function currentClock(action) {
+  return DS?.clock.kind === 'round' ? {action, expected_round:DS.clock.round} : {action};
+}
+
+$('cstart').onclick = e => act('clock', currentClock('start'), e.currentTarget);
+$('cpause').onclick = e => act('clock', currentClock('pause'), e.currentTarget);
+$('cfinish').onclick = e => { if (confirm('Finish this finalist’s pitch and ask the panel to submit their sheets?')) act('clock', {action: 'finish'}, e.currentTarget); };
+$('cmode').onclick = e => {
+  const to = DS.mode === 'self' ? 'desk' : 'self';
+  const question = to === 'desk' ? 'Switch aligned, paused stations to one shared clock?' : 'Switch to independent station clocks? The shared clock must be paused.';
+  if (confirm(question)) act('mode', {mode: to}, e.currentTarget);
+};
+$('creset').onclick = e => {
+  if (confirm(DS.clock.kind === 'final' ? 'Reset the finalist’s clock to 8:00?' : 'Reset the round clock to 0:00?')) act('clock', currentClock('reset'), e.currentTarget);
+};
+
+function el() {
+  return DS ? DS.clock.elapsed + (DS.clock.running ? (Date.now() - recv) / 1000 : 0) : 0;
+}
+function tickClock() {
+  if (!active || !DS) return;
+  if (DS.mode === 'self') document.querySelectorAll('[data-sc]').forEach(n => {
+    const station = DS.stations.find(s => s.station === +n.dataset.sc);
+    if (station) n.textContent = stxt(station);
+  });
+  const c = DS.clock;
+  if (c.kind === 'final') {
+    const final = KEV.finalClock(c, (Date.now() - recv) / 1000);
+    $('htt').textContent = final.time;
+    $('hph').textContent = ['review','completed'].includes(KEV.finalStatus(DS.final)) ? KEV.finalLabel(DS.final) : final.label;
+    return;
+  }
+  const phase = sphase(c), idle = !c.started_any && !c.running;
+  $('htt').textContent = idle ? '--:--' : phase.txt;
+  $('hph').textContent = idle ? 'Clock not started' : (c.running ? '' : 'Paused · ') + phase.ph;
+}
+
+function draw(force) {
+  if (!DS) return;
+  const final = DS.clock.kind === 'final', self = DS.mode === 'self' && !final;
+  $('head').hidden = dashboard === 'organizer' || (dashboard === 'scoring' && !['run','final'].includes(tab));
+  $('hr').textContent = final ? 'Stage final' : self ? 'Judge-paced' : 'Round ' + DS.clock.round;
+  $('creset').textContent = final ? 'Reset final clock' : 'Reset round clock';
+  $('cstart').textContent = final ? 'Start final clock' : 'Start';
+  $('cmode').hidden = final;
+  if ($('cmode').closest('.judging-clock-tools')) $('cmode').closest('.judging-clock-tools').hidden =
+    final && ['review','completed'].includes(KEV.finalStatus(DS.final));
+  $('cmode').textContent = self ? 'Switch to Desk clock' : 'Switch to judge-paced';
+  $('htt').hidden = $('hph').hidden = $('creset').hidden = self;
+  $('cstart').hidden = self || DS.clock.running || (final && DS.clock.ended);
+  $('cpause').hidden = self || !DS.clock.running;
+  $('cfinish').hidden = !final || KEV.finalStatus(DS.final) !== 'pitch';
+  if (final && ['review','completed'].includes(KEV.finalStatus(DS.final))) { $('cstart').hidden = $('cpause').hidden = $('creset').hidden = $('htt').hidden = true; }
+  KEV.stamp(DS.versions);
+  tickClock();
+  if (tab === 'home') { $('head').hidden=true; vHome(); return; }
+  if (tab === 'display') {
+    if (!$('present-frame')) vDisplay();
+    updateDisplay();
+    return;
+  }
+  if (tab === 'quiz') {
+    window.EventQuiz?.desk($('main'), get, post, quizEditor);
+    return;
+  }
+  if (tab === 'audience') {
+    window.AudienceQuestions?.desk($('main'), (path, signal) => KEV.api(path, {signal}, KEV.staff.token),
+      (path, body, signal) => KEV.api(path, {body, signal}, KEV.staff.token));
+    return;
+  }
+  if (tab === 'messages' || tab === 'attendees') {
+    if (!$('participant-tools')) vParticipantWorkspace();
+    if (tab === 'messages') updateMessages();
+    return;
+  }
+  if (tab === 'participants') return;
+  const stations = DS.stations.map(s => [s.station, s.pair, s.info, s.submitted, s.score, s.ticks_live, s.asked, s.clock.running, s.clock.ended, s.clock.phase, s.clock.round, s.judge, s.seen === null ? null : s.seen < 8]);
+  const data = {run: [DS.mode, DS.clock.kind, DS.clock.round, DS.clock.phase, stations, DS.preliminary], scores: [SC?.leaderboard, SC?.flags, summary, DS.preliminary], final: [SC?.final_state, SC?.leaderboard, SC?.final, DS.preliminary], calib: [DS.calib, calib]};
+  const sig = tab + JSON.stringify(data[tab]);
+  if (!force && sig === lastSig) return;
+  if (!force && document.activeElement?.closest('#main') && document.activeElement.matches('input, textarea, select')) return;
+  lastSig = sig;
+  const restore = KEV.focusedControl($('main'));
+  ({run: vRun, scores: vScores, final: vFinal, calib: vCalib})[tab]();
+  restore();
+}
+function vParticipantWorkspace() {
+  const messages = tab === 'messages';
+  const tools = Object.entries(PARTICIPANT_VIEWS).filter(([, view]) => view[2] === tab);
+  $('main').innerHTML = '<nav class="ops-subnav" aria-label="'+(messages ? 'Message tools' : 'Attendee support tools')+'">' +
+    tools.map(([key, [label]]) => '<button type="button" class="btn ghost" data-participant-view="'+key+'">'+label+'</button>').join('') +
+    '</nav><div id="participant-tools"></div>' + (messages ?
+      '<div id="message-composer"><p id="display-status" class="small" role="status"></p>'+messageComposer(true)+'</div><div id="participant-ops-delivery" hidden></div>' :
+      '<div id="participant-ops-help" hidden></div>');
+  if (messages) bindMessageComposer();
+  $('main').querySelectorAll('[data-participant-view]').forEach(button => {
+    button.onclick = () => showParticipantView(button.dataset.participantView, true);
+  });
+  showParticipantView(participantView, false);
+}
+
+function showParticipantView(view, updateURL) {
+  participantView = view;
+  const tools = $('participant-tools');
+  tools.hidden = view !== 'updates' && view !== 'nominations';
+  tools.dataset.view = view;
+  tools.querySelectorAll('[data-participant-panel]').forEach(panel => panel.hidden = panel.dataset.participantPanel !== view);
+  if ($('message-composer')) $('message-composer').hidden = view !== 'compose';
+  for (const area of ['help','delivery']) {
+    const host = $('participant-ops-'+area);
+    if (!host) continue;
+    host.hidden = area !== view;
+    if (!host.hidden) KEV.operations?.mount(host, false, area);
+  }
+  $('main').querySelectorAll('[data-participant-view]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.participantView === view));
+  });
+  if (updateURL) history.replaceState(null, '', '#'+PARTICIPANT_VIEWS[view][1]);
+}
+
+function vHome() {
+ const pr=DS.program || {}, items=dashboard === 'organizer' ? (DS.agenda || C?.agenda || []) : (C?.agenda || DS.agenda || []), current=items[pr.i || 0], next=items[(pr.i || 0)+1];
+ const submitted=DS.stations.filter(s=>s.submitted).length, assigned=DS.stations.filter(s=>s.pair!=null).length;
+ const signature=JSON.stringify([pr.i,pr.announce,current,next,DS.room,submitted,assigned,DS.calib?.active,DS.counts?.calib,DS.clock?.kind,DS.clock?.round,DS.final?.status,DS.stations.map(s=>[s.clock.running,s.seen==null?false:s.seen<8])]);
+ if($('desk-home') && signature===lastSig)return;
+ if ($('operations-home')?.contains(document.activeElement)) return;
+ lastSig=signature;const restore=KEV.focusedControl($('main'));const operationsHost=$('operations-home');
+ if (dashboard === 'organizer') {
+   const roomLabels={info:'Programme',prep:'Prep countdown',pitch:'Pitch rounds',scores:'Scores',
+     quiz:'Quiz',audience:'Audience question',final:'Final',awards:'Awards',message:'Message'};
+   const room=DS.room || {};
+   const prepare=[
+     ['quiz-editor','Question editor','Edit quiz questions and preview the phone layout.'],
+     ['audience','Prepare a poll','Create unscored questions and save them as a draft.'],
+     ['participant-nominations','Customer nominations','Check the submission window and export responses.']
+   ];
+   const operate=[
+     ['quiz','Run quiz','Send a scored question and track answers.'],
+     ['participant-help','Help inbox','Claim requests and send private replies.'],
+     ['participant-delivery','Notification delivery','Review delivery status and test enrolled devices.']
+   ];
+   const tasks = (title, actions) => '<section class="ops-task-group"><h2>'+title+'</h2><div class="ops-task-list">'+actions.map(([key,label,detail])=>
+     '<button type="button" data-home-tab="'+key+'"><strong>'+label+'</strong><span>'+detail+'</span></button>').join('')+'</div></section>';
+   $('main').innerHTML='<div id="desk-home"><div class="ops-overview">'+
+     '<section class="ops-overview-current"><div class="ops-kicker-line"><p class="ops-eyebrow">Current cue</p>'+
+     (current?.time ? '<time>'+KEV.esc(current.time)+' event time</time>' : '')+'</div><h2>'+KEV.esc(current?.title || 'Ready for the event')+'</h2>'+
+     '<p class="ops-next">'+(next ? '<span>Up next · '+KEV.esc(next.time || '')+'</span><strong>'+KEV.esc(next.title)+'</strong>' : 'Last programme cue')+'</p>'+
+     '<div class="row"><button type="button" class="btn" data-home-tab="display">Open run of show</button><button type="button" class="btn ghost" data-home-tab="messages">Send a message</button></div></section>'+
+     '<section class="ops-overview-screen"><p class="ops-eyebrow">On the room screen</p><h2>'+KEV.esc(roomLabels[room.scene] || 'Waiting for room status')+'</h2>'+
+     (room.title ? '<p>'+KEV.esc(room.title)+'</p>' : '')+
+     '<p class="ops-eyebrow">Latest phone message</p><p>'+KEV.esc(pr.announce || 'No active phone message')+'</p></section></div>'+
+     '<div class="ops-task-grid">'+tasks('During the event',operate)+tasks('Prepare for the next cue',prepare)+'</div></div>';
+   if (operationsHost) $('desk-home').append(operationsHost);
+   else $('desk-home').insertAdjacentHTML('beforeend','<div id="operations-home"></div>');
+   KEV.operations?.mount($('operations-home'), false, 'readiness');
+   $('main').querySelectorAll('[data-home-tab]').forEach(button=>button.onclick=()=>select(button.dataset.homeTab,true));
+   restore();
+   return;
+ }
+ if (dashboard === 'scoring') {
+   const connected=DS.stations.filter(s=>s.seen!=null && s.seen<8).length;
+   const primary=DS.calib.active ? ['calib','Check practice sheets'] : DS.clock.kind === 'final' ?
+     ['final','Open Final'] : ['run','Open stations'];
+   $('main').innerHTML='<div id="desk-home"><section class="role-hero"><p class="role-kicker">Scoring Desk</p><h2>'+
+     KEV.esc(DS.calib.active ? 'Calibration in progress' : DS.clock.kind === 'final' ? KEV.finalLabel(DS.final) :
+       DS.mode === 'self' ? 'Judge-paced sessions' : 'Preliminary round '+DS.clock.round)+'</h2><p>'+
+     KEV.esc(current ? 'Current programme cue · '+current.title : 'Check the stations before the next team.')+
+     '</p><button type="button" class="btn" data-home-tab="'+primary[0]+'">'+primary[1]+'</button></section>'+
+     '<div class="role-metrics"><div><b>'+connected+' / '+DS.stations.length+'</b><span>Judging devices checked in</span></div>'+
+     '<div><b>'+submitted+' / '+assigned+'</b><span>Current sheets accepted</span></div>'+
+     '<div><b>'+DS.counts.calib+'</b><span>Practice sheets received</span></div></div>'+
+     '<section class="role-card judging-readiness"><h2>Before the first pitch</h2><ul><li>Confirm each judge has signed in at the assigned station.</li>'+
+     '<li>Choose the clock mode with the timekeeper. Use the shared clock for simultaneous rounds.</li>'+
+     '<li>Ask judges to send a practice sheet and compare it with the calibration key.</li></ul>'+
+     '<button class="btn alt" type="button" data-home-tab="calib">Open calibration</button></section></div>';
+   $('main').querySelectorAll('[data-home-tab]').forEach(button=>button.onclick=()=>select(button.dataset.homeTab,true));
+   restore();
+   return;
+ }
+ const links=[['run','Judging stations','Timers, assignments and incoming sheets'],['display','Programme & announcements','Set the current section and update the room'],['quiz','Event quiz','Send questions and review participation'],['audience','Audience questions','Send optional questions and review responses'],['participants','Participant updates','Release feedback, post news and review nominations'],['final','The Final','Finalists, stage order and result release'],['scores','Scores & review','Review submitted sheets and scoring flags']];
+ $('main').innerHTML='<div id="desk-home"><section class="role-hero"><p class="role-kicker">'+(dashboard === 'scoring' ? 'Scoring Desk · Judging operations' : 'Organizer · Event operations')+'</p><h2>'+KEV.esc(current?.title || 'Ready for the event')+'</h2><p>'+KEV.esc(current?.line || 'Keep the programme aligned with the host. Send questions and updates when the room is ready.')+'</p><button type="button" class="btn" data-home-tab="'+(dashboard === 'scoring' ? 'run' : 'display')+'">Manage current session</button><p class="role-next">'+KEV.esc(next?'Up next · '+next.time+' · '+next.title:'Follow the host for closing instructions.')+'</p></section>'+
+ (pr.announce?'<section class="role-announcement"><p class="role-kicker">Current Desk announcement</p><p>'+KEV.esc(pr.announce)+'</p></section>':'')+
+ '<div class="role-metrics"><div><b>'+submitted+' / '+assigned+'</b><span>Current sheets received</span></div><div><b>'+DS.stations.filter(s=>s.clock.running).length+'</b><span>Timers running</span></div><div><b>'+DS.stations.filter(s=>s.seen!=null && s.seen<8).length+' / '+DS.stations.length+'</b><span>Stations connected</span></div></div><section class="role-action-grid" aria-label="Event actions">'+links.filter(([key])=>Object.hasOwn(TABS,key)).map(([key,title,detail])=>'<button type="button" data-home-tab="'+key+'"><strong>'+title+'</strong><span>'+detail+'</span></button>').join('')+'</section></div>';
+ if(operationsHost)$('desk-home').append(operationsHost);else $('desk-home').insertAdjacentHTML('beforeend','<div id="operations-home"></div>');KEV.operations?.mount($('operations-home'));
+ $('main').querySelectorAll('[data-home-tab]').forEach(button=>button.onclick=()=>select(button.dataset.homeTab,true));restore();
+}
+// ───────── Run ─────────
+function sphase(c) {
+  const e = c.elapsed + (c.running ? (Date.now() - recv) / 1000 : 0);
+  const ph = e < 600 ? 'Pitch' : e < 780 ? 'Feedback' : e < 900 ? 'Change over' : 'Over time';
+  const left = e < 600 ? 600 - e : e < 780 ? 780 - e : e < 900 ? 900 - e : e - 900;
+  return {e, ph, txt: KEV.mmss(left) + (e >= 900 ? ' over' : '')};
+}
+function stxt(s) {
+  const sp = sphase(s.clock), idle = !s.clock.started_any && !s.clock.running;
+  return idle ? 'Not started' : s.clock.ended ? 'Ended' : (s.clock.running ? '' : 'Paused · ') + sp.ph + ' ' + sp.txt;
+}
+function vRun() {
+  const d = DS, c = d.clock, self = d.mode === 'self';
+  if (c.kind === 'final') {
+    $('main').innerHTML = '<div class="card"><h2>' + KEV.esc(KEV.finalLabel(d.final)) +
+      '</h2><p class="mut">The Final is on stage. Run its clock and collect ballots from Final.</p><button class="btn alt" id="go-final">Open Final</button></div>';
+    $('go-final').onclick = () => select('final', true);
+    return;
+  }
+  const phase = sphase(c);
+  const openControls = new Set([...$('main').querySelectorAll('details[open]')].map(el => el.id));
+  const open = id => openControls.has(id) ? ' open' : '';
+  const preliminary = d.preliminary || [];
+  const assigned = d.stations.filter(s => s.pair != null);
+  const rounds = d.config?.rounds || d.rounds || Math.ceil(d.pairs/d.stations.length);
+  const rows = d.stations.map(s => {
+    const receipt = preliminary.find(r => r.station === s.station && r.round === s.clock.round && r.pair === s.pair);
+    const fresh = s.seen != null && s.seen < 8;
+    const waiting = (self ? sphase(s.clock) : phase).e >= 780 || s.clock.ended;
+    const label = s.pair == null ? 'No team assigned' : s.submitted ? (dashboard === 'scoring' ? 'Accepted' : 'Submitted') : receipt?.exception ?
+      'Desk exception recorded' : waiting ? 'Sheet outstanding' : fresh ? 'Waiting for sheet' : 'Judge not connected';
+    return {s, receipt, fresh, waiting, label};
+  });
+  const missing = rows.filter(({s, receipt}) => s.pair != null && !s.submitted && !receipt?.exception);
+  const blocked = !self && c.running && phase.e < 780;
+  const title = self ? 'Independent station clocks' : 'Round ' + c.round + ' of ' + rounds;
+  const nextAction = self ? 'Each station runs its own clock. Check incoming sheets at changeover.' : blocked ?
+    'The round is running. Collect sheets during feedback.' : missing.length ?
+    'Collect the remaining sheets before changing rounds.' : 'All current assignments are accounted for.';
+  let h = '<section class="judging-board-head"><div><p class="role-kicker">Preliminary rounds</p><h2>' + title + '</h2><p>' + nextAction + '</p></div>' +
+    '<div class="judging-receipt-total"><strong>' + d.counts.round + ' / ' + assigned.length + '</strong><span>Accepted sheets</span></div>';
+  if (!self && c.round < rounds) h += '<button class="btn" id="nx"' + (blocked ? ' disabled' : '') + '>' +
+    (missing.length ? 'Review outstanding sheets' : 'Next round →') + '</button>';
+  h += '</section>';
+  if (!self) {
+    h += '<details class="card judging-tools" id="round-recovery"' + open('round-recovery') +
+      '><summary>Round navigation &amp; clock tools</summary><p class="small mut">10 min pitch · 3 min feedback · 2 min changeover</p><div class="row">' +
+      Array.from({length: rounds}, (_, i) => i + 1).map(round => '<button class="btn ghost sm" data-r="' + round +
+        '" aria-pressed="' + (round === c.round) + '">' + 'Round ' + round + '</button>').join('') +
+      '</div><div class="row"><button class="btn ghost sm" id="cend">End this round</button>' +
+      (KEV.workspaceMode === 'rehearsal' || !KEV.staff.hosted ?
+        '<button class="btn ghost sm" id="sk">Jump to 9:55</button><button class="btn ghost sm" id="sk2">Jump to 12:55</button>' : '') +
+      '</div></details>';
+  }
+  h += '<section class="judging-stations grid" aria-label="Stations">' + rows.map(({s, receipt, fresh, waiting, label}) => {
+    const info = s.info || {};
+    const tools = 'station-controls-' + s.station;
+    const idle = !s.clock.started_any && !s.clock.running;
+    const tone = s.submitted || receipt?.exception ? 'ok' : s.pair != null && waiting ? 'warn' : 'gray';
+    return '<article class="judging-station card st"><div class="row"><h3 class="grow">Station ' + s.station +
+      '</h3><span class="pill ' + tone + '">' + label + '</span></div>' +
+      (s.pair == null ? '<p class="mut">No team in this round.</p>' :
+        '<p class="judging-team">Team ' + s.pair + ' · ' + KEV.esc(info.partner || s.scenario) + '</p><p class="small mut">' +
+        KEV.esc(KEV.members(info)) + '</p>') +
+      (self ? '<p class="judging-station-clock">Round ' + s.clock.round + ' · <b data-sc="' + s.station + '">' + stxt(s) + '</b></p>' : '') +
+      '<p class="small mut">' + (s.judge ? KEV.esc(s.judge) + ' · ' : '') +
+      (s.seen == null ? 'No device check-in yet' : fresh ? 'Device checked in' : 'Last device check-in ' + Math.round(s.seen) + 's ago') + '</p>' +
+      (s.submitted ? '<span class="small">Score ' + s.score + ' pts</span>' : '') +
+      (receipt?.exception && !s.submitted ? '<p class="small mut">' + KEV.esc(receipt.exception.reason) + '</p>' : '') +
+      (self ? '<details class="section-tools station-controls" id="' + tools + '"' + open(tools) + '><summary>Station controls &amp; recovery</summary><div class="row">' +
+        (s.clock.running ? '<button class="btn ghost sm" data-sa="pause">Pause</button>' :
+          '<button class="btn ghost sm" data-sa="start">' + (idle ? 'Start' : 'Resume') + '</button>') +
+        '<button class="btn ghost sm" data-sa="finish">End session</button>' +
+        (s.clock.round < rounds ? '<button class="btn alt sm" data-sa="next">' +
+          (s.submitted || receipt?.exception || s.pair == null ? 'Next team' : 'Review sheet') + '</button>' : '') +
+        '</div><label class="field">Align to round<select data-st-round>' +
+        Array.from({length: rounds}, (_,i) => '<option value="' + (i+1) + '"' + (i+1 === s.clock.round ? ' selected':'') + '>' + (i+1) + '</option>').join('') +
+        '</select></label><button class="btn ghost sm" data-sa="goto">Change station round</button></details>' : '') + '</article>';
+  }).join('') + '</section>';
+  $('main').innerHTML = h;
+  $('main').querySelectorAll('[data-r]').forEach(button => button.onclick = () =>
+    act('clock', {action:'goto', round:+button.dataset.r, expected_round:c.round}, button));
+  d.stations.forEach(s => {
+    const controls = $('station-controls-' + s.station);
+    controls?.querySelectorAll('[data-sa]').forEach(button => button.onclick = () => {
+      const action = button.dataset.sa;
+      const body = {action, station:s.station, expected_round:s.clock.round};
+      if (action === 'goto') body.round = Number(controls.querySelector('[data-st-round]').value);
+      act('clock', body, button);
+    });
+  });
+  if (!self) {
+    if ($('nx')) $('nx').onclick = () => act('clock', {action:'next', expected_round:c.round}, $('nx'));
+    $('cend').onclick = () => { if (confirm('End the clock for this round? Judges can still submit their sheets.')) act('clock', {action:'finish', expected_round:c.round}, $('cend')); };
+    if ($('sk')) $('sk').onclick = () => act('clock', {action:'seek', elapsed:595, expected_round:c.round}, $('sk'));
+    if ($('sk2')) $('sk2').onclick = () => act('clock', {action:'seek', elapsed:775, expected_round:c.round}, $('sk2'));
+  }
+}
+
+// ───────── Scores ─────────
+function vScores() {
+  if (!SC) return; const lb = SC.leaderboard;
+  const pending = (DS.preliminary || []).filter(r => r.registered && !r.accepted);
+  const outstanding = pending.filter(r => !r.exception);
+  const receipts = dashboard !== 'scoring' || !pending.length ? '' :
+    '<details class="card judging-tools"><summary>' + outstanding.length + ' outstanding · ' +
+    (pending.length - outstanding.length) + ' Desk exceptions</summary><ul>' + pending.map(r =>
+      '<li>Round ' + r.round + ' · Station ' + r.station + ' · Team ' + r.pair +
+      (r.exception ? ' · ' + KEV.esc(r.exception.reason) : ' · Waiting for sheet') + '</li>').join('') + '</ul></details>';
+  const scoreTitle = dashboard === 'scoring' ? 'Score review' : 'Leaderboard';
+  let h = receipts + '<div class="card"><h2>' + scoreTitle + ' · ' + lb.length + ' accepted sheets</h2>' +
+    '<p class="small mut">Total = ticks × 10 + AI tick × 2 + badge bonus. Equal totals break on the 1–5 overall impression and confidence rating, then Solve and Discover.</p></div>';
+  h += '<div class="card table-scroll"><table><tr><th class="n">#</th><th>Team</th><th>Partner</th><th class="n">Rd</th><th class="n">St</th><th class="n">Disc</th><th class="n">solution device</th><th class="n">Solve</th><th class="n">Close</th><th class="n">Impression</th><th class="n">AI</th><th class="n">Badge</th><th class="n">Total</th><th></th></tr>' +
+    lb.map(r => '<tr><td class="n">' + r.rank + '</td><td>' + r.pair + '</td><td>' + KEV.esc(r.partner) + '<div class="small mut">' + KEV.esc(KEV.members(r)) + '</div></td><td class="n">' + r.round + '</td><td class="n">' + r.station + '</td>' +
+      r.groups.map(g => '<td class="n">' + g + '</td>').join('') + '<td class="n">' + (r.wrap_rating || '–') + ' / 5</td><td class="n">' + (r.ai ? '+2' : '') + '</td><td class="n">' + (r.badge || '') + '</td><td class="n"><b>' + r.total + '</b>' + (r.tie ? ' <span class="tie" title="Level on total, impression, Solve and Discover: the panel decides">tie</span>' : '') +
+      '</td><td><button class="btn ghost sm" data-ed="' + r.sheet + '">Edit</button></td></tr>').join('') + '</table></div>';
+  if (SC.flags.length) h += '<div class="card"><h3>Checks</h3>' + SC.flags.map(f => '<div class="flag ' + f.level + '">' + KEV.esc(f.text) + (f.sheet ? ' <button class="btn ghost sm" data-ed="' + f.sheet + '">Open</button>' : '') + '</div>').join('') + '</div>';
+  $('main').innerHTML = h + '<section class="card"><h2>Awards debrief</h2><p class="small mut">Draft a summary from the event’s aggregate rubric counts.</p>' +
+    '<div class="row"><button class="btn alt" id="sum">Draft debrief</button><span id="sums" role="status"></span></div><pre class="sum" id="sumt">' + KEV.esc(summary) + '</pre></section>';
+  if(dashboard==='scoring') { const section=document.createElement('section');section.className='card';section.innerHTML='<h2>Audience score release</h2><p>Choose when preliminary scores appear on the hall display. Publish Final winners from the Final section.</p><button class="btn" data-release-public="live">Show preliminary scores</button> <button class="btn ghost" data-release-public="off">Hide preliminary scores</button>'; $('main').prepend(section);section.querySelectorAll('[data-release-public]').forEach(b=>b.onclick=()=>{if(confirm('Change audience score visibility?'))act('public',{mode:b.dataset.releasePublic},b);}); }
+  document.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => editSheet(+b.dataset.ed));
+  $('sum').onclick = async e => {
+    const button = e.currentTarget, status = $('sums');
+    button.disabled = true;
+    status.textContent = 'Drafting…';
+    try {
+      const result = await post('/api/desk/ai-summary');
+      summary = result.text;
+      if (tab === 'scores') {
+        $('sumt').textContent = summary;
+        $('sums').textContent = result.source === 'ai' ? 'Drafted by OpenAI-compatible AI service. Review before sharing.' : 'Drafted from a template.';
+      }
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  };
+}
+async function editSheet(id) {
+  let all;
+  try { all = (await get('/api/desk/sheets')).sheets; }
+  catch (e) { $('desk-status').textContent = e.message; return; }
+  const s = all.find(x => x.id === id);
+  if (!s) return;
+  const T = C.rubric.flatMap(g => g.ticks);
+  const ratingKey=s.kind==='final'?'final_rating':'wrap_rating', ratingLabel=s.kind==='final'?'Final score':'Overall impression and confidence';
+  $('mbody').innerHTML = '<h2 id="sheet-title">Station ' + s.station + ' · team ' + s.pair + '</h2><p class="small mut">Judge: ' + KEV.esc(s.judge) + '. Changes are logged.</p>' +
+    (s.kind==='final'?'':'<div class="tg">' + T.map((t, i) => '<label title="' + KEV.esc(t.short) + '"><input type="checkbox" ' + (s.ticks[i] ? 'checked' : '') + ' data-k="' + i + '"><span>' + t.id + '</span></label>').join('') + '</div><label class="chk"><input type="checkbox" id="eai" ' + (s.ai ? 'checked' : '') + '> AI bonus tick</label>') +
+    '<label class="field" for="erating">'+ratingLabel+'<select id="erating">'+[1,2,3,4,5].map(n=>'<option value="'+n+'"'+(s[ratingKey]===n?' selected':'')+'>'+n+' / 5</option>').join('')+'</select></label>' +
+    '<h3>Judge notes</h3><p class="small">' + KEV.esc(s.notes || '–') + '</p><h3>Feedback</h3><p class="small">' + KEV.esc(s.feedback || '–') + '</p>' +
+    '<label class="field">Reason for this change<input id="edit-reason" maxlength="300" required></label>' +
+    '<p id="sheet-status" role="alert"></p><div class="row"><button class="btn" id="esv">Save</button><button class="btn bad" id="evd">Void sheet</button><button class="btn ghost" id="ecl">Close</button></div>';
+  const dialog = $('modal');
+  dialog.showModal();
+  $('ecl').onclick = () => dialog.close();
+  $('esv').onclick = e => {
+    const ticks = s.kind==='final' ? s.ticks : Array.from(dialog.querySelectorAll('.tg input'), c => c.checked ? 1 : 0);
+    act('sheet', {id, action: 'ticks', why: $('edit-reason').value, ticks, ai: s.kind==='final'?s.ai:($('eai').checked ? 1 : 0),[ratingKey]:+$('erating').value}, e.currentTarget, () => dialog.close());
+  };
+  $('evd').onclick = e => {
+    if (confirm('Void this sheet? The judge can submit again.')) act('sheet', {id, action: 'void', why: $('edit-reason').value}, e.currentTarget, () => dialog.close());
+  };
+}
+
+// ───────── Final ─────────
+function vFinal() {
+  if (!SC) return;
+  const f = SC.final_state, rows = SC.final || [], top = SC.leaderboard.slice(0, 3), phase = KEV.finalStatus(f), prepared = !phase || ['idle','prepared'].includes(phase);
+  const expected = f.expected_judges || f.panel?.length || DS.config?.judge_count || DS.stations.length;
+  const active = ['ready','pitch','collecting'].includes(phase), published = phase === 'completed' || f.published;
+  const currentTeam = f.pairs[f.current];
+  let h = '<section class="card"><div class="row"><h2 class="grow">Final control</h2><span class="pill" id="final-status">' + KEV.esc(KEV.finalLabel(f)) + '</span></div>' +
+    '<ol class="final-flow" aria-label="Final workflow">' + ['Prepare teams','Start pitch','Collect sheets','Review results','Publish winners'].map((label,i)=>'<li'+([prepared,active&&phase!=='collecting',phase==='collecting',phase==='review',published][i]?' aria-current="step"':'')+'>'+label+'</li>').join('') + '</ol>' +
+    '<p>Each finalist uses its original customer scenario. The Desk controls one eight-minute clock; every new finalist starts paused at 8:00.</p><p class="small mut">' + expected + ' judges are expected for each team. Wait for accepted sheets before moving on.</p>';
+  if (f.legacy_case_review_required) h += '<p class="error" role="alert">' + KEV.esc(f.legacy_case_warning) + '</p>';
+  if (prepared) {
+    const outstanding = (DS.preliminary || []).filter(r => r.registered && !r.accepted && !r.exception).length;
+    h += '<p class="small mut">' + (outstanding ? outstanding + ' preliminary sheets are outstanding. Starting the Final requires those sheets or a recorded exception.' :
+      'Preliminary score sheets are accounted for.') + '</p>';
+    h += '<h3>Qualifiers from the preliminary rounds</h3>' + (top.length ? top.map(r=>'<p class="small">#' + r.rank + ' · Team ' + r.pair + ' · ' + KEV.esc(r.partner) + ' · ' + r.total + ' points · impression ' + (r.wrap_rating||'–') + '/5' + (r.tie?' · Tie: panel review required':'')+'</p>').join('') : '<p class="mut">No preliminary scores yet.</p>') +
+      '<p class="small mut">The preliminary total ranks teams first; the 1–5 overall impression and confidence stars break tied totals. Exactly three teams advance.</p><label class="field" for="fp">Three finalist team numbers, in stage order</label><input type="text" id="fp" placeholder="For example: 7, 12, 21" value="' + KEV.esc(finalistDraft ?? (f.pairs.length ? f.pairs.join(', ') : top.map(r=>r.pair).join(', '))) + '">' +
+      '<fieldset class="final-panel"><legend>Final judging panel</legend>' + DS.stations.map(j=>'<label class="chk"><input type="checkbox" name="final-panel" value="' + j.station + '"' + ((f.panel?.length ? f.panel : DS.config?.final_panel || DS.stations.map(s=>s.station)).includes(j.station)?' checked':'') + '> ' + KEV.esc(j.judge || 'Judge '+j.station) + ' · Station ' + j.station + '</label>').join('') + '</fieldset><div class="row"><button class="btn alt" id="fset">Set finalists and panel</button><button class="btn" id="fgo"' + (!f.pairs.length?' disabled':'') + '>Open Final — ready at 8:00</button></div>';
+  } else if (active) {
+    h += '<h3>Finalist ' + (f.current + 1) + ' of ' + f.pairs.length + ' · Team ' + currentTeam + '</h3><p><strong>Original scenario:</strong> ' + KEV.esc(f.case_name || f.scenario || '') + '</p>' +
+      '<p class="small mut">' + (phase==='ready' ? 'Confirm the host, team and judges are ready, then Start final clock above.' : phase==='pitch' ? 'The team is pitching. At time, judges review and submit their own sheets.' : 'Collect the panel’s sheets and give the team feedback.') + '</p>';
+  } else h += '<p>' + (published ? 'The confirmed winners are published on both audience displays. Judge screens are parked.' : 'Confirm all sheets and resolve any remaining ties before publishing the winners.') + '</p>';
+  h += '</section>';
+  if (active) {
+    h += '<section class="card"><h3>Panel receipts · ' + (f.receipts || []).filter(r=>r.submitted).length + ' / ' + expected + '</h3><div class="receipt-grid">' + (f.receipts || []).map(r=>'<div class="receipt-item"><strong>' + KEV.esc(r.judge || 'Judge '+r.station) + '</strong><span class="small mut">Station ' + r.station + '</span><span class="pill ' + (r.submitted?'ok':r.waived?'warn':'gray') + '">' + (r.needs_rescore?'Needs original-case rescore':r.submitted?'Accepted':r.waived?'Exception recorded':'Waiting for sheet') + '</span><span class="small mut">' + (r.seen===null || r.seen===undefined?'Not connected':r.seen<8?'Connected':'Last seen '+Math.round(r.seen)+'s ago') + '</span></div>').join('') + '</div>' +
+      (DS.clock.running ? '<p class="small mut">Finish or pause the stage clock before advancing.</p>' : '') + '<div class="row section-tools"><button class="btn" id="fnext"' + (!f.complete || DS.clock.running || f.current + 1 >= f.pairs.length?' disabled':'') + '>Next team →</button><button class="btn alt" id="fstop"' + (!f.all_complete || DS.clock.running?' disabled':'') + '>Review results</button></div>' +
+      (!f.complete ? '<p class="small mut">Waiting for ' + (f.missing || []).map(x=>'Judge '+x).join(', ') + '. Delayed sheets can be recovered without moving the stage clock.</p>' : '') +
+      '<details class="section-tools"><summary>Stage navigation and exceptions</summary><p class="small mut">Returning to a team resets its stage clock to paused 8:00. Judges can use Review an earlier Final sheet for scoring corrections without changing the stage.</p><div class="row">' + f.pairs.map((p,i)=>'<button class="btn ghost sm" data-fi="'+i+'"'+(i===f.current || !f.complete?' disabled':'')+'>'+ (i+1)+'. Team '+p+'</button>').join('') + '</div>' +
+      (!f.complete || !f.all_complete ? '<form id="final-override" class="section-tools"><label class="field" for="override-action">Continue with missing sheets<select id="override-action"><option value="next">Next team</option><option value="stop">Review results</option></select></label><label class="field" for="override-reason">Reason for the panel exception<textarea id="override-reason" required minlength="10" maxlength="500"></textarea></label><p class="small mut">This records an exception for missing judges. Their late sheets can still be recovered before publication. Review the consequence before continuing.</p><button class="btn bad">Record exception and continue</button></form>' : '') + '</details></section>';
+  }
+  if (rows.length) h += '<section class="card table-scroll"><h3>' + (published?'Published results':'Final score review') + '</h3><p class="small mut">' + (published?'Published result snapshot.':'Each judge gives every finalist 1–5 stars. The average determines first, second and third place.') + '</p><table><thead><tr><th>Rank</th><th>Team</th><th>Company</th><th>Scores accepted</th><th>Average / 5</th></tr></thead><tbody>' + rows.map(r=>'<tr><td>'+(r.tie?'Tie':r.rank)+'</td><td>'+r.pair+'</td><td>'+KEV.esc(r.partner)+'</td><td>'+r.judges+' / '+(r.expected||expected)+(r.complete?' ✓':' · Pending')+'</td><td>'+r.final_rating+(r.tie?' · Panel decision needed':'')+'</td></tr>').join('')+'</tbody></table></section>';
+  if (phase === 'review') {
+    h += '<section class="card"><h3>Confirm and publish</h3>' + (!f.all_complete?'<p class="error">Some teams still need accepted sheets or a recorded panel exception.</p>':'<p>All required sheets are accounted for.</p>') +
+      (f.unresolved_ties?.length ? '<form id="final-ties"><p class="error">Unresolved ties: ' + f.unresolved_ties.map(g=>g.map(p=>'Team '+p).join(' / ')).join('; ') + '</p><label class="field" for="tie-order">Panel’s final ranking — all finalist team numbers<input id="tie-order" required value="' + rows.map(r=>r.pair).join(', ') + '"></label><label class="field" for="tie-reason">Panel decision and reason<textarea id="tie-reason" required minlength="10" maxlength="500"></textarea></label><button class="btn alt">Record panel decision</button></form>' : '') +
+      '<p>Publishing shows the confirmed podium on Live and the room board and locks the result snapshot.</p><button class="btn" id="fpublish"' + (!f.can_publish?' disabled':'') + '>Publish confirmed winners</button></section>';
+  }
+  if (published) h += '<details class="card"><summary>Correct a published result</summary><form id="final-reopen"><p>Reopening hides the public podium and returns to review. Judges can recover and resubmit earlier sheets. Publish again only after review.</p><label class="field" for="reopen-reason">Reason for reopening<textarea id="reopen-reason" required minlength="10" maxlength="500"></textarea></label><button class="btn bad">Reopen results for correction</button></form></details>';
+  $('main').innerHTML = h;
+  if ($('fp')) $('fp').oninput=e=>{finalistDraft=e.target.value;};
+  if ($('fset')) $('fset').onclick=e=>act('final',{action:'set',pairs:$('fp').value.split(/[ ,]+/).filter(Boolean).map(Number),panel:[...document.querySelectorAll('[name="final-panel"]:checked')].map(x=>+x.value)},e.currentTarget,()=>{finalistDraft=null;});
+  if ($('fgo')) $('fgo').onclick=e=>act('final',{action:'start'},e.currentTarget);
+  if ($('fnext')) $('fnext').onclick=e=>act('final',{action:'next'},e.currentTarget);
+  if ($('fstop')) $('fstop').onclick=e=>act('final',{action:'stop'},e.currentTarget);
+  document.querySelectorAll('[data-fi]').forEach(b=>b.onclick=()=>{if(confirm('Select Team '+f.pairs[+b.dataset.fi]+' and reset its stage clock to paused 8:00?'))act('final',{action:'goto',index:+b.dataset.fi},b);});
+  if ($('final-override')) $('final-override').onsubmit=e=>{e.preventDefault();const action=$('override-action').value,reason=$('override-reason').value.trim();if(reason.length<10)return;if(confirm('Record the missing-sheet exception and '+(action==='stop'?'review results':'move to the next team')+'?'))act('final',{action,override_reason:reason},e.submitter);};
+  if ($('final-ties')) $('final-ties').onsubmit=e=>{e.preventDefault();act('final',{action:'resolve',order:$('tie-order').value.split(/[ ,]+/).filter(Boolean).map(Number),reason:$('tie-reason').value.trim()},e.submitter);};
+  if ($('fpublish')) $('fpublish').onclick=e=>{if(confirm('Publish the confirmed Final winners to the audience now?'))act('final',{action:'publish',confirm:'PUBLISH'},e.currentTarget);};
+  if ($('final-reopen')) $('final-reopen').onsubmit=e=>{e.preventDefault();if(confirm('Hide the published winners and reopen score review?'))act('final',{action:'reopen',reason:$('reopen-reason').value.trim()},e.submitter);};
+}
+
+// ───────── Calibration ─────────
+function vCalib() {
+  const on = DS.calib.active; let h = '<div class="card"><h2>Calibration with the mock pitch</h2><p class="small mut">Judges open their station page, read the Desert Rose Travel mock pitch and tick the 10 items. Use it for the 11:00 calibration on the day and for the rehearsal. Aim for within 2 items of the key.</p>' +
+    '<button class="btn ' + (on ? 'bad' : '') + '" id="ct">' + (on ? 'End calibration (judges return to the real round)' : 'Start calibration') + '</button></div>';
+  if (calib && calib.rows.length) {
+    const ids = calib.ids;
+    h += '<div class="card table-scroll"><table><tr><th>Station</th><th>Judge</th>' + ids.map(i => '<th class="n">' + i + '</th>').join('') + '<th class="n">Off by</th></tr>' +
+      '<tr><td colspan="2"><i>Answer key</i></td>' + calib.key.map(k => '<td class="n">' + (k ? '✓' : '·') + '</td>').join('') + '<td></td></tr>' +
+      calib.rows.map(r => '<tr><td>' + r.station + '</td><td>' + KEV.esc(r.judge) + '</td>' + r.ticks.map((t, i) => '<td class="n" style="' + ((t ? 1 : 0) !== calib.key[i] ? 'background:var(--bad2);color:var(--bad);font-weight:700' : '') + '">' + (t ? '✓' : '·') + '</td>').join('') + '<td class="n"><b>' + r.off + '</b></td></tr>').join('') + '</table>' +
+      '<h3 style="margin-top:12px">Why the key says what it says</h3>' + ids.filter(i => true).map(i => '<div class="small"><b>' + i + '</b> ' + (C.mock.key[i].earned ? '✓ ' : '✗ ') + KEV.esc(C.mock.key[i].why) + '</div>').join('') + '</div>';
+  } else h += '<div class="card mut">No calibration sheets yet.</div>';
+  $('main').innerHTML = h;
+  $('ct').onclick = async () => { act('calib', {active: !on}, $('ct')); };
+}
+
+// Live View link and preview choices are browser preferences. They are never
+// used to decide what a link is authorized to reveal.
+const SCENES = {
+  info: 'Instructions', prep: 'Prep countdown', pitch: 'Pitch phase',
+  scores: 'Scores', final: 'Final', awards: 'Winners', message: 'Message only'
+};
+const DISPLAY_CHOICES = [
+  ['pub', {live: 'Show scores', off: 'Hide scores'}],
+  ['rev', {hidden: 'Keep podium hidden', top3: 'Reveal top three', winners: 'Review and publish winners'}]
+];
+const savedPreview = localStorage.getItem('kevenos:desk:preview');
+let previewOpen = savedPreview === null ? dashboard === 'organizer' && typeof matchMedia === 'function' && matchMedia('(min-width: 1050px)').matches : savedPreview === '1';
+let presenterNamed = localStorage.getItem('kevenos:desk:show-names') === '1';
+
+function presenterURL(path = '/live', embed = false) {
+  const url = new URL(path, location.origin);
+  const key = presenterNamed ? DS.view_key : DS.anonymous_view_key;
+  if (key) url.searchParams.set('key', key);
+  if (!presenterNamed) url.searchParams.set('names', '0');
+  if (embed) url.searchParams.set('embed', '1');
+  return url.href;
+}
+
+function updatePresenter() {
+  $('present-open').href = presenterURL();
+  $('present-board').href = presenterURL('/board');
+  $('present-name-state').textContent = presenterNamed ? 'Names shown' : 'Names hidden';
+  $('present-link').value = presenterURL();
+  $('present-toggle').setAttribute('aria-expanded', String(previewOpen));
+  $('present-toggle').textContent = previewOpen ? 'Close preview' : 'Preview presenter screen';
+  const frame = $('present-frame');
+  frame.hidden = !previewOpen;
+  if (!previewOpen) frame.removeAttribute('src');
+  else if (frame.src !== presenterURL('/live', true)) frame.src = presenterURL('/live', true);
+}
+
+function choices(kind, values) {
+  return Object.entries(values).map(([key, label]) => '<button class="btn ghost sm" data-' + kind + '="' + key + '" aria-pressed="false">' + label + '</button>').join('');
+}
+
+function messageComposer(organizer) {
+  const fields = [
+    {style:'room', title:'Room banner', details:'Show a short instruction on the projector.', form:'room-form',
+      status:'room-active-message', input:'droom', label:'Room screen message', send:'droomshow', clear:'droomclear',
+      submit:'Show on room screen', remove:'Clear room message'},
+    {style:'phones', title:'Phone announcement', details:'Send a time-sensitive announcement to signed-in participants.', form:'announce-form',
+      status:'phone-active-message', input:'dann', label:'Participant phone message', send:'dsend', clear:'dclr',
+      submit:'Send to phones', remove:'Clear phone message'}
+  ];
+  const cards = fields.map(field => {
+    const input = organizer ? '<textarea id="'+field.input+'" maxlength="200" rows="3" required></textarea>' :
+      '<input type="text" id="'+field.input+'" maxlength="200">';
+    const phoneOption = field.style === 'phones' ? '<label class="chk"><input type="checkbox" id="dimportant"> Open pop-up on participant phones</label>' : '';
+    return '<form id="'+field.form+'" class="room-announcement'+(organizer ? ' card ops-compose-card' : '')+'" data-channel="'+field.style+'">'+
+      (organizer ? '<header><h2>'+field.title+'</h2><p>'+field.details+'</p></header>' : '')+
+      '<label class="field">'+field.label+input+'</label>'+phoneOption+
+      '<div class="row"><button class="btn" id="'+field.send+'">'+field.submit+'</button>'+
+      '<button class="btn ghost" type="button" id="'+field.clear+'">'+field.remove+'</button></div>'+
+      (organizer ? '<p class="ops-message-status" id="'+field.status+'"></p>' : '')+'</form>';
+  }).join('');
+  return organizer ? '<div class="ops-compose-grid">'+cards+'</div>' : '<section class="card"><h2>Announcements</h2>'+cards+'</section>';
+}
+
+function bindMessageComposer() {
+  if (dashboard !== 'organizer') {
+    $('dann').value = DS.program.announce || '';
+    $('droom').value = DS.program.room_announce ?? DS.program.announce ?? '';
+  }
+  $('room-form').onsubmit = e => {
+    e.preventDefault();
+    sendDisplay('program', {action:'announce', channel:'room', text:$('droom').value}, $('droomshow'));
+  };
+  $('announce-form').onsubmit = e => {
+    e.preventDefault();
+    sendDisplay('program', {action:'announce', channel:'phones', text:$('dann').value, important:$('dimportant').checked}, $('dsend'));
+  };
+  $('dclr').onclick = e => sendDisplay('program', {action:'announce', channel:'phones', text:''}, e.currentTarget);
+  $('droomclear').onclick = e => sendDisplay('program', {action:'announce', channel:'room', text:''}, e.currentTarget);
+}
+
+function updateMessages() {
+  const programme = DS.program;
+  const room = programme.room_announce ?? programme.announce;
+  $('room-active-message').textContent = room ? 'Showing now · '+room : 'No banner showing';
+  $('phone-active-message').textContent = programme.announce ? 'Latest sent · '+programme.announce : 'No active phone announcement';
+  $('droomclear').disabled = displaySaving || !room;
+  $('dclr').disabled = displaySaving || !programme.announce;
+}
+
+function vDisplay() {
+  if(dashboard==='organizer')presenterNamed=false;
+  $('main').innerHTML =
+    '<div class="display-grid"><div>' +
+      '<section class="card"><div class="row"><h2 class="grow">On screen now</h2><span class="pill ok" id="present-name-state"></span></div>' +
+      '<p id="display-now" class="room-status"></p><p class="small mut" id="display-next"></p>' +
+      '<div class="row section-tools"><button class="btn" id="dnext">Next cue →</button><button class="btn ghost" id="dreturn">Return to programme</button></div>' +
+      '<p><label class="chk"><input id="present-names" type="checkbox"' + (presenterNamed ? ' checked' : '') + '> Include participant and company names in this link</label></p>' +
+      '<div class="row" id="present-actions"><button class="btn alt sm" id="present-toggle" aria-controls="present-frame"></button><a id="present-open" target="_blank" rel="noopener">Open presenter screen</a><a id="present-board" target="_blank" rel="noopener">Room board</a></div>' +
+      '<iframe id="present-frame" title="Audience Live View preview" referrerpolicy="no-referrer" hidden></iframe>' +
+      '<div id="present-share"><label for="present-link" class="field section-heading">Share link</label><div class="row"><input id="present-link" class="grow" type="text" readonly><button class="btn ghost sm" id="present-copy">Copy</button></div><p id="present-copy-status" class="small" role="status"></p></div></section>' +
+      (dashboard === 'organizer' ? '' : messageComposer(false)) +
+    '</div><div>' +
+      '<section class="card"><h2>Audience visibility</h2><p class="small mut">Control when scores and the podium are available on audience screens and participant phones. Preliminary totals appear when scores are visible; Final results require reviewed publication.</p>' +
+      '<div class="row section-tools">' + choices(...DISPLAY_CHOICES[0]) + '</div><div class="row">' + choices(...DISPLAY_CHOICES[1]) + '</div></section>' +
+      '<section class="card"><h2>Room override</h2><p class="small mut">Show a different scene until you move to another cue or return to the programme.</p><div class="row">' + choices('scene', SCENES) + '</div></section>' +
+      '<p id="display-status" class="small" role="status"></p>' +
+    '</div></div>' +
+    '<section class="card"><div class="row"><h2 class="grow">Programme cues</h2><button class="btn ghost sm" id="dprev">← Previous cue</button>' +
+    '</div><details class="section-tools"><summary>Timing settings</summary><label class="chk"><input type="checkbox" id="dclock"> Follow the time of day</label></details>' +
+    '<div id="agenda-steps" class="grid agenda-grid"></div></section>';
+  if (dashboard === 'organizer') arrangeOrganizerDisplay();
+  $('present-names').onchange = e => {
+    presenterNamed = e.target.checked;
+    localStorage.setItem('kevenos:desk:show-names', presenterNamed ? '1' : '0');
+    $('present-copy-status').textContent = '';
+    updatePresenter();
+  };
+  $('present-toggle').onclick = () => {
+    previewOpen = !previewOpen;
+    localStorage.setItem('kevenos:desk:preview', previewOpen ? '1' : '0');
+    updatePresenter();
+  };
+  $('present-copy').onclick = () => KEV.copyInput($('present-link'), $('present-copy-status'));
+  if ($('room-form')) bindMessageComposer();
+  $('dreturn').onclick = e => sendDisplay('program', {action:'return'}, e.currentTarget);
+  $('dprev').onclick = e => sendDisplay('program', {action: 'prev'}, e.currentTarget);
+  $('dnext').onclick = e => sendDisplay('program', {action: 'next'}, e.currentTarget);
+  $('dclock').onchange = e => sendDisplay('program', {action: 'mode', mode: e.target.checked ? 'clock' : 'manual'}, e.currentTarget);
+  document.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => sendDisplay('public', {mode: b.dataset.pub}, b));
+  document.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => b.dataset.rev === 'winners' ? select('final',true) : sendDisplay('reveal', {mode: b.dataset.rev}, b));
+  document.querySelectorAll('[data-scene]').forEach(b => b.onclick = () => sendDisplay('program', {action: 'scene', scene: b.dataset.scene}, b));
+  $('agenda-steps').onclick = e => {
+    const button = e.target.closest('[data-set]');
+    if (button) sendDisplay('program', {action: 'set', index: Number(button.dataset.set)}, button);
+  };
+}
+
+function arrangeOrganizerDisplay() {
+  $('present-names').closest('p').hidden = true;
+  const layout = $('main').querySelector('.display-grid');
+  const programme = $('agenda-steps').closest('section');
+  const screen = $('present-frame').closest('section');
+  const override = layout.querySelector('[data-scene]').closest('section');
+  const status = $('display-status');
+  const settings = document.createElement('details');
+  settings.className = 'ops-screen-settings';
+  settings.innerHTML = '<summary>Room board and presenter link</summary>';
+  settings.append($('present-board'), $('present-share'));
+  screen.append(settings);
+  $('present-open').className = 'btn ghost sm';
+  programme.classList.add('ops-cue-panel');
+  screen.classList.add('ops-screen-panel');
+  programme.insertAdjacentHTML('afterbegin','<div class="ops-cue-now"><p class="ops-eyebrow">Current cue</p><h2 id="ops-cue-title"></h2></div>');
+  programme.querySelector('.ops-cue-now').append($('display-next'), $('dnext'));
+  programme.querySelector('details').classList.add('ops-screen-settings');
+  programme.classList.add('ops-programme');
+  screen.insertAdjacentHTML('beforeend','<button id="open-room-message" type="button" class="btn ghost sm">Manage room banner</button>');
+  screen.querySelector('#open-room-message').onclick = () => select('messages', true);
+  const secondary = document.createElement('details');
+  secondary.className = 'ops-screen-settings ops-override-panel';
+  secondary.innerHTML = '<summary>Room overrides</summary>';
+  secondary.append(override.querySelector('p'), override.querySelector('.row'));
+  screen.append(secondary);
+  layout.classList.add('ops-live-layout');
+  layout.replaceChildren(programme, screen);
+  $('main').replaceChildren(status, layout);
+}
+
+function updateDisplay() {
+  const program = DS.program;
+  const agenda = DS.agenda;
+  const override = program.scene || 'auto';
+  const activeStep = agenda[program.i];
+  const room = DS.room || {scene:override === 'auto' ? activeStep?.scene : override, title:activeStep?.title};
+  const label = {quiz:'Quiz', audience:'Audience question', ...SCENES}[room.scene] || SCENES.info;
+  const source = {quiz:'Shown from Quiz', audience:'Shown from Audience questions', manual:'Room override',
+    final:'Controlled by Judging Operations', agenda:'Following programme'}[room.source];
+  $('display-now').textContent = [label, room.title, source, (program.room_announce ?? program.announce) && 'Room message active'].filter(Boolean).join(' · ');
+  const next = agenda[program.i + 1];
+  $('display-next').textContent = next ? 'Up next · ' + next.time + ' · ' + next.title : 'Last programme cue';
+  if (dashboard === 'organizer') $('ops-cue-title').textContent = activeStep?.title || 'No cue selected';
+  $('dnext').disabled = displaySaving || !next;
+  $('dprev').disabled = displaySaving || program.i <= 0;
+  $('dreturn').disabled = displaySaving || !(room.shares_pending || override !== 'auto');
+  $('dclock').checked = program.mode === 'clock';
+  const list = $('agenda-steps');
+  const agendaSignature = JSON.stringify(agenda);
+  if (list.dataset.signature !== agendaSignature) {
+    list.dataset.signature = agendaSignature;
+    list.innerHTML = agenda.map((item, i) => '<button type="button" class="card" data-set="' + i +
+      '"><time class="small">' + KEV.esc(item.time || '') + '</time><b>' + KEV.esc(item.title) +
+      '</b>' + (dashboard === 'organizer' ? '<small data-cue-label></small>' : '') + '</button>').join('');
+  }
+  for (const [key, value] of Object.entries({pub: DS.public, rev: DS.reveal, scene: override, set: String(program.i)})) {
+    document.querySelectorAll('[data-' + key + ']').forEach(button => {
+      const pressed = button.dataset[key] === value;
+      button.classList.toggle(key === 'set' ? 'on' : 'alt', pressed);
+      if (key !== 'set') button.classList.toggle('ghost', !pressed);
+      button.setAttribute('aria-pressed', String(pressed));
+      if (key === 'set' && dashboard === 'organizer') {
+        const index = Number(button.dataset.set);
+        button.querySelector('[data-cue-label]').textContent = pressed ? 'Current' : index === program.i + 1 ? 'Next' : '';
+        if (pressed) button.setAttribute('aria-current','step');
+        else button.removeAttribute('aria-current');
+      }
+    });
+  }
+  updatePresenter();
+}
+
+let displaySaving = false;
+async function sendDisplay(path, body, button) {
+  if (displaySaving) {
+    if (button === $('dclock')) button.checked = DS.program.mode === 'clock';
+    return;
+  }
+  displaySaving = true;
+  const origin = tab;
+  const status = $('display-status');
+  const controls = document.querySelectorAll('[data-pub], [data-rev], [data-scene], [data-set], #dsend, #dclr, #droomshow, #droomclear, #dreturn, #dprev, #dnext, #dclock');
+  controls.forEach(control => control.disabled = true);
+  status.textContent = 'Updating…';
+  try {
+    await post('/api/desk/' + path, body);
+    if (tab !== origin || !active) return;
+    if (!await refresh(true)) throw new Error('Saved. Waiting for the latest display state.');
+    if (status.isConnected) status.textContent = origin === 'messages' ?
+      (body.text ? (body.channel === 'room' ? 'Room banner is showing.' : 'Phone announcement sent.') : 'Message cleared.') : 'Display updated.';
+    if (body.action === 'announce' && status.isConnected) {
+      const room = body.channel === 'room';
+      $(room ? 'droom' : 'dann').value = origin === 'messages' ? '' : room ? DS.program.room_announce || '' : DS.program.announce || '';
+      if (origin === 'messages' && !room) $('dimportant').checked = false;
+    }
+  } catch (e) {
+    if (status.isConnected) status.textContent = e.message;
+    if (button === $('dclock')) button.checked = DS.program.mode === 'clock';
+  } finally {
+    displaySaving = false;
+    controls.forEach(control => control.disabled = false);
+    if (tab === 'display' && active) updateDisplay();
+    if (tab === 'messages' && active) updateMessages();
+  }
+}
+
+setInterval(refresh, 2000);
+setInterval(tickClock, 250);
+start();
+</script>
+</body>
+</html>

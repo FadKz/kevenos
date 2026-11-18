@@ -1,0 +1,95 @@
+/* Event Assistant uses the KevenOS palette and controls. */
+.ppa-launch {
+  position: fixed;
+  z-index: 20;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  gap: .45rem;
+  padding: .7rem 1.1rem;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--ink);
+  box-shadow: 0 4px 16px #112c4c33;
+}
+.ppa-launch:hover { background: var(--blue); color: var(--on-accent); }
+.ppa-mark { font-size: 1.2rem; line-height: 1; }
+dialog.ppa-dialog {
+  position: fixed;
+  inset: auto max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) auto;
+  width: min(27rem, calc(100% - 2rem));
+  max-width: none;
+  height: min(42rem, calc(100dvh - 2rem));
+  max-height: none;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 0;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 16px 48px #112c4c38;
+}
+.ppa-dialog::backdrop { background: #112c4c57; }
+.ppa-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+.ppa-header {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .8rem .95rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.ppa-header > .ppa-mark { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: .7rem; background: var(--blue2); color: var(--blue); }
+.ppa-heading { flex: 1; min-width: 0; }
+.ppa-heading h2 { margin: 0 0 .25rem; font-size: 1.08rem; }
+.ppa-scope { display: flex; flex-wrap: wrap; gap: .25rem; margin: 0; }
+.ppa-scope .pill { padding: .08rem .5rem; font-size: .72rem; }
+.ppa-workspace { background: var(--teal2); color: var(--teal); }
+.ppa-log { padding: .9rem; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); }
+.ppa-log p { margin: .3rem 0 0; }
+.ppa-log h3 { margin: 0; }
+.ppa-welcome { padding: .3rem 0; }
+.ppa-welcome h3 { font-size: 1rem; color: var(--ink); }
+.ppa-suggestions { display: grid; gap: .5rem; margin-top: .7rem; }
+.ppa-suggestions .btn { justify-content: flex-start; text-align: left; background: var(--card); }
+.ppa-message, .ppa-proposal { margin-bottom: .65rem; border: 1px solid var(--line); border-radius: .75rem; padding: .65rem .75rem; background: var(--card); }
+.ppa-message { max-width: 95%; }
+.ppa-message p, .ppa-proposal p, .ppa-effects { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; }
+.ppa-message.ppa-user { margin-left: auto; background: var(--blue2); border-color: transparent; }
+.ppa-proposal { border-color: #a8bfe2; }
+.ppa-proposal h3 { color: var(--navy); font-size: 1rem; }
+.ppa-proposal .ppa-command { color: var(--mut); font-size: .8rem; }
+.ppa-arguments { display: grid; gap: .3rem; margin: .6rem 0; }
+.ppa-argument { display: grid; grid-template-columns: minmax(5rem, 35%) minmax(0, 1fr); gap: .5rem; font-size: .85rem; }
+.ppa-argument dt { color: var(--mut); }
+.ppa-argument dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ppa-effects { padding-left: 1.3rem; }
+.ppa-actions, .ppa-recovery, .ppa-reset { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.ppa-actions { margin-top: .7rem; }
+.ppa-result { color: var(--mut); }
+.ppa-source { display: block; margin-top: .45rem; color: var(--mut); font-size: .75rem; }
+.ppa-footer { padding: .65rem .85rem max(.7rem, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.ppa-notice { margin: 0 0 .35rem; font-size: .85rem; color: var(--mut); }
+.ppa-notice:empty, .ppa-recovery:not(:has(.btn:not([hidden]))) { display: none; }
+.ppa-notice.ppa-problem { color: var(--bad); }
+.ppa-elapsed { margin: -.1rem 0 .4rem; color: var(--mut); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.ppa-recovery, .ppa-reset { margin-bottom: .45rem; }
+.ppa-reset p { width: 100%; margin: 0; font-size: .85rem; }
+.ppa-form { display: flex; align-items: end; gap: .5rem; }
+.ppa-form textarea { min-height: 3.15rem; max-height: 8rem; padding: .55rem .7rem; }
+.ppa-privacy { margin: .4rem 0 0; color: var(--mut); font-size: .75rem; }
+.ppa-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rehearsal-plan { margin-top: 1rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: .75rem; background: var(--bg); }
+.rehearsal-plan h3 { color: var(--ink); font-size: 1rem; }
+.rehearsal-plan h4 { margin: .65rem 0 .25rem; font-size: .875rem; }
+.rehearsal-plan ul { padding-left: 1.3rem; }
+.rehearsal-plan-counts { display: grid; gap: .25rem .85rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); font-size: .875rem; }
+.rehearsal-plan-counts div { display: flex; justify-content: space-between; gap: .5rem; padding: .2rem .4rem; border-bottom: 1px solid var(--line); }
+.rehearsal-plan-counts dd { margin: 0; font-weight: 650; }
+@media (max-width: 540px) {
+  dialog.ppa-dialog { inset: auto 0 0; width: 100%; height: min(43rem, 92dvh); border-radius: 1rem 1rem 0 0; }
+  .ppa-launch { right: max(.75rem, env(safe-area-inset-right)); bottom: max(.75rem, env(safe-area-inset-bottom)); }
+}
+@media (max-height: 480px) {
+  dialog.ppa-dialog { height: calc(100dvh - 1rem); bottom: .5rem; }
+}

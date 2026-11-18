@@ -1,0 +1,101 @@
+.registration { max-width: 1100px; }
+.registration-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.registration-summary .card { display: grid; gap: 3px; }
+.registration-summary strong { font-size: clamp(1.45rem, 5vw, 2rem); font-variant-numeric: tabular-nums; }
+.registration-summary span { font-size: .88rem; color: var(--mut); }
+.registration-tools { margin-bottom: 14px; }
+.registration-tools p { margin: 0; }
+.registration-filters { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.registration-team { border-top: 1px solid var(--line); padding-block: 15px; }
+.registration-team h3 { font-size: 1.05rem; color: var(--ink); }
+.registration-team p { margin: 0 0 6px; }
+.registration-person { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 9px 18px; padding-block: 8px; }
+.registration-person + .registration-person { border-top: 1px solid var(--line); }
+.registration-person .row { flex-wrap: wrap; }
+.registration-person details { flex-basis: 100%; }
+.registration-person summary, .registration summary { cursor: pointer; }
+.registration-person .btn { min-height: 44px; }
+#registration-edit, #registration-access { width: min(440px, calc(100% - 28px)); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+#registration-edit .field, #registration-access .field { margin-block: 10px; }
+#registration-edit-error { color: var(--bad); }
+#registration-qr { display: block; width: min(100%, 232px); aspect-ratio: 1; margin: 10px auto; background: #fff; }
+@media (max-width: 620px) {
+  .registration-summary .card { padding: 10px; }
+  .registration-filters { grid-template-columns: 1fr; }
+}
+/* Participant directory and arrival handoff */
+.registration {max-width:1240px}
+.registration-list-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;margin:12px 0}
+.registration-list-meta p{margin:0}.registration-list-meta #registration-updated{margin-left:auto}
+.registration-table{width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
+.registration-table thead th{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);padding:14px 12px;border-bottom:1px solid var(--line)}
+.registration-table thead th:first-child{width:30%}.registration-table thead th:last-child{width:26%}
+.registration-table tbody th,.registration-table tbody td{padding:17px 12px;border-bottom:1px solid var(--line);vertical-align:middle;overflow-wrap:anywhere;font-weight:400}
+.registration-table tbody tr:hover{background:var(--card)}
+.registration-company,.registration-sub{display:block;color:var(--mut);font-size:.85rem;margin-top:5px;line-height:1.4}
+.registration-row-actions .btn{margin:3px;min-height:44px}
+.arrival-status{display:inline-flex;border:1px solid var(--line);border-radius:99px;padding:5px 10px;color:var(--ink);font-size:.8rem;white-space:nowrap}
+.arrival-status.present{color:var(--ok);border-color:var(--ok)}
+.registration-receipt{border:1px solid var(--ok);border-left:5px solid var(--ok);border-radius:14px;padding:20px;margin:18px 0;background:var(--card)}
+.registration-receipt h3{font-size:1.3rem;margin:5px 0}.registration-receipt p{margin:6px 0 12px}.registration-receipt .row{flex-wrap:wrap;margin-bottom:12px}
+.registration-eyebrow{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);font-weight:750}
+.registration-empty{text-align:center;padding:40px 16px;color:var(--mut)}.registration-empty h3{color:var(--ink)}
+#registration-detail{width:min(560px,calc(100% - 28px));max-height:calc(100dvh - 32px);overflow:auto;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+.registration-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.registration-assignment{font-size:1.1rem;font-weight:700}.registration-teammates{padding:0;list-style:none}.registration-teammates li{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:12px 0}.registration-teammates span{font-size:.85rem;color:var(--mut)}
+#registration-detail .row{flex-wrap:wrap}#registration-detail h3{margin-top:24px}#registration-detail summary{cursor:pointer;padding-block:14px}
+.registration-secondary{display:flex;flex-wrap:wrap;gap:8px}.registration button:focus-visible,.registration-receipt h3:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+@media(max-width:700px){
+ .registration-table,.registration-table tbody{display:block;width:100%}.registration-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .registration-table tbody tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;padding:14px;gap:12px}
+ .registration-table tbody th{grid-column:1/-1}.registration-table tbody th,.registration-table tbody td{display:block;padding:0;border:0}
+ .registration-table td[data-label]::before{content:attr(data-label);display:block;color:var(--mut);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+ .registration-row-actions{grid-column:1/-1;display:flex!important;gap:8px}.registration-row-actions .btn{margin:0;flex:1}
+ .registration-list-meta #registration-updated{margin-left:0}.registration-list-meta{align-items:flex-start}.registration-filters{gap:8px}
+ .registration-teammates li{flex-wrap:wrap;gap:5px}.registration-receipt .btn{min-height:44px}#registration-detail{padding:18px}
+}
+.registration-table tbody th{font-size:1rem;color:var(--ink);text-transform:none;letter-spacing:normal;line-height:1.4}
+@media(max-width:700px){.registration-tools{display:grid;grid-template-columns:1fr 1fr;gap:12px}.registration-tools .grow{grid-column:1/-1}.registration-tools .btn{min-width:0;width:100%}}
+
+#registration-detail-error{color:var(--bad)}
+
+.registration-report-action { display:flex; justify-content:flex-end; margin-bottom:10px; }
+body.registration-report-active > :not(#registration-report) { display:none !important; }
+#registration-report { width:min(100% - 24px,1050px); margin:18px auto; }
+.registration-report-toolbar { flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.registration-report-toolbar p { flex-basis:100%; margin:0; }
+#registration-report-content {
+  padding:clamp(12px,3vw,34px); border-radius:14px; color:#172642; background:#fff;
+  font: .92rem/1.42 system-ui,sans-serif;
+}
+#registration-report-content h1 { margin:0 0 5px; font-size:1.9em; line-height:1.16; }
+#registration-report-content h2 { margin:1em 0 .45em; font-size:1.3em; }
+#registration-report-content .report-meta { color:#415571; margin:0 0 .7em; }
+#registration-report-content .report-totals { border-block-start:2px solid #136362; margin:1em 0 0; padding-top:.7em; }
+#registration-report-content table { width:100%; table-layout:fixed; border-collapse:collapse; overflow-wrap:anywhere; }
+#registration-report-content th,#registration-report-content td {
+  vertical-align:top; padding:.42em .46em; border-bottom:1px solid #c8d2df; text-align:start; font:inherit; color:inherit;
+}
+#registration-report-content th { font-weight:650; }
+#registration-report-content thead th { border-bottom-color:#526981; }
+#registration-report-content ul { margin:0; padding-inline-start:1.25em; }
+#registration-report-content .report-check-in th:first-child { width:31%; }
+#registration-report-content .report-check-in th:nth-child(2) { width:26%; }
+#registration-report-content .report-check-in th:nth-child(3) { width:10%; }
+#registration-report-content .report-assignments th:first-child { width:9%; }
+#registration-report-content .report-assignments th:nth-child(2) { width:22%; }
+#registration-report-content .report-assignments th:nth-child(3) { width:28%; }
+#registration-report-content .report-assignments th:nth-child(4) { width:16%; }
+@media print {
+  @page { size:A4; margin:14mm; }
+  html:has(body.registration-report-active) { background:#fff; color-scheme:light; }
+  body.registration-report-active { display:block; background:#fff; margin:0; padding:0; color:#172642; }
+  #registration-report { width:auto; margin:0; }
+  .registration-report-toolbar { display:none !important; }
+  #registration-report-content { padding:0; border-radius:0; font-size:10pt; }
+  #registration-report-content h2 { break-after:avoid; }
+  #registration-report-content thead { display:table-header-group; }
+  #registration-report-content tr { break-inside:avoid; }
+  .report-assignment-page { break-before:page; }
+  .report-assignment-page h2 { margin-top:0 !important; }
+}

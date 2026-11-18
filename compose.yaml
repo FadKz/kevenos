@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    image: kevenos:1.0.0
+    ports: ["8080:8080"]
+    volumes: ["kevenos_data:/data"]
+    restart: unless-stopped
+volumes:
+  kevenos_data:

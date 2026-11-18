@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in | KevenOS</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/event.css">
+</head>
+<body data-nav-page="Access required">
+  <main class="event-shell event-main event-login">
+    <section class="event-hero" aria-labelledby="event-title">
+      <p class="event-kicker">product vendor and implementation partner</p>
+      <h1 id="event-title">KevenOS Competition</h1>
+      <p class="event-meta"><time datetime="2000-01-01">Event date configured by organizer</time><span>Example Venue</span></p>
+    </section>
+    <section class="card" aria-labelledby="signin-title">
+      <h2 id="signin-title">Sign in to continue</h2>
+      <p class="mut" id="signin-help">Use the guest password shared by the organiser to see the event information.</p>
+      <a class="btn" id="go-home" href="/?access=guest">Go to guest sign-in</a>
+      <p class="small mut event-privacy">Admins can see sign-ins, IP addresses, available country information and site activity for 30 days.</p>
+      <form id="signin" data-gate="1" method="post" aria-describedby="signin-help" hidden>
+        <label class="event-field" for="password">Event password
+          <input id="password" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required>
+        </label>
+        <button class="btn" type="submit">Continue</button>
+        <p id="signin-error" class="event-form-error" role="alert"></p>
+      </form>
+    </section>
+  </main>
+  <script src="/static/common.js"></script>
+  <script>
+    const goHome = document.getElementById('go-home');
+    const help = document.getElementById('signin-help');
+    if (KEV.staff.hosted) {
+      KEV.profile.mount();
+      const role=location.pathname.startsWith('/judge')?'judge':location.pathname.startsWith('/admin')?'admin':location.pathname.startsWith('/desk')?'desk':location.pathname.startsWith('/participant')?'participant':'guest';
+      help.textContent='Choose your role and enter its password. Staff use the password issued by Admin.';
+      goHome.textContent='Go to sign-in';goHome.href='/?access='+role;
+    } else {
+      const form = document.getElementById('signin');
+      const password = document.getElementById('password');
+      const errorText = document.getElementById('signin-error');
+      help.textContent = 'Enter the event password to open the local judging kit.';
+      goHome.hidden = true;
+      form.hidden = false;
+      form.onsubmit = async event => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        errorText.textContent = '';
+        try {
+          await KEV.api('/api/site-login', {body: {password: password.value}});
+          location.reload();
+        } catch (error) {
+          errorText.textContent = error.status ? error.message : 'Cannot reach the event. Try again.';
+          button.disabled = false;
+          password.select();
+        }
+      };
+    }
+  </script>
+</body>
+</html>

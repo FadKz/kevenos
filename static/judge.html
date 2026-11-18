@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Judge | KevenOS</title><link href="/static/app.css" rel="stylesheet"/><link href="/static/event.css" rel="stylesheet"/>
+<style>
+body{padding-bottom:96px}
+.wrap{max-width:760px;margin:0 auto;padding:0 14px}
+/* header */
+#top{position:sticky;top:var(--kevenos-nav-height, 0px);z-index:30;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:10px 0 8px}
+#top .r1{display:flex;align-items:center;gap:10px}
+#who{min-width:0;flex:1}#who b{display:block;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#who span{display:block;color:var(--mut);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#clk{text-align:right}#tt{font-size:2.3rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.ph{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.ph.pitch{color:var(--blue)}.ph.feedback{color:var(--warn)}.ph.change,.ph.over{color:var(--bad)}
+#top .r2{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px}
+#ctl{display:flex;gap:8px;align-items:center;flex:1;flex-wrap:wrap}#ctl .btn{min-height:44px}
+#judge-help{white-space:nowrap;padding-inline:10px}
+.more{position:relative}.more>summary{list-style:none;cursor:pointer;width:44px;height:44px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:var(--card)}
+.more>summary::-webkit-details-marker{display:none}
+.menu{position:absolute;right:0;top:48px;z-index:40;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:6px;min-width:230px;display:flex;flex-direction:column}
+.menu :is(button,summary){border:0;background:none;text-align:left;padding:11px 12px;border-radius:9px;font-weight:600;cursor:pointer;color:var(--ink)}.menu :is(button,summary):hover{background:var(--blue2)}
+.menu details button{display:block;width:100%;padding-inline-start:22px}
+#cue{margin-top:8px;font-size:.92rem;color:var(--mut);line-height:1.35;overflow-wrap:anywhere}#cue.flash{animation:fl 1s ease 2}@keyframes fl{50%{color:var(--warn)}}
+#cue:empty{display:none}
+#clock-status{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.reference-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.reference-controls button{min-height:44px;font-size:.875rem}
+.reference-controls button[aria-expanded="true"]{background:var(--blue2);border-color:var(--blue);color:var(--blue)}
+/* step strip */
+#steps{display:flex;gap:6px;margin:12px 0 4px}
+#steps button{flex:1;position:relative;overflow:hidden;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 4px 7px;cursor:pointer;color:var(--mut);font-weight:700;font-size:.78rem;line-height:1.15;text-align:center;min-width:0}
+#steps button b{display:block;font-size:1rem;color:var(--ink);font-variant-numeric:tabular-nums}
+#steps button i{position:absolute;left:0;bottom:0;height:4px;background:var(--blue);width:0;transition:width .5s}
+#steps button.now{border-color:var(--blue)}#steps button.sel{background:var(--blue);border-color:var(--blue);color:var(--on-accent)}#steps button.sel b{color:inherit}#steps button.sel i{background:var(--on-accent);opacity:.6}
+#steps button.full b::after{content:" ✓";color:var(--ok)}#steps button.sel.full b::after{color:var(--on-accent)}
+/* ticks */
+.stephead{margin:16px 2px 8px}.stephead h2{margin:0;font-size:1.35rem}.stephead p{margin:2px 0 0;color:var(--mut);font-size:.92rem}
+.tick-row{position:relative;margin-bottom:10px}
+.tick{display:flex;gap:14px;align-items:center;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:16px;padding:14px 60px 14px 14px;cursor:pointer;min-height:72px}
+.tick .box{flex:none;width:34px;height:34px;border-radius:10px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.1rem}
+.tick .lab{flex:1;font-size:1.08rem;font-weight:600;line-height:1.3}
+.tick.on{border-color:var(--ok);background:var(--ok2)}.tick.on .box{background:var(--ok);border-color:var(--ok);color:var(--on-accent)}.tick.on .box::after{content:"✓"}
+.tick.sug:not(.on){border:2px dashed var(--blue)}.tick.sug:not(.on) .box::after{content:"?";color:var(--blue)}
+.info{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:var(--line);color:var(--mut);width:44px;height:44px;border-radius:50%;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.counts{margin:-4px 4px 12px 52px;padding:10px 12px;border-radius:12px;background:var(--blue2);font-size:.9rem}
+.acc{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:14px;background:var(--blue2);color:var(--blue);font-weight:600;margin-bottom:10px}
+/* wrap up */
+.star-field{margin:18px 0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.star-field h3{margin:0 0 4px}.star-field p{margin:0 0 10px}.star-rating{display:flex;gap:8px;flex-wrap:wrap}
+.star-rating button{width:48px;height:48px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:#9aa3b5;font-size:1.65rem;cursor:pointer}
+.star-rating button.on{background:var(--warn2);border-color:var(--warn);color:var(--warn)}.star-rating button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.mini{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:8px 0 14px}
+.mini button{border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:10px 0;font-weight:700;cursor:pointer;color:var(--mut)}.mini button.on{background:var(--ok2);border-color:var(--ok);color:var(--ok)}.mini button.on::after{content:" ✓"}
+.row2{display:flex;width:100%;text-align:left;gap:10px;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer;font-weight:600}
+.sw{width:46px;height:28px;border-radius:99px;background:var(--line);position:relative;flex:none;transition:.2s}.sw::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s}.row2.on .sw{background:var(--ok)}.row2.on .sw::after{left:21px}
+.row2 .mut{display:block}
+textarea{min-height:110px;resize:vertical}
+.done{background:var(--ok2);color:var(--ok);border-radius:14px;padding:12px 14px;margin:12px 0 0;font-weight:700;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.done.pending,.done.review{background:var(--warn2);color:var(--warn)}
+.done.review{border:1px solid var(--warn)}
+.sub{margin:0 0 6px;color:var(--mut);font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+/* bottom bar */
+#bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:25}
+#bar .in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center}
+#bsc{font-size:1.45rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}#bsub{font-size:.75rem;color:var(--mut)}
+#bnote{min-height:46px;padding-inline:12px}
+#bsub2{min-height:46px;padding:0 20px;font-size:1.02rem}
+@media(max-width:360px){#ctl .btn,#bsub2{padding-inline:10px}#bar .in{gap:7px}#bnote{padding-inline:8px}}
+/* sheets */
+#sheet{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:86dvh;overflow:auto;overscroll-behavior:contain;overflow-wrap:anywhere;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:22px 22px 0 0;padding:0 14px max(24px,env(safe-area-inset-bottom))}
+#sheet::backdrop,#modal::backdrop{background:#112c4c78}
+#sheet .sh{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:10px;padding:12px 0 10px;background:var(--bg)}#sheet .sh h2{margin:0;flex:1}
+#reference-switch{margin-bottom:12px}
+@media(min-width:1100px){
+  body.reference-open{--judge-reference-width:clamp(340px,33vw,440px)}
+  .reference-open #app,.reference-open #kevenos-nav{width:calc(100% - var(--judge-reference-width))}
+  .reference-open #bar{right:var(--judge-reference-width)}
+  .reference-open #ppver{transform:translateX(calc(0px - var(--judge-reference-width)))}
+  #sheet{inset:0 0 0 auto;width:440px;height:100dvh;max-height:none;border-radius:22px 0 0 22px}
+  #sheet.docked{width:var(--judge-reference-width);border-radius:0;z-index:35}
+}
+.reference-title{font-size:1.12rem;color:var(--ink)}
+.reference-intro{margin:0 0 10px;padding:0 2px}
+.reference-intro p{margin:0}
+.reference-criteria{margin-top:10px}.reference-criteria li+li{margin-top:8px}
+.cardx h4{margin:14px 0 4px}.cardx h4:first-child{margin-top:0}
+.q{display:flex;width:100%;gap:10px;padding:10px 6px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;cursor:pointer;border-radius:8px}.q:hover{background:var(--blue2)}
+.q b{min-width:2.6em;color:var(--mut)}.q.core b::after{content:" ★";color:#e0a100}.q.asked{background:var(--ok2)}
+.rev{display:block;margin:4px 0 0;padding:8px 10px;border-radius:8px;background:var(--card);border-left:4px solid var(--ok);font-weight:500}
+.wcard{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:var(--card)}.wcard.todo{border-color:var(--warn);background:var(--warn2)}
+.say{font-style:italic;margin:6px 0}
+.chk{display:flex;gap:8px;align-items:center;padding:6px 0}.chk input{width:20px;height:20px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}.chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;cursor:pointer;color:var(--ink)}
+.kbd{font:600 .72rem ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:5px;padding:0 5px;color:var(--mut)}
+@media(prefers-reduced-motion:reduce){#cue.flash{animation:none}}
+.cardx{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+</style><link href="/static/judging-operations.css" rel="stylesheet"/><link href="/static/role-home.css" rel="stylesheet"/></head><body class="role-home-page">
+<div class="login" hidden="" id="login">
+<h1>Station <span id="ls"></span></h1><p class="mut" id="login-help">Enter your name to start judging.</p>
+<div class="card" id="judge-local-access"><label class="small mut" for="lname" id="login-label">Your name</label><input autocomplete="name" id="lname" placeholder="Your name" type="text"/>
+<p><button class="btn" id="lgo" style="width:100%">Start judging</button></p><p style="text-align:center"><a href="/judge">Choose another station</a></p><p id="lerr" role="alert" style="color:var(--bad);font-weight:600;min-height:1.4em"></p></div>
+<p hidden="" id="judge-hosted-access"><a class="btn" href="/?access=judge" id="judge-signin">Judge sign-in</a></p>
+</div>
+<div hidden="" id="app"><nav aria-label="Judge sections" class="role-tabs role-judge-tabs"><button aria-pressed="true" id="judge-home-tab" type="button">Today</button><button aria-pressed="false" id="judge-score-tab" type="button">Scorecard</button></nav><main class="role-shell" id="judge-home"><header class="role-heading"><p class="role-kicker">Judging</p><h1>Your judging day</h1><p id="judge-home-connection" role="status">Connecting to your station…</p></header><section class="role-announcement" hidden="" id="judge-home-notice"><p class="role-kicker">From the Desk</p><p id="judge-home-announcement"></p></section><div class="role-grid"><section class="role-hero"><p class="role-kicker" id="judge-home-stage">Your station</p><h2 id="judge-home-team">Getting your assignment</h2><p id="judge-home-detail"></p><p class="role-status" id="judge-home-receipt"></p><button class="btn" id="judge-home-open" type="button">Open judging workspace</button></section><section class="role-card"><p class="role-kicker">Customer scenario</p><h2 id="judge-home-scenario"></h2><p id="judge-home-brief"></p><button class="btn ghost" id="judge-home-customer" type="button">Review customer scenario</button></section></div><section class="role-card"><p class="role-kicker">Happening in the room</p><h2 id="judge-home-program"></h2><p id="judge-home-next"></p></section><section class="role-card"><h2>Before the team begins</h2><ol class="role-checklist"><li>Confirm the team and scenario. Read your customer role.</li><li>Open Scorecard. If the Desk runs the clock, wait for the timekeeper. If you run it, start when the team is ready.</li><li>Listen, tick the criteria demonstrated and capture useful feedback.</li><li>In Wrap up, give the overall 1–5 rating, approve shareable feedback and check the saved receipt.</li></ol><button class="btn ghost" id="judge-home-guide" type="button">Open judge guide</button></section></main><div hidden="" id="judge-workspace">
+<div id="top"><div class="wrap">
+<div class="r1"><div id="who"></div><div id="clk"><div class="ph" id="tph"></div><div id="tt">--:--</div></div><span class="dot" id="tdot" title="Connected to the scoring desk"></span></div>
+<div class="r2"><div id="ctl"></div>
+<button aria-controls="sheet" aria-haspopup="dialog" class="btn ghost" data-nav-help="" id="judge-help" type="button">How to judge</button>
+<details class="more" id="more"><summary aria-label="More" id="judge-menu">⋯</summary><div class="menu" id="menu"></div></details></div>
+<div id="cue"></div><div aria-atomic="true" id="clock-status" role="status"></div>
+<div aria-label="Judge references" class="reference-controls" hidden="" id="reference-controls" role="group">
+<button aria-controls="sheet" aria-expanded="false" class="btn ghost" id="bhelp" type="button">Stage guide</button>
+<button aria-controls="sheet" aria-expanded="false" class="btn ghost" id="bcustomer" type="button">Customer scenario</button>
+</div>
+</div></div>
+<div class="wrap">
+<div class="banner" hidden="" id="offline" style="background:var(--bad2);color:var(--bad);border-radius:10px;margin-top:10px">Connection lost. Drafts stay on this device. Check the receipt before you leave.</div>
+<div class="done judge-receipt-banner" hidden="" id="subbed" role="status"></div>
+<p id="judge-phase-note" class="judge-phase-note"></p>
+<div id="steps"></div>
+<div id="view"></div>
+</div>
+<div id="bar"><div class="in">
+<div><div id="bsc">0 pts</div><div id="bsub"></div></div><div style="flex:1"></div>
+<button aria-haspopup="dialog" class="btn ghost" id="bnote" type="button">Notes</button>
+<button class="btn" id="bsub2">Wrap up →</button>
+</div></div>
+</div></div>
+<dialog aria-labelledby="helper-title" hidden="" id="sheet"></dialog>
+<dialog aria-labelledby="modal-title" hidden="" id="modal"><div id="mbody"></div></dialog>
+<script src="/static/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const scoped = document.body.dataset.scoped === '1';
+$('judge-local-access').hidden=scoped;$('judge-hosted-access').hidden=!scoped;
+const station = +(location.pathname.split('/')[2] || new URLSearchParams(location.search).get('s') || 0);
+let token = scoped ? null : localStorage[KEV.tokenKey('judge', station)], C = null, S = null, recvAt = 0, online = true, D = null, dkey = null;
+let lastStep = -9, lastFollowed = null, fbBusy = false, syncing = false, submitting = false, receiptRevision = 0;
+let view = 0, follow = true, openInfo = {}, sheetKind = null, recoveryPair = null, screenMode = null;
+const GROUPS = [[0, 3], [3, 5], [5, 8], [8, 10]];
+
+function judgeDestination(scoring) {
+  closeSheet();
+  $('judge-home').hidden=scoring; $('judge-workspace').hidden=!scoring;
+  $('judge-home-tab').setAttribute('aria-pressed',String(!scoring));
+  $('judge-score-tab').setAttribute('aria-pressed',String(scoring));
+  history.replaceState(null,'',location.pathname+location.search+(scoring?'#scoring':'#today'));
+  window.scrollTo(0,0);
+}
+$('judge-home-tab').onclick=()=>judgeDestination(false);
+$('judge-score-tab').onclick=$('judge-home-open').onclick=()=>judgeDestination(true);
+$('judge-home-guide').onclick=e=>openSheet('materials',e.currentTarget);
+$('judge-home-customer').onclick=e=>openSheet('customer',e.currentTarget);
+function renderJudgeHome() {
+ const a=S.assignment, info=a.info || {}, scenario=scn();
+ $('judge-home-stage').textContent='Station '+station+(a.kind==='final'?' · Final':a.kind==='calib'?' · Calibration':' · Round '+a.round);
+ $('judge-home-team').textContent=a.pair==null?'Waiting for your next team':a.kind==='calib'?'Calibrate together':'Team '+a.pair;
+ $('judge-home-detail').textContent=[info.partner,KEV.members(info)].filter(Boolean).join(' · ') || 'Follow the Event Desk for the next assignment.';
+ $('judge-home-receipt').textContent=S.submitted?'Sheet received · Thank you':S.clock.running?'Session in progress · Open your workspace':S.clock.ended?'Complete Wrap up and submit your sheet':'Review the scenario before you start.';
+ const held = outbox().find(item => item.assignment === dkey);
+ if (held) $('judge-home-receipt').textContent=held.status==='pending'?'Waiting to send · keep this device open':'Needs Scoring Desk help · your sheet is saved on this device';
+ $('judge-home-open').textContent=held?'Check your sheet':S.submitted?'Review accepted sheet':S.clock.running?'Continue scoring':'Open scorecard';
+ $('judge-home-scenario').textContent=scenario?.name || 'Scenario pending';
+ $('judge-home-brief').textContent=scenario?.line || 'Review the customer situation and role before the team arrives.';
+ const pr=S.program || {}, items=C?.agenda || [], i=pr.i || 0;
+ $('judge-home-program').textContent=items[i]?.title || 'Follow the host';
+ $('judge-home-next').textContent=items[i+1] ? 'Up next · '+items[i+1].time+' · '+items[i+1].title : 'Follow the Desk for closing instructions.';
+ $('judge-home-notice').hidden=!pr.announce;$('judge-home-announcement').textContent=pr.announce || '';
+ $('judge-home-customer').disabled=!scenario || (a.kind==='final' && a.pair==null);
+ if(finalParked()) {
+   $('judge-home-team').textContent=S.final?.published?'Judging complete — thank you':'Follow the stage Final';
+   $('judge-home-receipt').textContent=S.final?.published?'The Desk has published the results. Your accepted sheets are saved.':'Only the configured Final panel submits scores. Follow the host and the Desk.';
+   $('judge-home-open').textContent='Open judging summary';
+ } else if(a.kind==='final' && !held) {
+   $('judge-home-receipt').textContent=S.submitted?'Final rating received': 'Use the original customer scenario. Give this finalist a 1–5 rating.';
+ }
+}
+if(location.hash==='#scoring') { $('judge-home').hidden=true;$('judge-workspace').hidden=false;$('judge-home-tab').setAttribute('aria-pressed','false');$('judge-score-tab').setAttribute('aria-pressed','true'); }
+// ───────── sign in ─────────
+let identity = null, judgeSession = null, profileStopped = false;
+const oldInvite = scoped && new URLSearchParams(location.hash.slice(1)).has('invite');
+if (oldInvite) history.replaceState(null,'',location.pathname+location.search);
+const canSync = () => scoped ? !!judgeSession?.authenticated && !profileStopped && KEV.profile.active : !!token;
+function showLogin(message = '') {
+  for(const id of ['judge-home-stage','judge-home-team','judge-home-detail','judge-home-receipt','judge-home-scenario','judge-home-brief','judge-home-program','judge-home-next','judge-home-announcement'])$(id).replaceChildren();
+  $('judge-home-notice').hidden=true;
+  $('app').hidden=true;$('login').hidden=false;$('ls').textContent=station;$('lerr').textContent=message;
+  KEV.nav.render();
+  $('judge-local-access').hidden=scoped;$('judge-hosted-access').hidden=!scoped;
+  if(scoped){
+    $('login-help').textContent=oldInvite?'Invitation links have been replaced. Ask Admin for your Staff password, then sign in.':'Sign in with your event password to open your assigned judging station.';
+    $('lname').value='';
+  }else $('lname').value=localStorage['kevenos:judgeName'] || '';
+}
+function stopJudge(message) {
+  profileStopped=true;receiptRevision++;token=null;judgeSession=null;identity=null;
+  closeSheet();closePanel($('modal'));C=S=D=null;dkey=null;recoveryPair=null;
+  for(const id of ['who','view','steps','subbed','mbody','sheet','ctl','menu'])$(id).replaceChildren();
+  $('tt').textContent='--:--';$('tph').textContent='';$('cue').textContent='';$('clock-status').textContent='';
+  showLogin(message);
+}
+function sessionEnded() {
+  if(scoped){KEV.profile.invalidate('Your Judge sign-in has ended. Sign in again. Saved work stays on this device.');return;}
+  delete localStorage[KEV.tokenKey('judge',station)];token=null;closeSheet();closePanel($('modal'));showLogin();
+}
+$('lgo').onclick=async()=>{
+  if(scoped)return;
+  const value=$('lname').value.trim();if(!value){$('lerr').textContent='Please enter your name.';return;}
+  $('lgo').disabled=true;
+  try{const r=await KEV.api('/api/login',{body:{role:'judge',station,name:value}});token=r.token;localStorage[KEV.tokenKey('judge',station)]=token;localStorage['kevenos:judgeName']=value;await start();}
+  catch(error){$('lerr').textContent=error.message;}finally{$('lgo').disabled=false;}
+};
+$('lname').addEventListener('keydown',event=>{if(event.key==='Enter')$('lgo').click();});
+
+// ───────── helpers ─────────
+const name = () => (scoped ? identity?.name : localStorage['kevenos:judgeName']) || ('Station ' + station);
+const draftScope = () => KEV.workspaceMode + ':' + KEV.context + ':' + station + (scoped ? ':' + identity?.key + ':' + KEV.profile.context : '');
+const queueKey = () => 'kevenos:workspace-outbox:' + draftScope();
+const draftKey = key => 'kevenos:workspace-draft:' + draftScope() + ':' + key;
+const scn = () => S?.scenario_snapshot || [...C.scenarios, C.demo].find(s => s?.id === S?.scenario);
+const finalParked = () => S?.assignment.kind === 'final' && (S.final?.published || S.final?.eligible === false || S.final?.can_submit === false);
+const displayMode = () => finalParked() ? (S.final?.published ? 'completed' : 'waiting') : 'scoring';
+const elapsed = () => !S ? 0 : S.clock.elapsed + (S.clock.running ? (Date.now() - recvAt) / 1000 : 0);
+const nTicks = () => D.ticks.filter(Boolean).length;
+const kind = () => S.assignment.kind;
+const selfPaced = () => S && S.mode === 'self' && kind() === 'round';
+const groupOf = i => GROUPS.findIndex(([a, b]) => i >= a && i < b);
+function newDraft() { return {ticks: Array(10).fill(0), ai: 0, spoke: 0, wrap_rating: 0, final_rating: 0, notes: '', feedback: '', participant_feedback_approved: false, fbEdited: false, asked: {}, raised: {IT: {}, Business: {}}}; }
+function saveDraft() { if(KEV.profile.isPreview || (scoped && !canSync()))return;localStorage.setItem(draftKey(dkey), JSON.stringify(D)); }
+function suggestions() {
+  const a = D.asked, r = D.raised, s = Array(10).fill(0);
+  if (a.Q1 != null && a.Q2 != null) s[0] = 1;
+  if (a.Q3 != null || a.Q13 != null) s[1] = 1;
+  if (r.IT.u && r.IT.m) s[5] = 1;
+  if (r.Business.u && r.Business.m) s[6] = 1;
+  if (r.IT.s && r.Business.s) s[7] = 1;
+  return s;
+}
+function score() {
+  const t = nTicks(), ai = D.ai ? 2 : 0, badge = (S.assignment.info && S.assignment.info.badge) || 0;
+  return {t, ai, badge, total: t * 10 + ai + badge};
+}
+function stepCounts() { return GROUPS.map(([a, b]) => D.ticks.slice(a, b).filter(Boolean).length); }
+
+// ───────── sync loop ─────────
+function judgingContentSignature(content) {
+  // Only agenda and known save metadata may change without rebuilding scoring.
+  // Compare every other field, including new fields, without depending on JSON key order.
+  const ignored = new Set(['agenda', 'content_version', 'content_saved', 'content_note', '_source']);
+  const ordered = value => Array.isArray(value) ? value.map(ordered) :
+    value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, ordered(value[key])])) : value;
+  return JSON.stringify(ordered(Object.fromEntries(Object.entries(content).filter(([key]) => !ignored.has(key)))));
+}
+async function sync() {
+  if (syncing || submitting || KEV.workspaceChanging || (scoped && !canSync())) return;
+  syncing = true;
+  const revision = receiptRevision;
+  try {
+    const askedN = D ? Object.keys(D.asked).length : 0;
+    const state = await KEV.api('/api/sync', {body: {ticks: D ? nTicks() : null, asked: askedN, judge: name(), ...(recoveryPair ? {final_pair: recoveryPair} : {})}}, token);
+    if (revision !== receiptRevision) return;
+    const received = Date.now();
+    if (C && state.versions && state.versions.content !== (C.content_version || 1)) {
+      const content = await KEV.api('/api/content', null, token);
+      if (revision !== receiptRevision) return;
+      const judgingChanged = judgingContentSignature(C) !== judgingContentSignature(content);
+      C = content;
+      if (judgingChanged) dkey = null;
+    }
+    if (S && S.scenario !== state.scenario && isReference(sheetKind)) closeSheet();
+    S = state;
+    recvAt = received; setOnline(true); KEV.stamp(S.versions);
+    onState();
+    renderJudgeHome();
+    if (outbox().some(item => item.status === 'pending')) flushOutbox();
+  } catch (e) {
+    if (e.status === 401) return sessionEnded();
+    if (e.code !== 'workspace_changed') setOnline(false);
+  } finally { syncing = false; }
+}
+function setOnline(v) { $('judge-home-connection').textContent=v?'Connected · Station '+station:'Updates interrupted. Follow the Desk; open the workspace for your saved draft.'; online = v; $('tdot').className = 'dot' + (v ? '' : ' off'); $('offline').hidden = v; }
+function outbox(key = queueKey()) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+function storeOutbox(key, entries) {
+  if (entries.length) localStorage.setItem(key, JSON.stringify(entries));
+  else localStorage.removeItem(key);
+}
+function holdSheet(entry) {
+  const key = queueKey();
+  storeOutbox(key, outbox(key).filter(item => item.assignment !== entry.assignment).concat(entry));
+}
+let flushing = false, recoveredSheet = null;
+async function flushOutbox() {
+  if (flushing || submitting || KEV.workspaceChanging || KEV.profile.isPreview || (scoped && !canSync())) return;
+  const key = queueKey();
+  const attemptToken = token, accessRevision=KEV.profile.revision;
+  flushing = true;
+  try {
+    for (const item of outbox(key).filter(entry => entry.status === 'pending')) {
+      let rejection;
+      let receipt;
+      try { receipt = await KEV.api('/api/submit', {body: item.body}, attemptToken); }
+      catch (error) {
+        if (['workspace_changed','access_changed','profile_expired'].includes(error.code) || error.status === 401 || !error.status || error.status >= 500) break;
+        rejection = error.message;
+      }
+      if(accessRevision!==KEV.profile.revision || (scoped && !canSync()))break;
+      const rest = outbox(key).filter(entry => entry.assignment !== item.assignment);
+      if (rejection) rest.push({...item, status: 'review', error: rejection});
+      else receiptRevision++;
+      storeOutbox(key, rest);
+      if (key === queueKey() && attemptToken === token) {
+        if (receipt && item.assignment === dkey && D) D.sub = true;
+        else if (receipt && item.body.kind === 'round') recoveredSheet = {key, team:item.body.pair};
+        renderSubmitted(); renderBar();
+      }
+    }
+  } finally { flushing = false; }
+}
+
+function onState() {
+  const a = S.assignment, key = a.kind + ':' + a.pair + ':' + a.round + (a.kind === 'final' ? ':' + S.final?.run_id : '');
+  if (key !== dkey) {
+    closeSheet(); closePanel($('modal'));
+    dkey = key;
+    try { D = JSON.parse(localStorage.getItem(draftKey(key))); } catch { D = null; }
+    if (!D) {
+      D = newDraft();
+      const saved = a.kind === 'final' && S.submitted;
+      if (saved && typeof saved === 'object') {
+        for (const field of ['ticks','ai','spoke','wrap_rating','final_rating','notes','feedback']) if (saved[field] !== undefined) D[field] = saved[field];
+        D.fbEdited = Boolean(D.feedback);
+        D.asked = Object.fromEntries((saved.asked || []).map(item => [item.q,item.t || 0]));
+        D.raised = {IT:{},Business:{},...Object.fromEntries((saved.raised || []).map(item => [item.k,item]))};
+      }
+    }
+    D.sub = Boolean(S.submitted);
+    view = a.kind === 'final' ? 4 : 0; follow = true; lastStep = -9; lastFollowed = null;
+    buildAll();
+  } else if (D.sub !== Boolean(S.submitted) && !submitting) {
+    D.sub = Boolean(S.submitted);
+    renderSubmitted(); renderBar();
+  }
+  if (screenMode !== displayMode()) buildAll();
+  renderTop();
+}
+
+// ───────── the screen ─────────
+function buildAll() {
+  const a = S.assignment, parked = finalParked(), none = parked || a.pair === null || a.pair === undefined;
+  screenMode = displayMode();
+  $('steps').hidden = none; $('bar').hidden = none; $('reference-controls').hidden = none; $('view').innerHTML = '';
+  renderWho();
+  if (parked) {
+    closeSheet();
+    const published = S.final?.published;
+    $('view').innerHTML = '<div class="cardx" style="margin-top:16px"><h2>' + (published ? 'Judging complete — thank you' : 'Waiting for the Final') + '</h2><p class="mut">' + (published ? 'The Desk has published the results. Your accepted sheets are saved.' : 'This Final is being managed by the Desk. Only the configured panel submits sheets; this page updates automatically.') + '</p></div>';
+    $('tt').textContent = ''; $('tph').textContent = KEV.finalLabel(S.final); $('cue').textContent = '';
+    renderSubmitted(); return;
+  }
+  if (none) {
+    $('view').innerHTML = '<div class="cardx" style="margin-top:16px"><h2>No team at your station</h2><p class="mut">' + (selfPaced() && !S.has_next ? 'You have judged every team for this station. Thank you!' : 'Wait for the next round. This page will update by itself.') + '</p></div>';
+    $('cue').textContent = ''; $('clock-status').textContent = 'No team at your station'; renderSubmitted(); return;
+  }
+  renderSteps(); renderView(); renderSubmitted(); renderBar();
+}
+function renderWho() {
+  const a = S.assignment, i = a.info || {}, sc = scn();
+  const title = a.kind === 'calib' ? 'Calibration: score the mock pitch' : a.kind === 'final' ? 'Finalist ' + ((S.assignment.recovery ? Math.max(0,(S.final?.visited || []).findIndex(item=>item.pair===a.pair)) : (S.final?.current || 0)) + 1) + ' of ' + (S.final?.total || S.final?.pairs?.length || 0) + ' · Team ' + a.pair + (i.partner ? ' · ' + i.partner : '') : (a.pair == null ? 'Station ' + station : 'Team ' + a.pair + ' · ' + (i.partner || ''));
+  const sub = a.kind === 'round' ? ['Station ' + station, sc && sc.name, KEV.members(i)].filter(Boolean).join(' · ') : ['Judge ' + station, sc?.name, KEV.members(i)].filter(Boolean).join(' · ');
+  $('who').innerHTML = '<b>' + KEV.esc(title) + '</b><span>' + KEV.esc(sub) + (a.kind === 'round' && i.badge ? ' · badge +' + i.badge : '') + '</span>';
+}
+function renderSteps() {
+  if (!D || S.assignment.pair == null || finalParked()) return;
+  const sc = stepCounts(), nowStep = S.clock.phase === 'pitch' && (S.clock.started_any || S.clock.running) ? S.clock.step : -1;
+  const strip = $('steps');
+  if (kind() === 'final') {
+    strip.innerHTML = '<button data-s="4" aria-pressed="true" class="sel"><i></i>Final score<b>' + (D.final_rating ? D.final_rating + '★' : '→') + '</b></button>';
+    strip.querySelector('button').onclick = () => { view = 4; renderView(); renderBar(); };
+    return;
+  }
+  const html = C.steps.map((s, i) => {
+    const cap = GROUPS[i][1] - GROUPS[i][0];
+    return '<button data-s="' + i + '" aria-pressed="' + (view === i) + '" class="' + (view === i ? 'sel ' : '') + (nowStep === i ? 'now ' : '') + (sc[i] === cap ? 'full' : '') + '"><i></i>' + KEV.esc(s.name) + '<b>' + sc[i] + '/' + cap + '</b></button>';
+  }).join('') + '<button data-s="4" aria-pressed="' + (view === 4) + '" class="' + (view === 4 ? 'sel' : '') + '"><i></i>Wrap up<b>' + (D.sub ? '✓' : '→') + '</b></button>';
+  if (strip.dataset.signature === html) return;
+  const restore = KEV.focusedControl(strip);
+  strip.innerHTML = html;
+  strip.dataset.signature = html;
+  restore();
+  strip.querySelectorAll('button').forEach(b => b.onclick = () => { view = +b.dataset.s; follow = false; renderSteps(); renderView(); renderBar(); window.scrollTo({top: 0}); });
+}
+function renderView() {
+  if (!D || finalParked()) return;
+  if (sheetKind === 'guide') updateStageGuide();
+  const el = $('view');
+  if (view === 4) return renderWrap(el);
+  const g = C.rubric[view], [a] = GROUPS[view], st = C.steps[view], sug = suggestions();
+  const need = g.ticks.some((t, k) => sug[a + k] && !D.ticks[a + k]);
+  let h = '<div class="stephead"><h2>' + KEV.esc(st.n + '  ' + st.name) + '</h2><p>' + KEV.esc(st.line) + '</p></div>';
+  if (need && !D.sub) h += '<div class="acc"><span>✨ Suggested from what you logged</span><button class="btn alt sm" id="bacc">Accept</button></div>';
+  g.ticks.forEach((t, k) => {
+    const i = a + k;
+    h += '<div class="tick-row"><button type="button" class="tick' + (D.ticks[i] ? ' on' : '') + (sug[i] ? ' sug' : '') + '" data-i="' + i + '" aria-pressed="' + Boolean(D.ticks[i]) + '"><span class="box" aria-hidden="true"></span><span class="lab">' + KEV.esc(t.short) + '</span></button>' +
+      '<button type="button" class="info" data-info="' + i + '" aria-label="What counts for criterion ' + (i + 1) + '" aria-expanded="' + Boolean(openInfo[i]) + '" aria-controls="counts-' + i + '">i</button></div>';
+    h += '<div class="counts" id="counts-' + i + '"' + (openInfo[i] ? '' : ' hidden') + '><b>Counts when:</b> ' + KEV.esc(t.counts) + '<div class="small mut" style="margin-top:4px">' + KEV.esc(t.text) + '</div></div>';
+  });
+  const restore = KEV.focusedControl(el);
+  el.innerHTML = h;
+  restore();
+  el.querySelectorAll('.tick').forEach(button => button.onclick = () => toggleTick(+button.dataset.i));
+  el.querySelectorAll('[data-info]').forEach(button => button.onclick = () => {
+    const i = +button.dataset.info;
+    openInfo[i] = !openInfo[i];
+    button.setAttribute('aria-expanded', String(openInfo[i]));
+    $('counts-' + i).hidden = !openInfo[i];
+  });
+  if ($('bacc')) $('bacc').onclick = () => { suggestions().forEach((x, i) => { if (x && groupOf(i) === view) D.ticks[i] = 1; }); saveDraft(); refreshAll(); };
+}
+function toggleTick(i) { if(KEV.profile.isPreview || (scoped && !canSync()))return;D.ticks[i] = D.ticks[i] ? 0 : 1; saveDraft(); refreshAll(); }
+function refreshAll() { renderSteps(); renderView(); renderBar(); }
+
+function renderWrap(el) {
+  const sc = scn();
+  const final = kind() === 'final';
+  const ratingKey = final ? 'final_rating' : 'wrap_rating';
+  const ratingTitle = final ? 'Your Final score' : 'Overall impression and team confidence';
+  const ratingHelp = final ? 'Score this finalist from 1 to 5. These panel scores determine first, second and third place.' : 'Use 1 to 5 stars as your overall tiebreak score, including how confidently the team presented.';
+  const stars = '<div class="star-field"><h3>' + ratingTitle + '</h3><p class="small mut">' + ratingHelp + '</p><div class="star-rating" role="radiogroup" aria-label="' + ratingTitle + '">' + [1,2,3,4,5].map(n=>'<button type="button" data-rating="'+n+'" role="radio" aria-checked="'+(D[ratingKey]===n)+'" aria-label="'+n+' star'+(n===1?'':'s')+'" class="'+(D[ratingKey]>=n?'on':'')+'">★</button>').join('') + '</div></div>';
+  if (final) {
+    el.innerHTML = '<div class="stephead"><h2>Final score</h2><p>Give one overall score after the finalist has presented.</p></div>' + stars + '<label class="sub" for="fb" style="display:block;margin-top:14px">Optional note for the panel</label><textarea id="fb" placeholder="A short reason for your score.">' + KEV.esc(D.feedback) + '</textarea>';
+    el.querySelectorAll('[data-rating]').forEach(button=>button.onclick=()=>{D.final_rating=+button.dataset.rating;saveDraft();renderWrap(el);renderSteps();renderBar();});
+    $('fb').oninput=e=>{D.feedback=e.target.value;D.fbEdited=true;saveDraft();};
+    return;
+  }
+  let h = '<div class="stephead"><h2>Wrap up</h2><p>Check the ticks, add feedback for the team, then submit.</p></div>' +
+    stars +
+    '<div class="sub">Your ticks · tap to correct</div><div class="mini">' + D.ticks.map((t, i) => '<button data-m="' + i + '" aria-label="Criterion ' + (i + 1) + '" aria-pressed="' + Boolean(t) + '" class="' + (t ? 'on' : '') + '">' + (i + 1) + '</button>').join('') + '</div>' +
+    '<button type="button" class="row2' + (D.ai ? ' on' : '') + '" id="aitick" aria-pressed="' + Boolean(D.ai) + '"><span>' + KEV.esc(C.bonus_tick.text) + '<span class="small mut">' + KEV.esc(C.bonus_tick.counts) + ' · judge only, +2</span></span><span class="sw" aria-hidden="true"></span></button>' +
+    '<button type="button" class="row2' + (D.spoke ? ' on' : '') + '" id="spoke" aria-pressed="' + Boolean(D.spoke) + '"><span>All team members spoke<span class="small mut">If a team member did not speak, say so in the feedback.</span></span><span class="sw" aria-hidden="true"></span></button>' +
+    '<section class="judge-wrap-section" aria-label="Feedback for the team"><h3><label for="fb">Feedback for the team</label></h3>' +
+    (kind() === 'round' && sc ? '<p class="small mut" style="margin:0 0 6px">Ask “Which type, and why?” (answer: type ' + KEV.esc(sc.type) + '). Then one thing that worked, one to add.</p>' : '') +
+    '<textarea id="fb" maxlength="2000" placeholder="Name one strength and one thing to try next.">' + KEV.esc(D.feedback) + '</textarea>' +
+    '<label class="small"><input type="checkbox" id="participant-approve"' + (D.participant_feedback_approved ? ' checked' : '') + '> This feedback is ready for the Desk to share with this team.</label>' +
+    '<div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn alt sm" id="fbd">✨ Draft feedback</button><span class="small mut" id="fbs"></span></div><p class="small mut">Use Notes for private observations. The Desk shares only the approved text above.</p></section>';
+  const restore = KEV.focusedControl(el);
+  el.innerHTML = h;
+  restore();
+  el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => toggleTick(+b.dataset.m));
+  el.querySelectorAll('[data-rating]').forEach(button=>button.onclick=()=>{D.wrap_rating=+button.dataset.rating;saveDraft();renderWrap(el);renderSteps();renderBar();});
+  $('aitick').onclick = () => { D.ai = D.ai ? 0 : 1; saveDraft(); renderWrap(el); renderBar(); };
+  $('spoke').onclick = () => { D.spoke = D.spoke ? 0 : 1; saveDraft(); renderWrap(el); };
+  $('fb').oninput = e => { D.feedback = e.target.value; D.fbEdited = true; D.participant_feedback_approved = false; $('participant-approve').checked = false; saveDraft(); };
+  $('participant-approve').onchange = e => { D.participant_feedback_approved = e.target.checked; saveDraft(); };
+  $('fbd').onclick = draftFeedback;
+}
+
+function renderBar() {
+  if (!D) return;
+  const s = score();
+  $('bsc').textContent = kind() === 'final' ? (D.final_rating ? D.final_rating + ' / 5' : 'Choose 1–5') : s.total + ' pts';
+  $('bsub').textContent = kind() === 'final' ? 'Overall finalist score' : s.t + ' of 10 ticks' + (s.ai ? ' · +2 AI' : '') + (s.badge ? ' · +' + s.badge + ' badge' : '');
+  const hold = outbox().find(item => item.assignment === dkey);
+  $('bsub2').disabled = view === 4 && (submitting || Boolean(hold));
+  $('bsub2').textContent = view === 4 && hold ? (hold.status === 'review' ? 'Needs Desk review' : 'Pending on this device') : view === 4 ? (D.sub ? 'Resubmit' : 'Submit sheet') : 'Wrap up →';
+  $('bsub2').className = 'btn' + (view !== 4 || (D.sub && selfPaced() && S.has_next) ? ' alt' : '');
+  renderControls();
+}
+function renderSubmitted() {
+  const el = $('subbed');
+  const queue = outbox();
+  const current = queue.find(item => item.assignment === dkey);
+  const other = queue.filter(item => item !== current);
+  const earlier = earlierSavedWork();
+  let html = '';
+  if (current?.status === 'pending') {
+    html = '<span><strong>Pending on this device.</strong> Waiting to send. Keep this page open and check for the Desk receipt.</span>' +
+      '<button class="btn alt sm" id="sretry">Retry now</button>';
+  } else if (current) {
+    html = '<span><strong>Needs Desk review.</strong> The Desk did not accept this sheet. ' + KEV.esc(current.error) + '</span>' +
+      '<button class="btn alt sm" data-sheet-download="current">Download sheet</button>';
+  } else if (D?.sub) {
+    html = '<span><strong>✓ Accepted by the Desk.</strong>' + (kind() === 'final' && !S.final?.published ? ' Wait for the Desk to call the next finalist. You can correct and resubmit until results are published.' : '') + '</span>';
+  }
+  if (S?.final?.needs_rescore) html = '<span><strong>Reassess this Final sheet.</strong> ' + KEV.esc(S.final.legacy_case_warning || 'Check this team’s original scenario and submit a replacement sheet.') + '</span>' + html;
+  if (recoveredSheet?.key === queueKey()) html += '<span>Earlier sheet for Team ' + recoveredSheet.team + ' accepted by the Desk.</span>';
+  if (other.length) {
+    html += '<span>' + other.length + ' unconfirmed ' + (other.length === 1 ? 'sheet' : 'sheets') + ' from earlier assignments on this device.</span>' +
+      '<button class="btn alt sm" data-sheet-download="other">Download earlier sheets</button>';
+  }
+  if (earlier.length) {
+    html += '<span>Earlier saved work is available on this device.</span>' +
+      '<button class="btn alt sm" data-sheet-download="earlier-context">Download earlier saved work</button>';
+  }
+  el.hidden = !html;
+  el.dataset.receipt = current?.status || (D?.sub ? 'accepted' : '');
+  el.className = 'done judge-receipt-banner' + (current?.status === 'pending' ? ' pending' : current || other.length || S?.final?.needs_rescore ? ' review' : '');
+  if (el.dataset.signature === html) return;
+  const restore = KEV.focusedControl(el);
+  el.dataset.signature = html;
+  el.innerHTML = html;
+  restore();
+  if ($('sretry')) $('sretry').onclick = flushOutbox;
+  el.querySelectorAll('[data-sheet-download]').forEach(button => button.onclick = () => {
+    const selection = button.dataset.sheetDownload;
+    const exportData = selection === 'earlier-context' ? {station, previous: earlierSavedWork()} :
+      {workspace: KEV.workspaceMode, context: KEV.context, station, sheets: selection === 'current' ? [current] : other};
+    KEV.saveFile(new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'}), 'kevenos-' + KEV.workspaceMode + '-station-' + station + '-sheets.json');
+  });
+}
+
+// Earlier generations and pre-workspace storage are export-only, and only
+// when they can be associated with the current hosted judge identity.
+function earlierSavedWork() {
+  if (!scoped || !identity?.key) return [];
+  const identityScope = station + ':' + identity.key;
+  return Object.keys(localStorage).flatMap(key => {
+    const [prefix, storage, mode, context, localStation, localIdentity, ...assignment] = key.split(':');
+    if (prefix !== 'pp') return [];
+    const legacy = KEV.workspaceMode === 'live' && (key === 'kevenos:outbox:' + identityScope || key.startsWith('kevenos:draft:' + identityScope + ':'));
+    const prior = ['workspace-outbox', 'workspace-draft'].includes(storage) && mode === KEV.workspaceMode && (context !== KEV.context || assignment[0] !== KEV.profile.context) &&
+      localStation === String(station) && localIdentity === identity.key;
+    if (!legacy && !prior) return [];
+    const scope = legacy ? {source: 'before workspace support', assignment: key.split(':').slice(4).join(':')} :
+      {context, assignment: assignment.join(':')};
+    try { return [{...scope, data: JSON.parse(localStorage.getItem(key))}]; } catch { return []; }
+  });
+}
+
+// ───────── judge-paced sessions ─────────
+async function session(action, force) {
+  if(KEV.profile.isPreview || (scoped && !canSync()))return;
+  try { await KEV.api('/api/session', {body: {action, force: !!force, expected_round:S.assignment.round}}, token); await sync(); }
+  catch (e) {
+    if (action === 'next' && /not submitted/i.test(e.message)) { if (confirm(e.message + ' Move on anyway?')) return session(action, true); return; }
+    alert(e.message);
+  }
+}
+const judgeMenu = '<button data-k="keys">Keyboard shortcuts</button>' + (scoped ? '' : '<button data-k="stations">Change station</button>');
+function judgeMenuAction(action) {
+  $('more').open = false;
+  if (action === 'stations') { location.href = '/judge'; return; }
+  if (action === 'recover') return showFinalRecovery();
+  openSheet(action, $('judge-menu'));
+}
+function showFinalRecovery() {
+  const visited = (S.final?.visited || []).map(item => typeof item === 'object' ? item : {pair:item});
+  $('mbody').innerHTML = '<h2 id="modal-title">Review a Final sheet</h2><p>Your choice only changes this device. The stage timer and the other judges stay on the current finalist.</p><label class="field" for="recover-team">Team</label><select id="recover-team">' + visited.map(item => '<option value="' + item.pair + '">Team ' + item.pair + (item.partner ? ' · ' + KEV.esc(item.partner) : '') + (S.final.pending_assignments?.includes(item.pair) ? ' · sheet missing' : '') + '</option>').join('') + '</select><div class="actions" style="margin-top:16px"><button class="btn" id="recover-open">Open sheet</button><button class="btn alt" id="recover-stage">Return to on-stage team</button><button class="btn ghost" id="recover-close">Cancel</button></div>';
+  showPanel($('modal'), $('recover-team'), $('judge-menu'));
+  $('recover-close').onclick = () => closePanel($('modal'));
+  $('recover-open').onclick = async () => { recoveryPair = +$('recover-team').value; closePanel($('modal')); await sync(); };
+  $('recover-stage').onclick = async () => { recoveryPair = null; closePanel($('modal')); await sync(); };
+}
+function renderControls() {
+  const el = $('ctl'), menu = $('menu');
+  const finalMenu = judgeMenu + (kind() === 'final' && !S.final?.published && S.final?.eligible !== false && S.final?.visited?.length ? '<button data-k="recover">Review an earlier Final sheet</button>' : '');
+  if (!selfPaced() || S.assignment.pair == null) {
+    if (el.dataset.sig !== finalMenu) {
+      el.innerHTML = '';
+      menu.innerHTML = finalMenu;
+      el.dataset.sig = finalMenu;
+      menu.querySelectorAll('[data-k]').forEach(b => b.onclick = () => judgeMenuAction(b.dataset.k));
+    }
+    return;
+  }
+  const c = S.clock, idle = !c.started_any && !c.running;
+  const confirmed = D.sub && !submitting && !outbox().some(item => item.assignment === dkey);
+  const next = S.has_next && confirmed;
+  const B = (a, l, cls = '') => '<button class="btn ' + cls + '" data-a="' + a + '">' + l + '</button>';
+  const M = (a, l) => '<button data-a="' + a + '">' + l + '</button>';
+  let main = '', recovery = '';
+  if (!c.ended && (c.running || c.phase !== 'over')) {
+    main = c.running ? B('pause', 'Pause', 'ghost') : B('start', idle ? 'Start pitch' : 'Resume', next ? 'ghost' : '');
+  }
+  if (next && (!scoped || !c.running || c.elapsed >= 780)) main += B('next', 'Next team →');
+  if (c.running && c.phase === 'pitch') recovery += M('feedback', 'End pitch · start feedback');
+  if (!idle && !c.ended) recovery += M('finish', 'End session');
+  if (c.ended || c.phase === 'over') recovery += M('start', 'Reopen clock');
+  if (!idle) recovery += M('reset', 'Reset clock to 0:00');
+  if (!scoped && S.has_next && !confirmed && !submitting) recovery += M('skip', 'Move on without submitting');
+  const m = judgeMenu + (recovery ? '<details id="clock-controls"><summary id="clock-controls-toggle">Clock controls</summary>' + recovery + '</details>' : '');
+  const sig = main + m; if (el.dataset.sig === sig) return; el.dataset.sig = sig;
+  const restoreMain = KEV.focusedControl(el), restoreMenu = KEV.focusedControl(menu);
+  const recoveryOpen = $('clock-controls')?.open;
+  el.innerHTML = main; menu.innerHTML = m;
+  if (recoveryOpen && $('clock-controls')) $('clock-controls').open = true;
+  restoreMain(); restoreMenu();
+  const act = b => {
+    if (menu.contains(b)) {
+      $('more').open = false;
+      $('judge-menu').focus({preventScroll: true});
+    }
+    const a = b.dataset.a;
+    if (b.dataset.k) return judgeMenuAction(b.dataset.k);
+    if (a === 'skip') {
+      if (confirm('Move on without submitting the current sheet? Any unsent work stays on this device.')) session('next', true);
+      return;
+    }
+    if (a === 'reset') { if (confirm('Reset your clock to 0:00 for this team?')) session('reset', true); return; }
+    if (a === 'finish' && !confirm('End this session? The clock stops. You can still edit and submit your sheet.')) return;
+    if (a === 'finish') { view = 4; follow = false; refreshAll(); }
+    session(a);
+  };
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b));
+  menu.querySelectorAll('[data-a],[data-k]').forEach(b => b.onclick = () => act(b));
+}
+function renderTop() {
+  if (!S || !D) return;
+  renderWho(); renderControls(); renderSteps(); renderTimer();
+}
+
+// ───────── clock, phases, cues ─────────
+function announceClock(status) {
+  const el = $('clock-status');
+  if (el.textContent !== status) el.textContent = status;
+}
+function renderTimer() {
+  if (!S || !D || finalParked() || S.assignment.pair == null || KEV.workspaceChanging) return;
+  const el = elapsed(), c = S.clock;
+  const mayFollow = (!$('sheet').open || (sheetDocked() && document.activeElement !== $('qf'))) &&
+    !$('modal').open && !$('view').contains(document.activeElement);
+  if (c.kind === 'final') {
+    const final = KEV.finalClock(c, (Date.now() - recvAt) / 1000);
+    $('tt').textContent = S.assignment.recovery || S.final?.status === 'review' ? '' : final.time;
+    $('tph').className = 'ph ' + (final.ended ? 'over' : 'pitch');
+    $('tph').textContent = S.assignment.recovery ? 'Earlier sheet' : KEV.finalLabel(S.final);
+    announceClock($('tph').textContent);
+    const cue = S.assignment.recovery ? 'Reviewing Team ' + S.assignment.pair + ' · the stage remains on Team ' + S.final.stage_pair : S.final?.status === 'review' ? 'Results review · submit or correct your sheet before publication.' : 'Desk controls the timer · original scenario: ' + (scn()?.name || '');
+    if ($('cue').textContent !== cue) $('cue').textContent = cue;
+    const next = $('subbed').dataset.receipt === 'accepted' ? 'Final rating accepted. Follow the Desk for the next finalist.' :
+      final.ended ? 'Give one overall rating and check for an accepted receipt.' : 'Listen to the pitch and consult the original scenario as needed.';
+    if ($('judge-phase-note').textContent !== next) $('judge-phase-note').textContent = next;
+    if (!S.assignment.recovery && final.ended && lastStep !== 'final-over' && mayFollow) {
+      lastStep = 'final-over';
+      view = 4; refreshAll();
+    }
+    if (!final.ended) lastStep = 'final';
+    return;
+  }
+  let ph = 'pitch', step = 0, left;
+  const ends = [120, 300, 480, 600];
+  if (el < 600) { ph = 'pitch'; step = ends.findIndex(e => el < e); left = ends[step] - el; }
+  else if (el < 780) { ph = 'feedback'; step = 4; left = 780 - el; }
+  else if (el < 900) { ph = 'change'; step = 5; left = 900 - el; }
+  else { ph = 'over'; step = 5; left = 0; }
+  const idle = !c.started_any && !c.running;
+  $('tt').textContent = idle ? '--:--' : KEV.mmss(ph === 'pitch' ? 600 - el : left);
+  $('tph').className = 'ph ' + ph; $('tph').textContent = idle ? (selfPaced() ? 'Press Start' : 'Waiting for the timekeeper') : c.running ? ({pitch: 'Pitch', feedback: 'Feedback', change: 'Change over', over: 'Time is up'})[ph] : (c.ended ? 'Session ended' : 'Paused');
+  announceClock($('tph').textContent + (!idle && ph === 'pitch' ? ' · ' + C.steps[step].name : ''));
+  const next = $('subbed').dataset.receipt === 'accepted' ? 'Your sheet was accepted. Follow the Desk for the next assignment.' :
+    c.ended || (!idle && ph !== 'pitch') ? 'Wrap up, send the sheet and check for an accepted receipt.' :
+    idle ? 'Confirm the team and review the customer scenario.' : 'Tick the criteria you observe. Your work is saved on this device as you go.';
+  if ($('judge-phase-note').textContent !== next) $('judge-phase-note').textContent = next;
+  document.querySelectorAll('#steps button').forEach((d, i) => {
+    if (i > 3) return;
+    const a = i === 0 ? 0 : ends[i - 1], b = ends[i];
+    const live = ph === 'pitch' && i === step && !idle;
+    d.firstChild.style.width = idle ? '0' : Math.max(0, Math.min(1, (el - a) / (b - a))) * 100 + '%';
+    d.classList.toggle('now', live);
+    if (live) d.setAttribute('aria-current', 'step');
+    else d.removeAttribute('aria-current');
+  });
+  const key = idle ? 'idle' : ph + step;
+  if (key !== lastStep) {
+    const first = lastStep === -9; lastStep = key;
+    const cue = $('cue');
+    cue.textContent = !idle && ph === 'pitch' ? 'Pitch stage · ' + C.steps[step].name : '';
+    if (!first && cue.textContent) { cue.classList.remove('flash'); void cue.offsetWidth; cue.classList.add('flash'); }
+  }
+  if (mayFollow && lastFollowed !== key) {
+    const first = lastFollowed === null;
+    lastFollowed = key;
+    if (idle) return;
+    if (ph === 'pitch') follow = true;
+    const v = ph === 'pitch' ? step : 4;
+    if (follow && v !== view) {
+      view = v;
+      refreshAll();
+      if (v === 4 && c.running && !D.feedback && !D.sub && !first) draftFeedback();
+    }
+  }
+}
+setInterval(() => { try { renderTimer(); } catch (e) {} }, 500);
+
+// ───────── reference panels and modal sheets ─────────
+const panelReturn = new WeakMap();
+const referenceTriggers = {guide: $('bhelp'), customer: $('bcustomer')};
+const isReference = kind_ => Object.hasOwn(referenceTriggers, kind_);
+const sheetDocked = () => $('sheet').classList.contains('docked');
+const shouldDock = () => isReference(sheetKind) && window.innerWidth >= 1100;
+function presentPanel(panel, docked) {
+  if (panel === $('sheet')) {
+    panel.classList.toggle('docked', docked);
+    document.body.classList.toggle('reference-open', docked);
+    if ($('reference-switch')) $('reference-switch').hidden = docked;
+  }
+  if (docked) {
+    $('app').removeAttribute('inert');
+    panel.removeAttribute('aria-modal');
+    panel.show();
+  } else {
+    $('app').setAttribute('inert', '');
+    panel.setAttribute('aria-modal', 'true');
+    panel.showModal();
+  }
+}
+function showPanel(panel, focus, trigger) {
+  if (panel === $('modal') && sheetDocked()) closeSheet(false);
+  const restoreFocus = trigger && !$('app').contains(trigger)
+    ? () => trigger.focus({preventScroll: true})
+    : KEV.focusedControl($('app'), trigger);
+  panelReturn.set(panel, restoreFocus);
+  panel.hidden = false;
+  presentPanel(panel, panel === $('sheet') && shouldDock());
+  focus?.focus({preventScroll: true});
+}
+function closePanel(panel, restoreFocus = true) {
+  if (!panel.open) return;
+  panel.close();
+  panel.hidden = true;
+  panel.removeAttribute('aria-modal');
+  $('app').removeAttribute('inert');
+  if (panel === $('sheet')) {
+    panel.classList.remove('docked');
+    document.body.classList.remove('reference-open');
+    panel.replaceChildren();
+    sheetKind = null;
+    updateReferenceControls();
+  }
+  if (restoreFocus) panelReturn.get(panel)?.();
+  panelReturn.delete(panel);
+}
+for (const panel of [$('sheet'), $('modal')]) {
+  panel.addEventListener('cancel', e => { e.preventDefault(); closePanel(panel); });
+  panel.addEventListener('click', e => {
+    if (e.target !== panel || panel.classList.contains('docked')) return;
+    const {left, right, top, bottom} = panel.getBoundingClientRect();
+    if (e.clientX < left || e.clientX >= right || e.clientY < top || e.clientY >= bottom) closePanel(panel);
+  });
+}
+function updateReferenceControls() {
+  for (const [kind_, button] of Object.entries(referenceTriggers)) {
+    button.setAttribute('aria-expanded', String(sheetKind === kind_));
+  }
+}
+function openSheet(kind_, trigger) {
+  const sheet = $('sheet');
+  if ($('modal').open) return;
+  if (sheet.open) {
+    if (isReference(sheetKind) && isReference(kind_)) {
+      if (sheetKind === kind_) { closeSheet(); return; }
+      sheetKind = kind_;
+      updateReferenceControls();
+      renderSheet();
+      panelReturn.set(sheet, KEV.focusedControl($('app'), trigger));
+      $('sx').focus({preventScroll: true});
+      return;
+    }
+    if (!sheetDocked()) return;
+    closeSheet(false);
+  }
+  sheetKind = kind_;
+  updateReferenceControls();
+  renderSheet();
+  showPanel(sheet, kind_ === 'notes' ? $('notes') : $('sx'), trigger);
+}
+function closeSheet(restoreFocus) { closePanel($('sheet'), restoreFocus); }
+window.addEventListener('resize', () => {
+  const sheet = $('sheet'), docked = shouldDock();
+  if (!sheet.open || sheetDocked() === docked) return;
+  const focus = document.activeElement;
+  sheet.close();
+  presentPanel(sheet, docked);
+  (sheet.contains(focus) && !focus.hidden ? focus : $('sx')).focus({preventScroll: true});
+});
+function renderSheet() {
+  const sh = $('sheet');
+  const head = t => '<div class="sh"><h2 id="helper-title">' + t + '</h2><button class="btn ghost" id="sx">Close</button></div>';
+  const alternate = sheetKind === 'guide' ? 'customer' : 'guide';
+  const switcher = () => '<button class="btn ghost" id="reference-switch"' + (sheetDocked() ? ' hidden' : '') + '>' + referenceTriggers[alternate].textContent + '</button>';
+  if (sheetKind === 'guide') {
+    sh.innerHTML = head('Stage guide') + switcher() + '<div id="guide-intro" class="reference-intro"></div><div id="lbody"></div>';
+    updateStageGuide();
+  } else if (sheetKind === 'customer') {
+    sh.innerHTML = head('Customer scenario') + switcher() + '<div id="lbody"></div>';
+    renderCustomer();
+  } else if (sheetKind === 'notes') {
+    sh.innerHTML = head('Notes') + '<div class="chips" id="nchips">' + C.steps.map(s => '<button data-tag="' + KEV.esc(s.name) + '">+ ' + KEV.esc(s.name) + '</button>').join('') + '</div>' +
+      '<textarea id="notes" placeholder="Quick notes. Tap a step to add a time-stamped tag. On a solution device you can dictate: press Fn twice.">' + KEV.esc(D.notes) + '</textarea>' +
+      '<div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn alt sm" id="tidy">Tidy my notes (AI)</button><span class="small mut" id="tidys"></span></div>';
+    $('notes').oninput = e => { D.notes = e.target.value; saveDraft(); };
+    sh.querySelectorAll('#nchips button').forEach(b => b.onclick = () => {
+      const ta = $('notes'), tag = '[' + b.dataset.tag + ' ' + KEV.mmss(elapsed()) + '] ';
+      const pre = ta.value && !ta.value.endsWith('\n') ? '\n' : ''; ta.value += pre + tag; D.notes = ta.value; saveDraft(); ta.focus();
+    });
+    $('tidy').onclick = tidyNotes;
+  } else if (sheetKind === 'materials') {
+    sh.innerHTML = head('How to judge') + '<div class="cardx usage-content" id="judge-materials" tabindex="-1"></div>';
+    KEV.loadHelp($('judge-materials'), {token});
+  } else if (sheetKind === 'keys') {
+    sh.innerHTML = head('Keyboard shortcuts') + '<div class="cardx"><p><span class="kbd">1</span>–<span class="kbd">9</span>, <span class="kbd">0</span> tick or untick item 1–10</p><p><span class="kbd">A</span> AI bonus tick</p><p><span class="kbd">N</span> notes</p><p><span class="kbd">F</span> feedback</p><p><span class="kbd">⌘ Enter</span> submit</p><p><span class="kbd">Esc</span> close a panel</p></div>';
+  }
+  $('sx').onclick = () => closeSheet();
+  if ($('reference-switch')) $('reference-switch').onclick = () => openSheet(alternate, referenceTriggers[alternate]);
+  sh.scrollTop = 0;
+}
+for (const [kind_, button] of Object.entries(referenceTriggers)) {
+  button.onclick = e => openSheet(kind_, e.currentTarget);
+}
+$('judge-help').onclick = e => openSheet('materials', KEV.nav.helpReturn || e.currentTarget);
+$('bnote').onclick = e => openSheet('notes', e.currentTarget);
+
+function renderCustomer() {
+  const sc = scn(), el = $('lbody');
+  if (kind() === 'calib') {
+    el.innerHTML = '<div class="cardx"><h3 class="reference-title">Calibration mock pitch</h3><p>' + KEV.esc(C.mock.intro) + '</p></div><div class="cardx">' + C.mock.lines.map(l =>
+      (l.step ? '<h3 style="margin-top:12px">' + KEV.esc(l.step) + '</h3>' : '') + '<p style="margin:4px 0"><b>' + KEV.esc(l.who) + ':</b> ' + KEV.esc(l.line) + '</p>').join('') + '</div>';
+  } else if (sc) {
+    el.innerHTML = '<div class="cardx"><div style="display:flex;gap:8px;align-items:center"><h3 class="reference-title" style="margin:0;flex:1;min-width:0">' + KEV.esc(sc.name) + '</h3><span class="pill">Type ' + KEV.esc(sc.type) + '</span></div>' +
+      '<p class="mut">' + KEV.esc(sc.line) + '</p><ul>' + sc.card.map(x => '<li>' + KEV.esc(x) + '</li>').join('') + '</ul>' +
+      '<h4>You play</h4><p>' + KEV.esc(sc.persona) + '</p><h4>Lean in when</h4><p>' + KEV.esc(sc.lean_in) + '</p>' +
+      '<h4>Your rules</h4><ul class="small">' + C.judge_rules.map(r => '<li>' + KEV.esc(r) + '</li>').join('') + '</ul></div>';
+  } else {
+    el.innerHTML = '<p>The customer brief for this assignment is unavailable.</p>';
+  }
+}
+function guideCriteria(model) {
+  return '<details class="reference-criteria"><summary>What counts</summary><ul>' + C.rubric[view].ticks.map(t =>
+    '<li><b>' + KEV.esc(t.short) + '</b><br>' + KEV.esc(t.counts) + '</li>').join('') + '</ul>' +
+    (model ? '<p><b>Model answer</b><br>' + KEV.esc(model) + '</p>' : '') + '</details>';
+}
+function updateStageGuide() {
+  const intro = $('guide-intro'), el = $('lbody'), sc = scn();
+  if (intro.dataset.stage === String(view)) return;
+  const hadFocus = el.contains(document.activeElement) || intro.contains(document.activeElement);
+  const st = C.steps[view];
+  intro.dataset.stage = String(view);
+  intro.innerHTML = '<h3 class="reference-title" id="guide-stage">' + KEV.esc(st?.name || 'Wrap up') + '</h3>' +
+    (st ? '<p class="mut">' + KEV.esc(st.line) + '</p>' : '') + (view === 0 && sc ? guideCriteria(sc.model.discover) : '');
+  if (view === 4) {
+    el.innerHTML = '<div class="cardx"><ul><li>Check all ten scoring criteria and the AI bonus.</li>' +
+      (kind() === 'round' ? '<li>Ask “Which type, and why?”</li>' : '') + '<li>Check whether all team members spoke.</li>' +
+      '<li>Write feedback for the team.</li><li>Submit the sheet and check for the receipt.</li></ul></div>';
+  } else if (!sc) {
+    el.innerHTML = '<div class="cardx">' + guideCriteria() + '</div>';
+  } else if (view === 0) {
+    renderQuestions(el);
+  } else if (view === 2) {
+    renderWorries(el, sc);
+  } else {
+    const bonus = view === 1 && sc.bonus?.ai;
+    el.innerHTML = '<div class="cardx"><h4>Model answer</h4><p>' + KEV.esc(sc.model[view === 1 ? 'maw' : 'close']) + '</p>' +
+      (bonus ? '<h4>AI bonus idea</h4><p>' + KEV.esc(bonus) + '</p>' : '') + '</div>';
+  }
+  $('sheet').scrollTop = 0;
+  if (hadFocus) $('sx').focus({preventScroll: true});
+}
+function renderQuestions(el) {
+  const core = C.questions.flatMap(g => g.items).filter(q => q.core), got = core.filter(q => D.asked[q.id] != null).length;
+  el.innerHTML = '<div class="cardx"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1">Tap a question when the team asks it</b><span class="pill ' + (got >= 6 ? 'ok' : '') + '">★ ' + got + ' of ' + core.length + '</span></div>' +
+    '<input type="text" id="qf" aria-label="Find a question" placeholder="Find a question…" style="margin:8px 0"><div id="ql">' +
+    qlist('') + '</div></div>';
+  $('qf').oninput = e => { $('ql').innerHTML = qlist(e.target.value); bindQ(); };
+  bindQ();
+}
+function renderWorries(el, sc) {
+  el.innerHTML = sc.objections.filter(([kind]) => kind === 'IT' || kind === 'Business').map(o => {
+    const k = o[0], r = D.raised[k], ref = C.objections.find(x => x.worry === o[1]) || {};
+    const due = elapsed() >= 120 && r.t == null && S.clock.phase === 'pitch';
+    return '<div class="wcard' + (due ? ' todo' : '') + '"><div style="display:flex;gap:8px;align-items:center"><span class="pill ' + (k === 'IT' ? '' : 'warn') + '">' + k + ' worry</span><b style="flex:1">' + KEV.esc(o[1]) + '</b></div>' +
+      '<div class="say">Say: ' + KEV.esc(o[2]) + '</div>' +
+      (r.t == null ? '<button class="btn" data-raise="' + k + '">I raised it</button>' + (due ? ' <span class="small">Time to raise it.</span>' : '') :
+      '<div class="small mut">Raised at ' + KEV.mmss(r.t) + '. Tick what you hear:</div>' +
+      ['u|Understood the worry ("I hear you")', 'm|Gave a solution device answer', 's|Named a implementation partner service'].map(x => { const [f, l] = x.split('|'); return '<label class="chk"><input type="checkbox" data-w="' + k + '" data-f="' + f + '" ' + (r[f] ? 'checked' : '') + '> ' + l + '</label>'; }).join('') +
+      '<details><summary class="small">What counts</summary><p class="small"><b>solution device answer:</b> ' + KEV.esc(ref.mac || '') + '<br><b>Service:</b> ' + KEV.esc(ref.service || '') + '</p></details>') + '</div>';
+  }).join('') + '<p class="small mut">Raise each worry once, when the team starts positioning solution device. Ticks you set here suggest the Solve ticks.</p>' +
+    '<details class="cardx"><summary>Model answer</summary><p>' + KEV.esc(sc.model.solve) + '</p></details>';
+  el.querySelectorAll('[data-raise]').forEach(b => b.onclick = () => {
+    const k = b.dataset.raise;
+    D.raised[k].t = Math.round(elapsed()); saveDraft(); renderWorries(el, sc); refreshAll();
+    [...el.querySelectorAll('[data-w]')].find(input => input.dataset.w === k)?.focus();
+  });
+  el.querySelectorAll('[data-w]').forEach(c => c.onchange = () => { D.raised[c.dataset.w][c.dataset.f] = c.checked ? 1 : 0; saveDraft(); refreshAll(); });
+}
+function qlist(f) {
+  const sc = scn(); f = f.toLowerCase();
+  return C.questions.map(g => {
+    const rows = g.items.filter(q => !f || (q.id + ' ' + q.text).toLowerCase().includes(f)).map(q => {
+      const asked = D.asked[q.id] != null, rv = sc.reveals[q.id];
+      return '<button type="button" class="q' + (q.core ? ' core' : '') + (asked ? ' asked' : '') + '" data-q="' + KEV.esc(q.id) + '" aria-pressed="' + asked + '"><b>' + KEV.esc(q.id) + '</b><span class="grow">' + KEV.esc(q.text) +
+        (asked ? '<span class="rev">' + (rv ? 'Answer: ' + KEV.esc(rv) : 'Answer based on the customer card.') + '</span>' : '') + '</span></button>';
+    });
+    return rows.length ? '<h3 style="margin-top:12px">' + KEV.esc(g.group) + '</h3>' + rows.join('') : '';
+  }).join('');
+}
+function bindQ() {
+  document.querySelectorAll('#ql .q').forEach(r => r.onclick = () => {
+    const q = r.dataset.q; if (D.asked[q] != null) delete D.asked[q]; else D.asked[q] = Math.round(elapsed());
+    saveDraft();
+    const f = $('qf').value;
+    const restore = KEV.focusedControl($('lbody'));
+    renderQuestions($('lbody'));
+    $('qf').value = f;
+    if (f) { $('ql').innerHTML = qlist(f); bindQ(); }
+    restore(); refreshAll();
+  });
+}
+
+// ───────── AI helpers ─────────
+async function draftFeedback() {
+  if(KEV.profile.isPreview || (scoped && !canSync()))return;
+  if (fbBusy) return; fbBusy = true; const st = () => $('fbs');
+  if (st()) st().textContent = 'Drafting…';
+  const sc = scn(), draft = D;
+  try {
+    const r = await KEV.api('/api/ai/feedback', {body: {ticks: D.ticks, notes: D.notes, asked: Object.keys(D.asked).map(q => ({q})), scenario: sc ? sc.id : null, ...(kind() === 'final' ? {final_pair:S.assignment.pair,run_id:S.final?.run_id} : {})}}, token);
+    if (draft !== D) { fbBusy = false; return; }
+    if (!D.fbEdited || !D.feedback.trim()) { D.feedback = r.text; D.fbEdited = false; D.participant_feedback_approved = false; saveDraft(); if ($('fb')) $('fb').value = r.text; if ($('participant-approve')) $('participant-approve').checked = false; }
+    else { if (st()) st().textContent = 'You already wrote feedback, so the draft was not applied. Template: ' + r.template; fbBusy = false; return; }
+    if (st()) st().textContent = r.source === 'ai' ? 'Drafted by the AI. Edit it in your own words.' : 'AI unavailable: template used. Edit it.';
+  } catch (e) { if (st()) st().textContent = 'Could not draft: ' + e.message; }
+  fbBusy = false;
+}
+async function tidyNotes() {
+  if(KEV.profile.isPreview || (scoped && !canSync()))return;
+  if (!D.notes.trim()) return;
+  const draft = D, notes = $('notes');
+  $('tidys').textContent = 'Tidying…';
+  try {
+    const r = await KEV.api('/api/ai/tidy', {body: {notes: D.notes}}, token);
+    if (draft !== D || notes !== $('notes') || !$('sheet').open) return;
+    if (r.source === 'ai') { $('notes').value = r.text; D.notes = r.text; saveDraft(); $('tidys').textContent = 'Done.'; } else $('tidys').textContent = 'AI unavailable: notes unchanged.';
+  } catch (e) { if (notes === $('notes') && $('sheet').open) $('tidys').textContent = e.message; }
+}
+
+// ───────── submit ─────────
+$('bsub2').onclick = () => {
+  if(KEV.profile.isPreview || (scoped && !canSync()))return;
+  if (view !== 4) { view = 4; follow = false; refreshAll(); window.scrollTo({top: 0}); return; }
+  const issues = [], s = score();
+  const asked = Object.keys(D.asked).length;
+  if (kind() === 'final' && !D.final_rating) issues.push('Choose a Final score from 1 to 5 stars.');
+  if (kind() === 'round' && !D.wrap_rating) issues.push('Choose an overall impression and confidence rating from 1 to 5 stars.');
+  if (kind() !== 'final' && s.t === 0) issues.push('No ticks are set.');
+  if (kind() !== 'final' && s.t === 10) issues.push('All ten items are ticked. Is that right?');
+  if (kind() === 'round' && !D.spoke) issues.push('“All team members spoke” is not confirmed.');
+  if (D.ticks[0] && asked > 0 && !(D.asked.Q1 != null && D.asked.Q2 != null)) issues.push('Discover item 1 is ticked, but Q1 and Q2 were not both logged.');
+  if (s.t <= 4 && !D.notes.trim()) issues.push('A low score with no notes. A short note helps the team.');
+  if (!D.feedback.trim() && kind() === 'round') issues.push('The feedback box is empty.');
+  if (!issues.length) return doSubmit();
+  $('mbody').innerHTML = '<h2 id="modal-title">Before you submit</h2><ul>' + issues.map(i => '<li>' + KEV.esc(i) + '</li>').join('') + '</ul><div style="display:flex;gap:10px"><button class="btn alt" id="mgo">Submit anyway</button><button class="btn ghost" id="mno">Go back</button></div>';
+  showPanel($('modal'), $('mno'), $('bsub2'));
+  $('mno').onclick = () => closePanel($('modal'));
+  $('mgo').onclick = () => { closePanel($('modal')); doSubmit(); };
+};
+async function doSubmit() {
+  if ($('judge-workspace').hidden || KEV.profile.isPreview || (scoped && !canSync()))return;
+  if (submitting || finalParked() || KEV.workspaceChanging || outbox().some(item => item.assignment === dkey)) return;
+  const a = S.assignment, assignment = dkey, draft = D;
+  const body = {kind: a.kind, pair: a.pair, ...(a.kind === 'final' ? {run_id:S.final?.run_id,final_rating:D.final_rating} : {}), ...(a.kind === 'round' ? {wrap_rating:D.wrap_rating,round:a.round} : {}),
+    ...(window.crypto?.randomUUID ? {submission_id:window.crypto.randomUUID()} : {}), ticks: D.ticks.slice(), ai: D.ai, spoke: D.spoke, notes: D.notes, feedback: D.feedback, judge: name(),
+    asked: Object.keys(D.asked).map(q => ({q, t: D.asked[q]})), raised: ['IT', 'Business'].map(k => Object.assign({k}, D.raised[k]))};
+  if (a.kind === 'round') body.participant_feedback_approved = D.participant_feedback_approved === true;
+  submitting = true;
+  renderBar();
+  try {
+    await KEV.api('/api/submit', {body}, token);
+    receiptRevision++;
+    if (assignment === dkey && draft === D) D.sub = true;
+    renderSubmitted();
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  } catch (e) {
+    if (['workspace_changed','access_changed','profile_expired'].includes(e.code)) return;
+    if (e.status === 401) return sessionEnded();
+    if (!e.status || e.status >= 500 || e.status === 409) {
+      try {
+        holdSheet({assignment, body, status: e.status === 409 ? 'review' : 'pending', error: e.status === 409 ? e.message : ''});
+        if (!e.status) setOnline(false);
+        renderSubmitted();
+        window.scrollTo({top: 0});
+        return;
+      } catch {
+        e = new Error('This device could not save the submission for retry. Keep the page open and contact the Desk.');
+      }
+    }
+    $('mbody').innerHTML = '<h2 id="modal-title">Could not submit</h2><p>' + KEV.esc(e.message) + '</p><button class="btn" id="submit-error-close">Close</button>';
+    showPanel($('modal'), $('submit-error-close'), $('bsub2'));
+    $('submit-error-close').onclick = () => closePanel($('modal'));
+  } finally {
+    submitting = false;
+    renderBar();
+  }
+}
+
+// ───────── keyboard ─────────
+function trapPanelFocus(event, panel) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closePanel(panel);
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const stops = [...panel.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary')].filter(el => {
+    const collapsed = el.closest('details:not([open])');
+    return !el.closest('[hidden]') && (!collapsed || el === collapsed.firstElementChild);
+  });
+  const first = stops[0], last = stops.at(-1), active = document.activeElement;
+  if (!stops.includes(active) || (event.shiftKey ? active === first : active === last)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first)?.focus();
+  }
+}
+document.addEventListener('keydown', e => {
+  const sheet = $('sheet'), modal = $('modal');
+  if (modal.open) return trapPanelFocus(e, modal);
+  if (sheet.open && !sheetDocked()) return trapPanelFocus(e, sheet);
+  if (sheet.open && e.key === 'Escape') {
+    e.preventDefault();
+    closeSheet(sheet.contains(document.activeElement));
+    return;
+  }
+  if (sheet.open && sheet.contains(e.target)) return;
+  if ($('judge-workspace').hidden || KEV.profile.isPreview || (scoped && !canSync()))return;
+  if (!D || !S || finalParked() || S.assignment.pair == null || KEV.workspaceChanging) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); if (view !== 4) { view = 4; refreshAll(); } $('bsub2').click(); return; }
+  if (tag === 'textarea' || tag === 'input') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^[0-9]$/.test(e.key)) { const i = e.key === '0' ? 9 : +e.key - 1; if (view !== 4 && groupOf(i) !== view) { view = groupOf(i); follow = false; } toggleTick(i); }
+  else if (e.key === 'a' || e.key === 'A') { D.ai = D.ai ? 0 : 1; saveDraft(); refreshAll(); }
+  else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openSheet('notes'); }
+  else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); view = 4; follow = false; refreshAll(); setTimeout(() => $('fb') && $('fb').focus(), 30); }
+});
+
+// ───────── start ─────────
+async function start() {
+  if(scoped){
+    try{
+      const me=await KEV.profile.session();
+      if(!me.authenticated || me.role!=='judge'){
+        showLogin(me.role==='admin'?'Open a Judge preview from Admin to choose a station.':'');
+        if(me.role==='admin'){$('judge-signin').href='/admin?view=judge#profiles';$('judge-signin').textContent='Choose a Judge profile';}
+        return;
+      }
+      if(Number(me.station)!==station){location.replace('/judge/'+me.station);return;}
+      if(!me.draft_key)throw new Error('Your Judge profile could not be checked. Sign in again.');
+      judgeSession=me;identity={name:me.label,key:me.draft_key};profileStopped=false;
+      KEV.profile.previewControls(document.body,'#view .tick,#view [data-m],#view textarea,#participant-approve,#aitick,#spoke,#fbd,#bacc,#bsub2,[data-a],#notes,#tidy,[data-tag],[data-raise],[data-w]');
+    }catch(error){showLogin(error.message);return;}
+  }else if(!token)return showLogin();
+  $('login').hidden=true;
+  try{C=await KEV.api('/api/content',null,token);}
+  catch(error){if(error.status===401)return sessionEnded();showLogin('Cannot reach the scoring desk: '+error.message);return;}
+  if(scoped && !canSync())return;
+  $('app').hidden=false;KEV.nav.render();await sync();
+}
+function hasPendingJudgeWork() {
+  const pending=outbox().some(item=>item.status==='pending');
+  const unfinished=D && !D.sub && (D.notes || D.feedback || D.ticks.some(Boolean));
+  return !!(pending || unfinished);
+}
+if(scoped)KEV.profile.mount({onEnd:stopJudge,hasPendingWork:hasPendingJudgeWork,navigationBusy:()=>submitting,beforeChange:()=>
+  !submitting && (!hasPendingJudgeWork() || confirm('You have saved judge work that has not been accepted. It stays on this device for recovery. Leave this page?'))
+});
+setInterval(()=>{if(canSync() && !$('app').hidden)sync();},2000);
+start();
+</script></body></html>

@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Event Admin | KevenOS</title>
+<link href="/static/app.css" rel="stylesheet"/>
+<link href="/static/assistant.css" rel="stylesheet"/>
+<link href="/static/role-home.css" rel="stylesheet"/>
+<link href="/static/agenda.css" rel="stylesheet"/><link href="/static/event-operations.css" rel="stylesheet"/><link href="/static/live-transition.css" rel="stylesheet"/></head>
+<body class="role-home-page">
+<main class="login" hidden="" id="login">
+<h1>Event Admin</h1>
+<div class="card">
+<p hidden="" id="access-help">Admin manages event settings, access and reports. Sign in with an Admin password.</p>
+<p id="err" role="alert"></p>
+<a class="btn" hidden="" href="/?access=admin" id="signin">Sign in as Admin</a>
+<form hidden="" id="local-login" method="post">
+<label for="pin">Organiser PIN</label>
+<input autocomplete="off" id="pin" inputmode="numeric" required="" type="password"/>
+<p><button class="btn" type="submit">Open Admin</button></p>
+</form>
+</div>
+</main>
+<div class="workspace admin-workspace" hidden="" id="app">
+<aside class="admin-sidebar">
+<nav aria-label="Admin sections" class="workspace-nav" id="nav"></nav>
+<div class="workspace-links">
+<button class="btn ghost sm" data-nav-help="" id="admin-help" type="button">Admin guide</button>
+<button class="btn ghost sm" data-nav-signout="" hidden="" id="sign-out" type="button">Sign out</button>
+</div>
+</aside>
+<main class="workspace-page">
+<header class="page-heading"><h1 id="heading" tabindex="-1"></h1><p id="description"></p></header>
+<nav aria-label="People and access" class="section-actions row" hidden="" id="people-nav"></nav>
+<p id="section-status" role="status"></p>
+<p id="download-status" role="alert"></p>
+<div id="main"></div>
+</main>
+<dialog aria-describedby="workspace-detail" aria-labelledby="workspace-title" id="workspace-dialog">
+<h2 id="workspace-title"></h2>
+<p id="workspace-detail"></p>
+<form id="workspace-form">
+<label class="field" for="workspace-confirm">Type <strong id="workspace-phrase"></strong> to confirm</label>
+<input autocapitalize="off" autocomplete="off" id="workspace-confirm" required="" spellcheck="false" type="text"/>
+<p id="workspace-error" role="alert"></p>
+<div class="row"><button class="btn ghost" id="workspace-cancel" type="button">Cancel</button><button class="btn" id="workspace-apply">Apply</button></div>
+</form>
+</dialog>
+<dialog id="issue-dialog" aria-labelledby="issue-title">
+<div class="row"><h2 class="grow" id="issue-title">New passwords</h2><button class="btn ghost sm" id="issue-done" type="button">Done</button></div>
+<p class="small mut">Share each password only with its account holder. You can open it again from the password list.</p>
+<div class="table-scroll" id="issue-rows"></div>
+<div class="row"><button class="btn" id="issue-download" type="button">Download passwords</button><span id="issue-status" role="status"></span></div>
+</dialog>
+</div>
+<script src="/static/common.js"></script>
+<script src="/static/event-operations.js"></script>
+<script src="/static/live-transition.js"></script>
+<script src="/static/assistant.js"></script>
+<script src="/static/accounts.js"></script>
+<script src="/static/agenda.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const get = path => KEV.api(path, null, KEV.staff.token);
+const post = (path, body = {}) => KEV.api(path, {body}, KEV.staff.token);
+const TABS = {
+  overview: ['Today', 'Check event readiness and open the tools you need.'],
+  people: ['People & access', 'Manage role assignments, the team roster and passwords.'],
+  profiles: ['View as a person', 'Preview an interface or help someone using their assigned access.'],
+  agenda: ['Agenda', 'Plan sections, schedule breaks and review timing changes before publishing.'],
+  content: ['Event content', 'Edit the judging materials and the presentation program.'],
+  reports: ['Reports', 'Download score sheets, feedback cards and an event backup.'],
+  notifications: ['Notifications', 'Send an event email to one recipient and review the mail service’s response.'],
+  activity: ['Visitor activity', 'Review sign-ins, page views and recorded actions.'],
+  system: ['System', 'Check the event configuration and manage rehearsal data.']
+};
+const PEOPLE = {accounts: 'People and roles', credentials: 'Participant passwords', roster: 'Team roster', access: 'Staff passwords'};
+const EXPORTS = {
+  scores: '/api/desk/export.csv', content: '/api/desk/content.json',
+  backup: '/api/desk/backup.json', cards: '/api/desk/cards'
+};
+let tab = 'overview', people = '', C, DS, roster, links, active = false, sectionKey = 0;
+let contentDirty = false, staffDirty = false, issuing = false;
+const emptyNotification = () => ({recipient: '', subject: '', message: ''});
+let notificationDraft = emptyNotification(), notificationAttempt = null, notificationBusy = false;
+let notificationFeedback = '', notificationProblem = false;
+
+function showLogin(message, switching = false) {
+  KEV.assistant?.unmount();
+  KEV.agenda?.unmount();
+  active = false;
+  sectionKey++;
+  if ($('workspace-dialog').open) $('workspace-dialog').close();
+  if ($('issue-dialog').open) $('issue-dialog').close();
+  clearIssue();
+  C = DS = roster = links = CT = CTDOC = ROWS = eventFiles = null;
+  RDIRTY = contentDirty = staffDirty = false;
+  notificationDraft = emptyNotification();
+  notificationAttempt = null;
+  notificationFeedback = '';
+  notificationProblem = false;
+  $('app').hidden = true;
+  $('sign-out').hidden = true;
+  KEV.nav.render();
+  KEV.closeHelp();
+  $('main').replaceChildren();
+  $('err').textContent = message;
+  $('access-help').hidden = !KEV.staff.hosted;
+  $('signin').textContent = switching ? 'Switch accounts' : 'Sign in as Admin';
+  $('signin').hidden = !KEV.staff.hosted;
+  $('local-login').hidden = KEV.staff.hosted;
+  $('login').hidden = false;
+}
+
+async function canChangeProfile() {
+  if (KEV.agenda?.unresolved) { setStatus('Check the agenda update outcome before changing profiles.', true); return false; }
+  if (issuing || notificationBusy || issueMailBusy || KEV.accounts?.busy || KEV.agenda?.busy) { setStatus('Wait for the current request to finish.', true); return false; }
+  if ($('issue-dialog').open && !confirm('Close the password window and change profile?')) return false;
+  if ((contentDirty || staffDirty || RDIRTY || KEV.accounts?.dirty || KEV.agenda?.dirty || Object.values(notificationDraft).some(Boolean)) && !confirm('Discard unsaved changes and leave this page?')) return false;
+  return true;
+}
+
+async function start() {
+  try {
+    const session = await KEV.staff.session();
+    if (!session.authenticated) return showLogin('');
+    if (session.role !== 'admin') return showLogin('This account does not have Admin access.', true);
+    [C, DS] = await Promise.all([get('/api/content'), get('/api/desk/state')]);
+    KEV.stamp(DS.versions);
+    $('sign-out').hidden = KEV.staff.hosted;
+    KEV.profile.mount({onEnd: reason => showLogin(reason || 'Your profile changed. Sign in again.'), beforeChange: canChangeProfile});
+    $('nav').innerHTML = Object.entries(TABS).filter(([key]) => KEV.staff.hosted || !['activity', 'notifications', 'profiles'].includes(key))
+      .map(([key, [label]]) => '<button data-t="' + key + '">' + label + '</button>').join('');
+    $('people-nav').innerHTML = Object.entries(PEOPLE).filter(([key]) => KEV.staff.hosted || key === 'roster')
+      .map(([key, label]) => '<button class="btn ghost sm" data-person="' + key + '">' + label + '</button>').join('');
+    $('login').hidden = true;
+    $('app').hidden = false;
+    KEV.nav.render();
+    active = true;
+    KEV.assistant?.mount($('app'), session.role, refreshAfterAssistant);
+    select(location.hash.slice(1), false);
+  } catch (e) {
+    if (!KEV.staff.hosted && e.status === 401) await KEV.staff.signOut();
+    showLogin(e.message);
+  }
+}
+
+async function refreshAfterAssistant() {
+  const generation = sectionKey, profileRevision = KEV.profile.revision;
+  try {
+    const updated = await get('/api/content');
+    if (!active || generation !== sectionKey || profileRevision !== KEV.profile.revision) return;
+    const changed = C?.content_version !== updated.content_version;
+    C = updated;
+    if (changed && contentDirty) {
+      setStatus('The event content has changed. Your draft is kept; use Reload latest before saving it.');
+      return;
+    }
+    if (changed) CT = CTDOC = null;
+    if (!contentDirty && !staffDirty && !RDIRTY && !issuing && !notificationBusy && !issueMailBusy && !KEV.accounts?.busy && !KEV.accounts?.dirty && !KEV.agenda?.busy && !KEV.agenda?.dirty) await select(tab === 'people' ? people : tab, false);
+  } catch (error) { fail(error, generation); }
+}
+
+$('local-login').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    await KEV.staff.localLogin($('pin').value.trim());
+    $('pin').value = '';
+    await start();
+  } catch (error) { $('err').textContent = error.message; }
+};
+
+$('sign-out').onclick = async () => {
+  if (!(await canChangeProfile())) return;
+  try {
+    await KEV.staff.signOut();
+    showLogin('Signed out of Event Admin.');
+  } catch (e) { setStatus(e.message, true); }
+};
+KEV.bindHelp($('admin-help'), () => KEV.staff.token);
+
+function setStatus(message, error = false) {
+  $('section-status').textContent = message;
+  $('section-status').classList.toggle('error', error);
+}
+
+function fail(error, key = sectionKey) {
+  if (!active || key !== sectionKey || error.code === 'workspace_changed') return;
+  if (error.status === 401 || error.status === 403) {
+    if (!KEV.staff.hosted) KEV.staff.signOut();
+    showLogin('Your Admin session ended. Sign in again.');
+    return;
+  }
+  setStatus(error.message, true);
+}
+
+document.addEventListener('click', e => {
+  const button = e.target.closest('[data-t], [data-person], [data-jump]');
+  if (!button || !active || issuing || notificationBusy) return;
+  select(button.dataset.t || button.dataset.person || button.dataset.jump, true);
+});
+window.addEventListener('hashchange', () => { if (active && !issuing && !notificationBusy) select(location.hash.slice(1), false); });
+
+async function select(key, focus) {
+  if (KEV.accounts?.busy) return;
+  const destination = KEV.staff.hosted || !['accounts', 'credentials', 'access', 'activity', 'notifications', 'profiles'].includes(key) ? key : 'roster';
+  const nextTab = Object.hasOwn(PEOPLE, destination) ? 'people' : Object.hasOwn(TABS, destination) ? destination : 'overview';
+  const nextPeople = Object.hasOwn(PEOPLE, destination) ? destination : KEV.staff.hosted ? 'accounts' : 'roster';
+  if (nextTab === tab && nextPeople === people && focus) return;
+  const moving = nextTab !== tab || nextPeople !== people;
+  if (tab === 'agenda' && (KEV.agenda?.busy || KEV.agenda?.unresolved)) {
+    if (!focus) history.replaceState(null, '', '#agenda');
+    if (moving) setStatus(KEV.agenda.unresolved ? 'Check the agenda update outcome before leaving.' : 'Wait for the agenda request to finish.', true);
+    return;
+  }
+  if (tab === 'agenda' && !moving && KEV.agenda?.dirty) return;
+  if (moving && (staffDirty || (tab === 'content' && contentDirty) || (tab === 'people' && people === 'roster' && RDIRTY) || KEV.accounts?.dirty || KEV.agenda?.dirty)) {
+    if (!confirm('Discard unsaved changes?')) {
+      if (!focus) history.replaceState(null, '', '#' + (tab === 'people' ? people : tab));
+      return;
+    }
+    if (tab === 'content') { CT = CTDOC = null; contentDirty = false; }
+    else { ROWS = null; RDIRTY = false; }
+  }
+  if (tab === 'agenda') KEV.agenda?.unmount();
+  staffDirty = false;
+  tab = nextTab;
+  people = nextPeople;
+  const generation = ++sectionKey;
+  if (focus) history.replaceState(null, '', '#' + (tab === 'people' ? people : tab));
+  $('heading').textContent = TABS[tab][0];
+  $('description').textContent = TABS[tab][1];
+  $('people-nav').hidden = tab !== 'people';
+  for (const button of document.querySelectorAll('#nav button, #people-nav button')) {
+    const selected = button.dataset.t === tab || button.dataset.person === people;
+    button.classList.toggle('on', selected);
+    if (selected) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  setStatus('');
+  $('download-status').textContent = '';
+  $('main').replaceChildren();
+  if (focus) {
+    $('heading').focus({preventScroll: true});
+    if (KEV.staff.hosted) post('/api/activity', {action: 'navigation', page: '/admin', section: tab === 'people' ? people : tab}).catch(() => {});
+  }
+  try {
+    await ({overview: vOverview, profiles: vProfiles, agenda: vAgenda, content: vContent, reports: vReports, notifications: vNotifications, activity: vActivity, system: vSystem,
+      people: {accounts: vAccounts, credentials: vCredentials, roster: vRoster, access: vAccess}[people]})[tab]();
+  } catch (error) { fail(error, generation); }
+}
+
+function vAgenda() {
+  if (KEV.profile.identity?.impersonation) {
+    $('main').textContent = 'Return to your Admin profile to edit the agenda.';
+    return;
+  }
+  return KEV.agenda.mount($('main'), {request: (body, signal) => KEV.api('/api/admin/agenda', {body, signal}, KEV.staff.token),
+    mode: DS.program?.mode, onError: error => fail(error)});
+}
+
+window.addEventListener('beforeunload', event => {
+  if (!KEV.workspaceChanging && (KEV.agenda?.dirty || KEV.agenda?.busy)) { event.preventDefault(); event.returnValue = true; }
+});
+
+function metrics(rows) {
+  return '<div class="grid stat-grid">' + rows.map(([label, value]) =>
+    '<div class="card"><span class="metric-label">' + KEV.esc(label) + '</span><strong class="metric">' + KEV.esc(value) + '</strong></div>'
+  ).join('') + '</div>';
+}
+
+async function vOverview() {
+  const generation = sectionKey;
+  const [status, workspace] = await Promise.all([get('/api/desk/state'), get('/api/admin/workspace')]);
+  if (!active || generation !== sectionKey) return;
+  DS = status;
+  const complete = DS.stations.filter(s => s.submitted).length;
+  const operationsHost=$('operations-home');
+  $('main').innerHTML =
+    '<section class="role-hero"><p class="role-kicker">Admin · Event readiness</p><h2>Set the team up for a great day</h2><p>Manage people, access, content and event settings.</p>' + (KEV.staff.hosted ? '<button type="button" class="btn" data-jump="profiles">Preview a dashboard or help someone</button>' : '') + '</section>' +
+    '<section class="role-action-grid" aria-label="Admin actions">'+[[KEV.staff.hosted?'accounts':'roster','People & access','Manage role assignments, the roster and passwords'],['agenda','Agenda','Edit the schedule and plan breaks'],['content','Event content','Keep judging materials and presentation content up to date'],['system','Event settings','Capacity, teams and rehearsal controls'],['reports','Reports & backup','Review results and save event records']].map(([key,title,detail])=>'<button type="button" data-jump="'+key+'"><strong>'+title+'</strong><span>'+detail+'</span></button>').join('')+'</section>' +
+    readiness(workspace.summary) +
+    metrics([['Round sheets', workspace.summary.round_sheets], ['Current assignments submitted', complete + ' / ' + DS.stations.filter(s => s.pair).length], ['Calibration sheets', DS.counts.calib]]);
+  if(operationsHost)$('main').append(operationsHost);else $('main').insertAdjacentHTML('beforeend','<div id="operations-home"></div>');
+  KEV.operations?.mount($('operations-home'));
+  $('overview-refresh').onclick = async e => {
+    const button = e.currentTarget;
+    button.disabled = true;
+    try { await vOverview(); } catch (error) { fail(error, generation); }
+    finally { button.disabled = false; }
+  };
+}
+
+function readiness(summary) {
+  const checks = [
+    ['Team roster', 'Registered teams ' + summary.registered_pairs + ' / ' + summary.expected_pairs + ' · Named participants ' + summary.participants + ' / ' + summary.expected_participants,
+      summary.registered_pairs >= summary.expected_pairs && summary.participants >= summary.expected_participants,
+      '<button class="btn ghost sm" data-jump="roster">Edit team roster</button>']
+  ];
+  if (KEV.staff.hosted) checks.push(
+    ['Passwords', summary.issued_participants + ' / ' + summary.participants + ' participant passwords issued', summary.participants > 0 && summary.issued_participants >= summary.participants,
+      '<button class="btn ghost sm" data-jump="credentials">Manage passwords</button>'],
+    ['Judge access', summary.judge_sessions + ' / ' + summary.expected_judges + ' stations signed in',
+      summary.judge_sessions >= summary.expected_judges, '<button class="btn ghost sm" data-jump="access">Manage Staff passwords</button>']
+  );
+  if (KEV.staff.hosted) checks.push(['Preview and Support', 'Choose a dashboard to preview or help someone with their role.', null, '<button class="btn alt sm" data-jump="profiles">View as a person</button>']);
+  if (!KEV.staff.hosted || KEV.nav.dashboards(KEV.profile.identity).some(view=>view.role==='scoring')) {
+    checks.push(['Run judging', DS.mode === 'self' ? 'Judge-paced sessions' : 'Shared Desk clock', null, '<a class="btn alt sm" href="' + (KEV.staff.hosted?'/scoring':'/desk') + '">Open Scoring Desk</a>']);
+  }
+  const optional = [
+    ['Audience display', DS.public === 'live' ? 'Scores visible' : 'Scores hidden', null, '<a class="btn ghost sm" href="/live" target="_blank" rel="noopener">Open Live View</a>'],
+    ['Event backup', 'Manual download', null, '<button class="btn ghost sm" data-export="backup">Download backup</button>']
+  ];
+  const listItems = rows => rows.map(([label, value, ready, action]) => '<li><div class="readiness-item row"><div class="grow"><strong>' + KEV.esc(label) +
+    '</strong><span class="mut small">' + KEV.esc(value) + '</span></div>' +
+    (ready === null ? '' : '<span class="pill ' + (ready ? 'ok">Ready' : 'warn">Needs attention') + '</span>') + action + '</div></li>').join('');
+  return '<section class="card"><div class="row"><h2 class="grow">Start here</h2><button class="btn ghost sm" id="overview-refresh">Refresh status</button></div>' +
+    '<ol class="readiness-list setup-list">' + listItems(checks) + '</ol></section>' +
+    '<details class="card overview-tools"><summary>Live display and backup</summary><ul class="readiness-list">' + listItems(optional) + '</ul></details>';
+}
+
+$('main').addEventListener('click', async e => {
+  const button = e.target.closest('[data-export]');
+  if (!button || !Object.hasOwn(EXPORTS, button.dataset.export)) return;
+  const path = EXPORTS[button.dataset.export];
+  const accessRevision = KEV.profile.revision;
+  const print = button.dataset.export === 'cards';
+  const preview = print ? window.open('', '_blank') : null;
+  $('download-status').textContent = '';
+  if (print && !preview) {
+    $('download-status').textContent = 'Allow pop-ups to open the print preview.';
+    return;
+  }
+  if (preview) preview.opener = null;
+  button.disabled = true;
+  const generation = sectionKey;
+  try {
+    const response = await KEV.profile.fetch(path, {headers: KEV.staff.token ? {'X-Token': KEV.staff.token} : {}, credentials: 'same-origin', cache: 'no-store'});
+    KEV.checkContext(response);
+    if (!response.ok) {
+      const error = new Error('Could not download the report.');
+      error.status = response.status;
+      throw error;
+    }
+    const blob = await response.blob();
+    if (!active || generation !== sectionKey || (KEV.staff.hosted && (!KEV.profile.active || KEV.profile.revision !== accessRevision))) throw KEV.profile.error('Your profile changed before the download finished.');
+    KEV.checkContext(response);
+    if (preview) {
+      const url = URL.createObjectURL(blob);
+      preview.location.replace(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      const filename = (response.headers.get('Content-Disposition') || '').match(/filename="?([^";]+)/i)?.[1];
+      KEV.saveFile(blob, filename || path.split('/').pop());
+    }
+  } catch (error) {
+    if (preview) preview.close();
+    if (error.status === 401 || error.status === 403) fail(error, generation);
+    else if (generation === sectionKey) $('download-status').textContent = error.message;
+  } finally { button.disabled = false; }
+});
+
+function vReports() {
+  $('main').innerHTML =
+    '<div class="grid"><section class="card"><h2>Scores CSV</h2><p class="small mut">Round rankings with rubric scores, bonuses and tie flags.</p><button class="btn alt" data-export="scores">Download scores</button></section>' +
+    '<section class="card"><h2>Feedback cards</h2><p class="small mut">Printable feedback for teams with submitted score sheets.</p><button class="btn alt" data-export="cards">Open print preview</button></section>' +
+    '<section class="card"><h2>Event backup</h2><p class="small mut">Download the event data as JSON.</p><button class="btn alt" data-export="backup">Download backup</button></section></div>' +
+    '<p class="small mut"><a href="/desk#scores">Open the Desk to draft the awards debrief</a></p>';
+}
+
+const NOTIFICATION_PATH = '/api/admin/notifications';
+const MAIL_STATUSES = {
+  sent: ['Accepted by mail service', 'ok'], sending: ['Sending', 'warn'], failed: ['Failed', 'bad'], uncertain: ['Delivery unknown', 'warn']
+};
+
+function notificationNotice(message, problem = false) {
+  notificationFeedback = message;
+  notificationProblem = problem;
+  const status = $('mail-send-status');
+  if (status) {
+    status.textContent = message;
+    status.classList.toggle('error', problem);
+  }
+}
+
+function sameNotification(payload) {
+  return notificationAttempt && Object.keys(notificationDraft).every(key => notificationAttempt.payload[key] === payload[key]);
+}
+
+function notificationValues() {
+  return {recipient: $('mail-recipient').value.trim(), subject: $('mail-subject').value.trim(), message: $('mail-message').value};
+}
+
+function updateNotificationForm(enabled) {
+  const send = $('mail-send');
+  const state = sameNotification(notificationValues()) ? notificationAttempt.state : '';
+  const locked = state === 'unconfirmed' || state === 'sending';
+  $('mail-recipient').readOnly = $('mail-subject').readOnly = $('mail-message').readOnly = locked || notificationBusy;
+  $('mail-new').disabled = notificationBusy;
+  send.disabled = !enabled || notificationBusy || state === 'uncertain' || state === 'failed';
+  send.textContent = state === 'unconfirmed' ? 'Retry same request' : state === 'sending' ? 'Check request status' : 'Send notification';
+}
+
+async function vNotifications() {
+  const generation = sectionKey;
+  if (KEV.workspaceMode === 'rehearsal') {
+    $('main').innerHTML = '<section class="card"><h2>Email is disabled in rehearsal</h2><p class="mut">Switch to Live Event Data when you are ready to send a real event email.</p><button class="btn alt" data-jump="system">Open Event Data settings</button></section>';
+    return;
+  }
+  const data = await get(NOTIFICATION_PATH);
+  if (!active || generation !== sectionKey) return;
+  const enabled = data.enabled === true;
+  $('main').innerHTML =
+    '<section class="card"><div class="row"><div class="grow"><h2>Event sender</h2><p class="small mut"><b>' +
+      KEV.esc(data.sender) + '</b>' + (data.smtp_host ? ' · ' + KEV.esc(data.smtp_host) : '') + '</p></div>' +
+      '<span class="pill ' + (enabled ? 'ok">Enabled' : 'warn">Unavailable') + '</span>' +
+      '<button class="btn ghost sm" id="mail-check" ' + (enabled ? '' : 'disabled') + '>Check connection</button></div>' +
+      '<p class="small mut">' + (enabled ? KEV.esc(data.remaining) + ' of ' + KEV.esc(data.limit_per_day) + ' sends remaining today. The connection check sends no email.' :
+      'The mail connection must be configured before Admin can send notifications.') + '</p><p id="mail-check-status" role="status"></p></section>' +
+    '<section class="card"><h2>Compose</h2><form id="mail-form" method="post">' +
+      '<div class="form-row"><label class="field">Recipient<input type="email" id="mail-recipient" name="recipient" maxlength="254" required autocomplete="off"></label>' +
+      '<label class="field">Subject<input type="text" id="mail-subject" name="subject" maxlength="160" required></label></div>' +
+      '<p><label class="field">Message<textarea id="mail-message" name="message" maxlength="12000" rows="7" required></textarea></label></p>' +
+      '<div class="row"><button class="btn" id="mail-send">Send notification</button><button class="btn ghost" id="mail-new" type="button">Clear draft</button></div>' +
+      '<p id="mail-send-status" role="status"></p></form></section>' +
+    '<section class="card"><div class="row"><h2 class="grow">Delivery history</h2><button class="btn ghost sm" id="mail-refresh">Refresh history</button></div>' +
+    '<div class="table-scroll">' + (data.messages.length ?
+      '<table><thead><tr><th scope="col">Submitted</th><th scope="col">Recipient</th><th scope="col">Subject</th><th scope="col">Status</th><th scope="col">Completed</th></tr></thead><tbody>' +
+      data.messages.map(message => {
+        const [label, color] = MAIL_STATUSES[message.status] || ['Unknown', 'gray'];
+        return '<tr><td>' + KEV.esc(formatTime(message.created)) + '</td><td>' + KEV.esc(message.recipient) + '</td><td>' + KEV.esc(message.subject) +
+          '</td><td><span class="pill ' + color + '">' + label + '</span>' + (message.error ? '<div class="small mut">' + KEV.esc(message.error) + '</div>' : '') +
+          '</td><td>' + KEV.esc(formatTime(message.completed)) + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<p class="small mut">No notifications yet.</p>') + '</div></section>';
+
+  $('mail-recipient').value = notificationDraft.recipient;
+  $('mail-subject').value = notificationDraft.subject;
+  $('mail-message').value = notificationDraft.message;
+  notificationNotice(notificationFeedback, notificationProblem);
+  updateNotificationForm(enabled);
+  $('mail-form').oninput = () => {
+    notificationDraft = notificationValues();
+    updateNotificationForm(enabled);
+  };
+  $('mail-form').onsubmit = e => {
+    e.preventDefault();
+    if (enabled && !$('mail-send').disabled) sendNotification(generation, enabled);
+  };
+  $('mail-new').onclick = () => {
+    if (['unconfirmed', 'sending', 'uncertain'].includes(notificationAttempt?.state) &&
+        !confirm('The previous request may still deliver. Clear this draft and start a new one?')) return;
+    notificationAttempt = null;
+    notificationDraft = emptyNotification();
+    $('mail-form').reset();
+    notificationNotice('');
+    updateNotificationForm(enabled);
+    $('mail-recipient').focus();
+  };
+  $('mail-refresh').onclick = async e => {
+    const button = e.currentTarget;
+    button.disabled = true;
+    try { await vNotifications(); }
+    catch (error) { fail(error, generation); }
+    finally { button.disabled = false; }
+  };
+  $('mail-check').onclick = async e => {
+    const button = e.currentTarget;
+    const status = $('mail-check-status');
+    button.disabled = true;
+    status.textContent = 'Checking SMTP connection…';
+    try {
+      await post(NOTIFICATION_PATH + '/check');
+      status.textContent = 'TLS and SMTP sign-in verified. No email sent.';
+      status.classList.remove('error');
+    } catch (error) {
+      if (error.status === 401 || error.status === 403) fail(error, generation);
+      else {
+        status.textContent = error.message;
+        status.classList.add('error');
+      }
+    } finally { button.disabled = false; }
+  };
+}
+
+async function sendNotification(generation, enabled) {
+  if (notificationBusy) return;
+  const content = notificationValues();
+  if (!content.subject || !content.message.trim()) {
+    notificationNotice('Enter a subject and message.', true);
+    return;
+  }
+  const previous = sameNotification(content) ? notificationAttempt : null;
+  const prompt = previous?.state === 'sending' ? 'Check the delivery request for ' :
+    previous?.state === 'unconfirmed' ? 'Retry the same request for ' : 'Send one notification to ';
+  if (!confirm(prompt + content.recipient + '?')) return;
+  notificationDraft = content;
+  notificationAttempt = previous || {payload: {...content, idempotency_key: crypto.randomUUID()}, state: 'ready'};
+  const attempt = notificationAttempt;
+  notificationBusy = true;
+  updateNotificationForm(enabled);
+  notificationNotice(previous ? 'Checking the existing delivery request…' : 'Sending notification…');
+  let refreshHistory = false;
+  try {
+    const {message} = await post(NOTIFICATION_PATH, attempt.payload);
+    if (!active || attempt !== notificationAttempt) return;
+    attempt.state = message.status;
+    if (message.status === 'sent') {
+      notificationDraft = emptyNotification();
+      notificationAttempt = null;
+      $('mail-form')?.reset();
+      notificationNotice('The mail service accepted the notification for ' + message.recipient + '.');
+    } else if (message.status === 'uncertain') {
+      notificationNotice('Delivery is unknown. Check the history before sending another notification to this recipient.', true);
+    } else if (message.status === 'sending') {
+      notificationNotice('The delivery request is still in progress. Check its status before starting another send.');
+    } else {
+      notificationNotice(message.error || 'The notification could not be sent.', true);
+    }
+    refreshHistory = true;
+  } catch (error) {
+    if (!active || attempt !== notificationAttempt) return;
+    if (error.status === 401 || error.status === 403) {
+      fail(error);
+      return;
+    }
+    if (!error.status || error.status >= 500) {
+      attempt.state = 'unconfirmed';
+      notificationNotice('The request could not be confirmed. Retry the same request to check for a recorded delivery.', true);
+    } else {
+      notificationNotice(error.message, true);
+    }
+  } finally {
+    notificationBusy = false;
+    if (active && generation === sectionKey) updateNotificationForm(enabled);
+  }
+  if (refreshHistory && active && generation === sectionKey) {
+    try { await vNotifications(); }
+    catch (error) { fail(error, generation); }
+  }
+}
+
+function formatTime(value) {
+  if (!value) return '—';
+  const date = new Date(typeof value === 'number' ? value * 1000 : value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(date);
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  const safe = /^[\t\r\n ]*[=+@-]/.test(text) ? "'" + text : text;
+  return '"' + safe.replaceAll('"', '""') + '"';
+}
+
+let issueGeneration = 0, issueMailBusy = false;
+function clearIssue() {
+  issueGeneration++;
+  issueMailBusy = false;
+  $('issue-rows').replaceChildren();
+  $('issue-status').textContent = '';
+  $('issue-download').onclick = null;
+}
+$('issue-done').onclick = () => $('issue-dialog').close();
+$('issue-dialog').addEventListener('close', clearIssue);
+
+function showIssued(issued, title = 'New passwords') {
+  if (!issued.length) return;
+  $('issue-title').textContent = title;
+  const generation = ++issueGeneration;
+  const out = $('issue-rows');
+  out.innerHTML = '<table><thead><tr><th scope="col">Person or group</th><th scope="col">Role</th><th scope="col">Password</th><th scope="col">Action</th></tr></thead><tbody>' +
+    issued.map((row, i) => '<tr><td>' + KEV.esc(row.label) + (row.pair ? '<div class="small mut">Team ' + KEV.esc(row.pair) + ' · Person ' + KEV.esc(row.member) + '</div>' : '') +
+    '</td><td>' + KEV.esc(row.grants?.length ? row.grants.map(KEV.accounts.grantLabel.bind(KEV.accounts)).join(', ') : roleName(row.role)) + '</td><td><input type="text" class="issue-password" id="issue-' + i + '" aria-label="Password for ' + KEV.esc(row.label) + '" autocomplete="off" readonly></td><td>' +
+    '<button class="btn ghost sm" data-copy="' + i + '">Copy</button><details class="issue-email"><summary>Email this password</summary><form data-email="' + i + '"><label class="field">Recipient email<input type="email" name="recipient" required maxlength="254" autocomplete="off"></label><p class="small mut">Includes their role, assignment, password and sign-in link. Send only to the intended person.</p><button class="btn alt sm" type="submit" disabled>Send password</button><p class="small" data-email-status role="status">Checking email availability…</p></form></details></td></tr>').join('') + '</tbody></table>';
+  issued.forEach((row, i) => { $('issue-' + i).value = row.password; });
+  out.querySelectorAll('[data-copy]').forEach(button => button.onclick = () => KEV.copyInput($('issue-' + button.dataset.copy), $('issue-status'), 'Password'));
+  $('issue-download').onclick = () => {
+    const rows = issued.map(({label, role, grants, pair, member, password}) => ({label, role, grants, pair, member, password}));
+    KEV.saveFile(new Blob([JSON.stringify(rows, null, 2)], {type: 'application/json'}), 'kevenos-issued-passwords.json');
+    $('issue-status').textContent = 'Passwords downloaded.';
+  };
+  $('issue-dialog').showModal();
+  get('/api/admin/notifications').then(info => {
+    if (generation !== issueGeneration || !$('issue-dialog').open) return;
+    out.querySelectorAll('[data-email]').forEach(form => {
+      const row = issued[Number(form.dataset.email)], status = form.querySelector('[data-email-status]'), button = form.querySelector('button');
+      const enabled = !!info.enabled && KEV.workspaceMode !== 'rehearsal' && !!row.issuance_grant;
+      button.disabled = !enabled;
+      status.textContent = enabled ? 'Optional. Email sharing is available for 10 minutes.' : (info.disabled_reason || 'Email is unavailable. Copy or download the password.');
+      let attempt = null;
+      form.onsubmit = async event => {
+        event.preventDefault();
+        if (!enabled || issueMailBusy) return;
+        const recipient = form.elements.recipient.value.trim();
+        if (!attempt) attempt = {credential_id: row.id, issuance_grant: row.issuance_grant, password: row.password, recipient, idempotency_key: crypto.randomUUID()};
+        else if (attempt.recipient !== recipient) { status.textContent = 'Check delivery to the original recipient before changing the email address.'; return; }
+        issueMailBusy = true; button.disabled = true; form.elements.recipient.disabled = true;
+        status.textContent = 'Sending…';
+        try {
+          const result = await post('/api/admin/credentials/share', attempt);
+          if (generation !== issueGeneration) return;
+          const receipt = result.message;
+          if (receipt.status === 'sent') { status.textContent = 'Accepted by the mail service for ' + receipt.recipient + '. Delivery to the inbox is not guaranteed.'; button.textContent = 'Sent'; }
+          else if (receipt.status === 'uncertain' || receipt.status === 'sending') { status.textContent = 'Delivery is unconfirmed. Check Notifications history before sending again.'; button.textContent = 'Check Notifications'; }
+          else { status.textContent = receipt.error || 'Email failed. The password is still valid; copy it or use a corrected recipient.'; attempt = null; button.disabled = false; form.elements.recipient.disabled = false; button.textContent = 'Send password'; }
+        } catch (error) {
+          if (generation !== issueGeneration) return;
+          if (!error.status || error.status >= 500) { status.textContent = 'Delivery could not be confirmed. Check the same request; this will not send a duplicate.'; button.textContent = 'Check delivery'; button.disabled = false; }
+          else { status.textContent = error.message; button.disabled = false; form.elements.recipient.disabled = false; attempt = null; }
+        } finally { if (generation === issueGeneration) issueMailBusy = false; }
+      };
+    });
+  }).catch(() => {
+    if (generation === issueGeneration) out.querySelectorAll('[data-email-status]').forEach(el => { el.textContent = 'Email availability could not be checked. Copy or download the password.'; });
+  });
+}
+
+
+function roleName(role) {
+  return ({guest: 'Guest', participant: 'Participant', desk: 'Legacy Desk', organizer: 'Organizer', scoring: 'Scoring Desk',
+    admin: 'Admin', judge: 'Judge', registration: 'Registration', anonymous: 'Anonymous'})[role] || role || 'Unknown';
+}
+
+async function vAccounts(message = '') {
+  const generation = sectionKey;
+  const [data, rosterResult] = await Promise.all([get('/api/admin/accounts'), get('/api/desk/roster')]);
+  if (!active || generation !== sectionKey) return;
+  KEV.accounts.mount($('main'), {...data, roster: rosterResult.roster, stations: DS.stations.map(station=>station.station),
+    mode: KEV.workspaceMode, actorId: KEV.profile.identity?.account_id,
+    save: body => post('/api/admin/accounts', body),
+    reload: async result => {
+      if (generation !== sectionKey) return;
+      if (result.reauthenticate) {
+        KEV.profile.signalChange();
+        KEV.profile.invalidate('Your roles were saved. Sign in again to continue.');
+      } else {
+        setStatus('Access updated.');
+        await vAccounts('Access updated.');
+      }
+    }
+  });
+  setStatus(message);
+}
+
+function showPasswordButton(credential, attribute) {
+  return '<button type="button" class="btn ghost sm" ' + attribute + '="reveal" data-id="' +
+    KEV.esc(credential.id) + '">Show password</button>';
+}
+
+async function showPassword(button, generation) {
+  if (issuing || $('issue-dialog').open) return;
+  issuing = true;
+  button.disabled = true;
+  setStatus('Opening password…');
+  try {
+    const result = await post('/api/admin/credentials', {action: 'reveal', id: button.dataset.id});
+    if (!active || generation !== sectionKey) return;
+    setStatus('');
+    showIssued([{...result.credential, password: result.password, issuance_grant: result.issuance_grant}], 'Current password');
+  } catch (error) {
+    if (generation !== sectionKey) return;
+    if (error.status === 409) setStatus(error.message, true);
+    else fail(error, generation);
+  } finally {
+    button.disabled = false;
+    issuing = false;
+  }
+}
+
+async function vCredentials(message = '') {
+  const generation = sectionKey;
+  const [{credentials, participants}, {accounts}] = await Promise.all([get('/api/admin/credentials'), get('/api/admin/accounts')]);
+  if (!active || generation !== sectionKey) return;
+  const rehearsal = KEV.workspaceMode === 'rehearsal';
+  const records = credentials.filter(c => c.grants ? c.grants.some(g=>g.role==='participant') : c.role==='participant').map(c=>{
+    const grant=c.grants?.find(g=>g.role==='participant');
+    return grant?{...c,pair:grant.pair,member:grant.member}:c;
+  });
+  const enrolled = new Set(records.filter(c => c.active && c.role === 'participant').map(c => c.pair + ':' + c.member));
+  for (const account of accounts.filter(account=>account.credentials.some(c=>c.active))) {
+    for (const grant of account.grants.filter(grant=>grant.role==='participant')) enrolled.add(grant.pair+':'+grant.member);
+  }
+  const candidates = participants.flatMap(row => KEV.memberList(row).flatMap(person => {
+    const member = person.id, name = person.name;
+    return name && !enrolled.has(row.pair + ':' + member) ? [{pair: row.pair, member, name}] : [];
+  }));
+  $('main').innerHTML =
+    '<section class="card"><div class="row"><div class="grow"><h2>Participant passwords</h2><p class="small mut">Each named participant gets an individual password and access to their own assignment. Add people to the team roster first.</p></div>' +
+    '<button class="btn ghost sm" data-jump="roster">Open team roster</button></div>' +
+    '<form id="participant-form" class="form-row"><label class="field">Participant<select id="member-choice" required><option value="">Choose a participant</option>' +
+    candidates.map((entry, i) => '<option value="' + i + '">Team ' + KEV.esc(entry.pair) + ' · ' + KEV.esc(entry.name) + '</option>').join('') +
+    '</select></label><button class="btn alt"' + (!candidates.length ? ' disabled' : '') + '>Generate password</button><button type="button" class="btn" id="bulk-participants"' + (!candidates.length ? ' disabled' : '') +
+    '>Generate all missing' + (candidates.length ? ' (' + candidates.length + ')' : '') + '</button></form></section>' +
+    '<section class="card"><div class="row"><h2 class="grow">Participant access</h2><label class="field">Filter<select id="credential-filter"><option value="">All participants</option>' +
+    ['participant'].map(role => '<option value="' + role + '">' + roleName(role) + '</option>').join('') +
+    '</select></label></div><div class="table-scroll" id="credential-table"></div></section>';
+
+  const forms = $('main').querySelectorAll('form');
+  const mutate = async (body, button) => {
+    if (issuing) return;
+    issuing = true;
+    button.disabled = true;
+    setStatus('Saving…');
+    try {
+      const result = await post('/api/admin/credentials', body);
+      if (generation !== sectionKey) return;
+      const issued = result.issued || (result.password && result.credential ? [{...result.credential, password: result.password, issuance_grant: result.issuance_grant}] : []);
+      const resultMessage = result.issued ? result.issued.length + ' passwords issued.' + (result.skipped ? ' ' + result.skipped + ' existing passwords kept.' : '') :
+        body.action === 'revoke' ? 'Credential revoked.' : 'Password issued.';
+      let refreshFailed = false;
+      try { await vCredentials(resultMessage); }
+      catch (error) {
+        if (!issued.length) throw error;
+        refreshFailed = true;
+      }
+      if (generation !== sectionKey) return;
+      if (issued.length) {
+        showIssued(issued);
+        if (refreshFailed) {
+          $('issue-status').textContent = 'Passwords issued. The credential list could not be refreshed.';
+          setStatus('Passwords issued. Reopen this section to refresh the credential list.');
+        }
+      }
+    } catch (error) {
+      fail(error, generation);
+    } finally { button.disabled = false; issuing = false; }
+  };
+  for (const form of forms) form.onsubmit = e => {
+    e.preventDefault();
+    const submitter = e.submitter || form.querySelector('button:not([type=button])');
+    const fields = new FormData(form);
+    const password = fields.get('password') || undefined;
+    if (!$('member-choice').value) return;
+    const {pair, member, name} = candidates[Number($('member-choice').value)];
+    mutate({action: 'create', role: 'participant', label: name, pair, member}, submitter);
+  };
+  $('bulk-participants').onclick = e => mutate({action: 'bulk-participants'}, e.currentTarget);
+
+  const renderTable = () => {
+    const role = $('credential-filter').value;
+    const rows = records.filter(c => !role || c.role === role || c.grants?.some(g=>g.role===role));
+    $('credential-table').innerHTML = rows.length ?
+      '<table><thead><tr><th scope="col">Name or label</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Last used</th><th scope="col">Actions</th></tr></thead><tbody>' +
+      rows.map(c => '<tr><td>' + KEV.esc(c.label) + (c.pair ? '<div class="small mut">Team ' + KEV.esc(c.pair) + ' · Person ' + KEV.esc(c.member) + '</div>' : '') +
+      '</td><td>' + KEV.esc(c.grants?.length ? c.grants.map(KEV.accounts.grantLabel.bind(KEV.accounts)).join(', ') : roleName(c.role)) + '</td><td><span class="pill ' + (c.active ? 'ok">Active' : 'gray">Revoked') + '</span></td><td>' + KEV.esc(formatTime(c.created)) + '</td><td>' +
+      KEV.esc(formatTime(c.last_used)) + '</td><td class="credential-actions"><div class="row">' +
+      (c.active ? showPasswordButton(c, 'data-credential') : '—') +
+      (c.active && c.can_manage_password ? '<button class="btn ghost sm" data-credential="reset" data-id="' + KEV.esc(c.id) + '">Reset</button><button class="btn bad sm" data-credential="revoke" data-id="' + KEV.esc(c.id) + '">Revoke</button>' : '') +
+      '</div></td></tr>').join('') + '</tbody></table>' : '<p class="small mut">No credentials for this role yet.</p>';
+  };
+  $('credential-filter').onchange = renderTable;
+  $('credential-table').onclick = e => {
+    const button = e.target.closest('[data-credential]');
+    if (!button) return;
+    const {credential: action, id} = button.dataset;
+    if (action === 'reveal') { showPassword(button, generation); return; }
+    const verb = action === 'reset' ? 'Reset' : 'Revoke';
+    const row = credentials.find(c => String(c.id) === id);
+    if (!row || !confirm(verb + ' the password for ' + row.label + ' and sign out their current sessions?')) return;
+    mutate({action, id}, button);
+  };
+  renderTable();
+  setStatus(message);
+}
+
+function actionName(action) {
+  const labels = {signin: 'Sign-in', 'signin-failed': 'Failed sign-in', signout: 'Sign-out', view: 'Page view', navigation: 'Navigation', download: 'Download', action: 'Change',
+    'credentials-create-staff': 'Staff password issued', 'credentials-create': 'Password issued', 'credentials-reveal': 'Password shown', 'credentials-reset': 'Password reset', 'credentials-revoke': 'Password revoked', 'credentials-bulk-participants': 'Participant passwords issued'};
+  const [key, section] = String(action || '').split(':');
+  if (key === 'navigation' && section) return 'Opened ' + (PEOPLE[section] || TABS[section]?.[0] || ({run: 'Run', scores: 'Scores', display: 'Live View', final: 'Final', calib: 'Calibration'})[section] || 'section');
+  return labels[action] || action || 'Unknown';
+}
+
+async function vActivity() {
+  const generation = sectionKey;
+  $('main').innerHTML =
+    '<div id="activity-metrics"></div><section class="card"><div class="row"><div class="grow"><h2>Activity log</h2>' +
+    '<p class="small mut" id="retention"></p></div><label class="field">Filter by role<select id="activity-role"><option value="">All roles</option>' +
+    ['guest', 'participant', 'judge', 'desk', 'admin', 'anonymous'].map(role => '<option value="' + role + '">' + roleName(role) + '</option>').join('') +
+    '</select></label><button class="btn ghost sm" id="activity-refresh">Refresh</button></div><div class="table-scroll" id="activity-table"></div>' +
+    '<div class="row section-tools"><button class="btn ghost sm" id="activity-newer" hidden>Newer</button><button class="btn alt sm" id="activity-older" hidden>Older</button></div></section>';
+  let cursor = '', next, history = [], sequence = 0;
+  const load = async () => {
+    const request = ++sequence;
+    const role = $('activity-role').value;
+    const filters = new URLSearchParams({limit: '100'});
+    if (role) filters.set('role', role);
+    if (cursor) filters.set('before', cursor);
+    $('activity-older').disabled = $('activity-newer').disabled = $('activity-refresh').disabled = true;
+    setStatus('Loading activity…');
+    try {
+      const {summary, events, next_before, retention_days} = await get('/api/admin/activity?' + filters);
+      if (generation !== sectionKey || request !== sequence) return;
+      next = next_before;
+      $('activity-metrics').innerHTML = metrics([['Visitors', summary.visitors], ['Page views', summary.views], ['Sign-ins', summary.signins], ['Recorded actions', summary.actions]]);
+      $('retention').textContent = 'Activity is kept for ' + retention_days + ' days. Guest entries identify the shared guest group.';
+      $('activity-table').innerHTML = events.length ?
+        '<table><thead><tr><th scope="col">Time</th><th scope="col">Visitor</th><th scope="col">Role</th><th scope="col">Location</th><th scope="col">Action</th><th scope="col">Path</th><th scope="col">Status</th></tr></thead><tbody>' +
+        events.map(row => '<tr><td>' + KEV.esc(formatTime(row.ts)) + '</td><td>' + KEV.esc(row.label || '—') +
+        (row.actor_label ? '<div class="small mut">Admin: ' + KEV.esc(row.actor_label) + (row.impersonation_mode ? ' · ' + KEV.esc(row.impersonation_mode) : '') + '</div>' : '') +
+        (row.visitor_id ? '<div class="small mut">' + KEV.esc(String(row.visitor_id).slice(0, 12)) + '</div>' : '') +
+        '</td><td>' + KEV.esc(row.grants?.length ? row.grants.map(KEV.accounts.grantLabel.bind(KEV.accounts)).join(', ') : roleName(row.role)) + '</td><td>' + KEV.esc([row.city, row.region, row.country].filter(Boolean).join(', ') || 'Unknown') +
+        (row.ip ? '<div class="small mut">' + KEV.esc(row.ip) + '</div>' : '') +
+        '</td><td>' + KEV.esc(actionName(row.action)) + '</td><td>' + KEV.esc(row.path || '—') + '</td><td>' + KEV.esc(row.status ?? '—') + '</td></tr>').join('') +
+        '</tbody></table>' : '<p class="small mut">No activity in this view.</p>';
+      $('activity-newer').hidden = !history.length;
+      $('activity-older').hidden = !next;
+      setStatus('');
+    } catch (error) { if (request === sequence) fail(error, generation); }
+    finally {
+      if (generation === sectionKey && request === sequence) $('activity-older').disabled = $('activity-newer').disabled = $('activity-refresh').disabled = false;
+    }
+  };
+  const reset = () => { cursor = ''; history = []; load(); };
+  $('activity-role').onchange = reset;
+  $('activity-refresh').onclick = reset;
+  $('activity-newer').onclick = () => { cursor = history.pop() || ''; load(); };
+  $('activity-older').onclick = () => { if (next) { history.push(cursor); cursor = String(next); load(); } };
+  await load();
+}
+// ───────── Content: edit the text without a rebuild ─────────
+let CT = null, CTDOC = null, CTRAW = false, eventFiles = null;
+const ctSkip = k => k.startsWith('content_');
+const ctLabel = path => path.filter(x => typeof x !== 'number').slice(-2).join(' › ') + (typeof path[path.length - 1] === 'number' ? ' ' + (path[path.length - 1] + 1) : '');
+function ctWalk(o, path, out) {
+  if (typeof o === 'string' || typeof o === 'number' || typeof o === 'boolean') { out.push([path, o]); return out; }
+  if (Array.isArray(o)) o.forEach((x, i) => ctWalk(x, path.concat(i), out));
+  else if (o && typeof o === 'object') Object.keys(o).forEach(k => ctWalk(o[k], path.concat(k), out));
+  return out;
+}
+function ctSet(path, v) { let o = CTDOC; for (let i = 0; i < path.length - 1; i++) o = o[path[i]]; o[path[path.length - 1]] = v; ctDirty(); }
+function ctDirty() { contentDirty = true; const b = $('ctsave'); if (b) b.disabled = false; $('ctstat') && ($('ctstat').textContent = 'Unsaved changes'); }
+async function vContent() {
+  const generation = sectionKey;
+  if (!CT) {
+    const doc = await get('/api/desk/content');
+    if (generation !== sectionKey) return;
+    CT = doc;
+    CTDOC = JSON.parse(JSON.stringify(CT.content));
+  }
+  const v = CT.versions, hist = CT.history;
+  let h = '<div id="event-files"></div><div class="card"><div class="row"><div class="grow"><h2 style="margin:0">Judging and presentation editor</h2><div class="small mut">Content <b>v' + v.content + '</b> (' + (v.content_source === 'edited' ? 'edited copy' : 'as shipped with the app v' + v.app) +
+    ')' + (v.content_note ? ' · “' + KEV.esc(v.content_note) + '”' : '') + '. Saving makes a new version that every judge page loads within a few seconds. Sheets record the version they were scored on.</div></div>' +
+    '<button class="btn alt sm" id="ctmode">' + (CTRAW ? 'Form editor' : 'Raw JSON') + '</button><button class="btn ghost sm" data-export="content">Download JSON</button></div>' +
+    '<p class="small mut">Change the wording freely. The number of criteria (' + C.rubric.map(g => g.ticks.length).join('/') + '), their ids, the scenario stations and questions Q1, Q2, Q3, Q13 are protected because scoring depends on them. Adding or removing items needs the raw JSON view.</p>' +
+    '<div class="row"><input type="text" id="ctnote" aria-label="Version note" placeholder="What changed? (shown to everyone)" style="flex:1"><button class="btn" id="ctsave" disabled>Save as v' + (v.content + 1) + '</button>' +
+    '<select id="cthist" aria-label="Content history"><option value="">Load an earlier version…</option>' + hist.map(x => '<option value="' + x.version + '">v' + x.version + (x.note ? ' · ' + KEV.esc(x.note.slice(0, 40)) : '') + '</option>').join('') + '</select>' +
+    '<button class="btn ghost sm" id="ctreload">Reload latest</button><button class="btn ghost sm" id="ctrev">Revert to shipped text</button></div><p class="small" id="ctstat" style="min-height:1.3em"></p></div>';
+  if (CTRAW) {
+    h += '<div class="card"><textarea id="ctraw" aria-label="Raw event content JSON" style="width:100%;min-height:60vh;font:12px ui-monospace,Menlo,monospace" spellcheck="false">' + KEV.esc(JSON.stringify(CTDOC, null, 1)) + '</textarea></div>';
+  } else {
+    h += Object.keys(CTDOC).filter(k => !ctSkip(k)).map(k => {
+      const leaves = ctWalk(CTDOC[k], [k], []);
+      return '<details class="card"><summary><b>' + KEV.esc(k) + '</b> <span class="small mut">' + leaves.length + ' fields</span></summary>' + leaves.map(([path, val], i) => {
+        const key = path[path.length - 1], ro = key === 'id' || path.includes('stations'), id = 'cf' + KEV.esc(k) + '_' + i;
+        const lab = '<label class="small mut" for="' + id + '">' + KEV.esc(ctLabel(path)) + '</label>';
+        if (typeof val === 'boolean') return '<div class="chk"><input type="checkbox" id="' + id + '" data-p=\'' + KEV.esc(JSON.stringify(path)) + '\' ' + (val ? 'checked' : '') + '> ' + lab + '</div>';
+        if (typeof val === 'number') return lab + '<input type="number" id="' + id + '" data-p=\'' + KEV.esc(JSON.stringify(path)) + '\' value="' + val + '"' + (ro ? ' readonly' : '') + ' style="max-width:120px">';
+        const long = val.length > 70 || val.includes('\n');
+        return lab + (long ? '<textarea id="' + id + '" data-p=\'' + KEV.esc(JSON.stringify(path)) + '\' style="width:100%;min-height:' + Math.min(160, 30 + val.length / 2) + 'px"' : '<input type="text" id="' + id + '" data-p=\'' + KEV.esc(JSON.stringify(path)) + '\' value="' + KEV.esc(val) + '"') + (ro ? ' readonly' : '') + (long ? '>' + KEV.esc(val) + '</textarea>' : '>');
+      }).join('') + '</details>';
+    }).join('');
+  }
+  $('main').innerHTML = h;
+  if (KEV.staff.hosted) showEventFiles(generation);
+  if (contentDirty) ctDirty();
+  document.querySelectorAll('[data-p]').forEach(i => { const path = JSON.parse(i.dataset.p);
+    i.oninput = i.onchange = () => ctSet(path, i.type === 'checkbox' ? i.checked : i.type === 'number' ? +i.value : i.value); });
+  if ($('ctraw')) $('ctraw').oninput = () => ctDirty();
+  $('ctmode').onclick = async () => {
+    if (CTRAW) {
+      try { CTDOC = JSON.parse($('ctraw').value); }
+      catch (error) { $('ctstat').textContent = 'Invalid JSON. ' + error.message; return; }
+    }
+    CTRAW = !CTRAW;
+    try { await vContent(); } catch (error) { fail(error, generation); }
+  };
+  $('ctsave').onclick = async e => {
+    if (CTRAW) {
+      try { CTDOC = JSON.parse($('ctraw').value); }
+      catch (error) { $('ctstat').textContent = 'Invalid JSON. ' + error.message; return; }
+    }
+    const button = e.currentTarget;
+    button.disabled = true;
+    try {
+      const result = await post('/api/desk/content', {content: CTDOC, note: $('ctnote').value, expected_content_version: CT.versions.content});
+      CT = null;
+      contentDirty = false;
+      const updated = await get('/api/content');
+      if (generation !== sectionKey) return;
+      C = updated;
+      await vContent();
+      if (generation === sectionKey) setStatus('Saved as v' + result.version + '. Judges update automatically.');
+    } catch (error) { fail(error, generation); }
+    finally { if (button.isConnected) button.disabled = false; }
+  };
+  $('cthist').onchange = async e => {
+    const version = e.target.value;
+    if (!version || (contentDirty && !confirm('Replace unsaved changes with version ' + version + '?'))) {
+      e.target.value = '';
+      return;
+    }
+    try {
+      const result = await get('/api/desk/content?v=' + encodeURIComponent(version));
+      if (generation !== sectionKey) return;
+      CTDOC = result.content;
+      contentDirty = true;
+      await vContent();
+      if (generation === sectionKey) setStatus('Loaded v' + version + '. Save it to publish as a new version.');
+    } catch (error) { fail(error, generation); }
+  };
+  $('ctreload').onclick = async () => {
+    if (contentDirty && !confirm('Discard this draft and load the latest event content?')) return;
+    CT = CTDOC = null;
+    contentDirty = false;
+    try {
+      const updated = await get('/api/content');
+      if (generation !== sectionKey) return;
+      C = updated;
+      await vContent();
+    } catch (error) { fail(error, generation); }
+  };
+  $('ctrev').onclick = async e => {
+    if (!confirm('Restore the shipped text as a new version? Earlier versions stay in history.')) return;
+    const button = e.currentTarget;
+    button.disabled = true;
+    try {
+      await post('/api/desk/content', {action: 'bundled', expected_content_version: CT.versions.content});
+      CT = null;
+      contentDirty = false;
+      const updated = await get('/api/content');
+      if (generation !== sectionKey) return;
+      C = updated;
+      await vContent();
+      if (generation === sectionKey) setStatus('Shipped text restored as a new version.');
+    } catch (error) { fail(error, generation); }
+    finally { button.disabled = false; }
+  };
+}
+
+async function showEventFiles(generation) {
+  const target = $('event-files');
+  try {
+    const files = eventFiles || (await get('/api/event')).resources;
+    if (!active || generation !== sectionKey || !target.isConnected) return;
+    eventFiles = files;
+    if (!files.length) return;
+    target.innerHTML = '<details class="card"><summary><b>Event documents</b> <span class="small mut">' + files.length + ' PDFs</span></summary>' +
+      '<ul>' + files.map(file => '<li><a href="/api/resources/' + encodeURIComponent(file.id) + '" target="_blank" rel="noopener">' + KEV.esc(file.title) + '</a></li>').join('') + '</ul></details>';
+  } catch {
+    if (target.isConnected) target.innerHTML = '<p class="small mut">Event documents are temporarily unavailable.</p>';
+  }
+}
+// ───────── Roster ─────────
+let ROWS = null, RDIRTY = false;
+const eventConfig = () => DS.configuration || DS.config || {team_size: 2, team_count: DS.pairs, judge_count: DS.stations.length, rounds: DS.rounds || Math.ceil(DS.pairs / DS.stations.length)};
+const memberCapacity = pair => Math.max(0,Math.min(eventConfig().team_size,(eventConfig().participant_count || eventConfig().team_count*eventConfig().team_size)-(pair-1)*eventConfig().team_size));
+const rsc = row => ({round: row.round || Math.ceil(row.pair / eventConfig().judge_count), station: row.station || ((row.pair - 1) % eventConfig().judge_count) + 1});
+async function vRoster() {
+  const generation = sectionKey;
+  if (!roster) {
+    const result = await get('/api/desk/roster');
+    if (generation !== sectionKey) return;
+    roster = result.roster; ROWS = null;
+  }
+  const size = eventConfig().team_size;
+  if (!ROWS) {
+    const by = {}; roster.forEach(r => by[r.pair] = r);
+    ROWS = Array.from({length: eventConfig().team_count || DS.pairs}, (_, i) => {
+      const r = by[i + 1] || {}, old = KEV.memberList(r);
+      return {...r, pair: i + 1, partner: r.partner || '', members: Array.from({length: memberCapacity(i+1)}, (_, n) => ({id: n + 1, name: old.find(m => m.id === n + 1)?.name || '', coach: old.find(m => m.id === n + 1)?.coach || 0}))};
+    }); RDIRTY = false;
+  }
+  const partners = [...new Set(ROWS.map(r => r.partner).filter(Boolean))];
+  const headings = Array.from({length: size}, (_, i) => '<th>Member ' + (i + 1) + '</th><th>Coach</th>').join('');
+  const csvHead = ['team', 'company', ...Array.from({length: size}, (_, i) => 'p' + (i + 1)), ...Array.from({length: size}, (_, i) => 'coach' + (i + 1))];
+  $('main').innerHTML = '<div class="card"><div class="row"><div class="grow"><h2>Team roster</h2><div class="small mut" id="rsum"></div></div><button class="btn" id="rsave">Save teams</button></div>' +
+    '<p class="small mut">Enter each team’s company and members. Original scenario assignments are retained when event size changes. Coach adds two points per qualified member, capped at four per team.</p>' +
+    '<datalist id="rpl">' + partners.map(p => '<option value="' + KEV.esc(p) + '">').join('') + '</datalist>' +
+    '<div class="table-scroll"><table id="rt"><tr><th>Team</th><th>Round · station</th><th>Original scenario</th><th>Company</th>' + headings + '<th></th></tr>' +
+    ROWS.map((r, i) => { const x = rsc(r), scenario = C.scenarios.find(c => c.id === r.scenario);
+      return '<tr data-i="' + i + '"><td><b>' + r.pair + '</b></td><td class="small mut">R' + x.round + ' · S' + x.station + '</td><td class="small mut">' + KEV.esc(scenario?.name || r.scenario || 'Assigned on save') + '</td>' +
+      '<td><input type="text" list="rpl" data-f="partner" maxlength="80" aria-label="Team ' + r.pair + ' company" value="' + KEV.esc(r.partner) + '" placeholder="Company"></td>' +
+      r.members.map(m => '<td><input type="text" data-f="name" data-member="' + m.id + '" maxlength="80" aria-label="Team ' + r.pair + ' member ' + m.id + ' name" value="' + KEV.esc(m.name) + '" placeholder="Name"></td><td><input type="checkbox" data-f="coach" data-member="' + m.id + '" aria-label="Team ' + r.pair + ' member ' + m.id + ' completed Sales Coach"' + (m.coach ? ' checked' : '') + '></td>').join('') +
+      (r.members.length<size ? '<td colspan="' + (2*(size-r.members.length)) + '" class="small mut">Partial team · ' + r.members.length + ' of ' + size + ' members</td>' : '') + '<td>' + (i ? '<button class="btn ghost sm" data-same="' + i + '" title="Use the company from the team above">↑ same</button>' : '') + '</td></tr>';
+    }).join('') + '</table></div><p id="rmsg" class="small" role="status"></p></div>' +
+    '<details class="card"><summary><b>Import or download a spreadsheet</b></summary><p class="small mut">One line per team, in this order: <b>' + csvHead.join(', ') + '</b>. Paste comma or tab separated rows. Check the table before saving.</p>' +
+    '<textarea id="rcsv" aria-label="Spreadsheet rows" style="min-height:140px"></textarea><div class="row"><button class="btn alt sm" id="rimp">Fill the table</button><button class="btn ghost sm" id="rexp">Download CSV</button>' +
+    (KEV.workspaceMode === 'rehearsal' ? '<button class="btn ghost sm" id="rdemo">Fill with sample names</button>' : '') + '<button class="btn ghost sm" id="rclr">Clear all</button></div></details>';
+  const sum = () => {
+    const occupied = ROWS.filter(r => r.partner || r.members.some(m => m.name));
+    const filled = occupied.filter(r => r.partner && r.members.every(m => m.name.trim())).length;
+    const names = ROWS.flatMap(r => r.members.map(m => m.name.trim().toLowerCase())).filter(Boolean), dup = names.filter((n, i) => names.indexOf(n) !== i);
+    $('rsum').textContent = filled + ' of ' + ROWS.length + ' teams complete · ' + names.length + ' named participants' + (occupied.length - filled ? ' · ' + (occupied.length - filled) + ' incomplete teams' : '') + (dup.length ? ' · Duplicate names: ' + [...new Set(dup)].join(', ') : '') + (RDIRTY ? ' · Unsaved changes' : '');
+  };
+  document.querySelectorAll('#rt [data-f]').forEach(inp => inp.oninput = inp.onchange = () => {
+    const row = ROWS[+inp.closest('tr').dataset.i], target = inp.dataset.member ? row.members.find(m => m.id === +inp.dataset.member) : row;
+    target[inp.dataset.f] = inp.type === 'checkbox' ? Number(inp.checked) : inp.value; RDIRTY = true; sum();
+  }); sum();
+  document.querySelectorAll('[data-same]').forEach(b => b.onclick = () => { const i = +b.dataset.same; ROWS[i].partner = ROWS[i - 1].partner; RDIRTY = true; vRoster(); });
+  const fill = rows => { rows.forEach(x => { const row = ROWS.find(r => r.pair === x.pair); if (row) Object.assign(row, x); }); RDIRTY = true; vRoster(); };
+  $('rimp').onclick = () => {
+    const records = $('rcsv').value.split(/\r?\n/).filter(line => line.trim()).map(parseRosterLine);
+    if (records.length && !/^\d+$/.test(records[0][0])) {
+      const header = records.shift().map(cell => cell.toLowerCase());
+      if (header.length !== csvHead.length || header.some((cell,i) => cell !== csvHead[i])) { $('rmsg').textContent = 'This spreadsheet template does not match the configured team size. Download the current CSV template and keep its column order.'; return; }
+    }
+    const lines = records;
+    if (lines.some(c => !/^\d+$/.test(c[0])) || new Set(lines.map(c => +c[0])).size !== lines.length) { $('rmsg').textContent = 'Each row needs a different valid team number. Check the CSV template.'; return; }
+    if (lines.some(c => c.length !== csvHead.length || +c[0] < 1 || +c[0] > ROWS.length || Array.from({length:size-memberCapacity(+c[0])},(_,n)=>memberCapacity(+c[0])+n).some(n=>c[2+n] || /^(1|y|yes|true|succeed)$/i.test(c[2+size+n]||'')))) { $('rmsg').textContent = 'A row has too many columns or a team number outside this event. Check the configured team size and template.'; return; }
+    const rows = lines.map(c => ({pair: +c[0], partner: c[1] || '', members: Array.from({length: memberCapacity(+c[0])}, (_, n) => ({id: n + 1, name: c[2 + n] || '', coach: /^(1|y|yes|true|succeed)$/i.test(c[2 + size + n] || '') ? 1 : 0}))}));
+    if (!rows.length) { $('rmsg').textContent = 'No rows found.'; return; } fill(rows);
+  };
+  $('rexp').onclick = () => {
+    const rows = [csvHead, ...ROWS.map(r => [r.pair, r.partner, ...Array.from({length:size},(_,n)=>r.members[n]?.name || ''), ...Array.from({length:size},(_,n)=>r.members[n]?.coach || 0)])];
+    KEV.saveFile(new Blob([rows.map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n'], {type: 'text/csv;charset=utf-8'}), 'kevenos-roster.csv');
+  };
+  if ($('rdemo')) $('rdemo').onclick = () => fill(ROWS.map((r, i) => ({pair:r.pair,partner:'Practice team ' + r.pair,members:r.members.map(m => ({id:m.id,name:'Practice person ' + (i * size + m.id),coach:0}))})));
+  $('rclr').onclick = () => { if (confirm('Clear the names in this table? Changes apply only after Save teams. Existing credentials for changed people will stop working.')) fill(ROWS.map(r => ({pair:r.pair,partner:'',members:r.members.map(m=>({id:m.id,name:'',coach:0}))}))); };
+  $('rsave').onclick = async e => {
+    const button = e.currentTarget; button.disabled = true;
+    try { const result = await post('/api/desk/roster', {rows: ROWS}); roster = ROWS = null; RDIRTY = false;
+      if (generation !== sectionKey) return; await vRoster(); if (generation === sectionKey) setStatus('Saved ' + result.rows + ' teams.');
+    } catch (error) { fail(error, generation); } finally { button.disabled = false; }
+  };
+}
+
+
+function parseRosterLine(line) {
+  if (line.includes('\t')) return line.split('\t').map(field => field.trim());
+  return [...line.matchAll(/(?:^|,)\s*(?:"((?:[^"]|"")*)"|([^,]*))/g)].map(match =>
+    match[1] !== undefined ? match[1].replaceAll('""', '"') : match[2].trim());
+}
+
+async function vAccess(message = '') {
+  const generation = sectionKey;
+  const [data, {accounts}] = await Promise.all([get('/api/admin/credentials'), get('/api/admin/accounts')]);
+  if (!active || generation !== sectionKey) return;
+  staffDirty = false;
+  const rehearsal = KEV.workspaceMode === 'rehearsal';
+  const staff = accounts.filter(a => a.account_type === 'staff' || a.grants.some(g => ['admin','organizer','scoring','registration','judge'].includes(g.role)));
+  const visible = new Set(data.credentials.map(c => c.id));
+  const rows = staff.flatMap(a => a.credentials.filter(c => visible.has(c.id)).map(c => ({...data.credentials.find(v=>v.id===c.id), account:a})));
+  const used = new Set(accounts.filter(a=>a.credentials.some(c=>c.active)).flatMap(a=>a.grants.filter(g=>g.role==='judge').map(g=>g.station)));
+  const stations = DS.stations.map(s=>s.station).filter(station=>!used.has(station));
+  const roles = ['judge','registration','organizer','scoring','admin'];
+  $('main').innerHTML = '<section class="card"><h2>Staff passwords</h2><p>Create one named staff account and choose the dashboards they need. The same password opens all assigned roles. Participants are added through the team roster.</p>' +
+    '<form id="staff-access-form"><div class="form-row"><label class="field">Staff name<input type="text" name="label" required maxlength="80" autocomplete="off"></label>' +
+    '<label class="field">Password (optional)<input name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" placeholder="Leave blank to generate"></label></div>' +
+    '<fieldset class="kevenos-account-roles"><legend>Staff roles</legend>' + roles.map(role=>'<div class="kevenos-account-role"><label><input type="checkbox" name="role" value="' + role + '"> <span><strong>' + roleName(role) + '</strong> <span class="small mut">' + KEV.esc(KEV.accounts.descriptions[role]) + '</span></span></label></div>').join('') + '</fieldset>' +
+    '<label class="field" id="staff-station-field" hidden>Judging station<select name="station"><option value="">Choose a station</option>' + stations.map(station=>'<option value="'+station+'">Station '+station+'</option>').join('') + '</select></label>' +
+    '<p id="staff-access-preview" class="small mut">Choose at least one role. You can change roles later without changing the password.</p>' +
+    (rehearsal ? '<div id="staff-shared-confirm" hidden><p>Operational staff roles apply in Live and Rehearsal. A Judge assignment applies to this Rehearsal only.</p><label><input type="checkbox" name="confirm_shared_roles"> I confirm these shared staff roles for this person.</label></div>' : '') +
+    '<button class="btn" type="submit">Create Staff password</button><p role="alert" id="staff-form-error"></p></form></section>' +
+    '<section class="card"><div class="row"><h2 class="grow">Staff accounts</h2><button class="btn ghost sm" data-jump="accounts">Manage all roles</button></div>' +
+    '<p class="small mut">Passwords belong to people; roles control access. Resetting or revoking a password signs that person out of every dashboard.' + (rehearsal ? ' Shared password resets and revocations require Live Event Data.' : '') + '</p>' +
+    '<div class="table-scroll" id="staff-table"><table><thead><tr><th>Name</th><th>Assigned roles</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + rows.map(c=>{
+      const canRotate = c.can_manage_password;
+      return '<tr><th scope="row">'+KEV.esc(c.account.label)+'</th><td>'+ (c.account.grants.map(g=>'<div>'+KEV.esc(KEV.accounts.grantLabel(g))+'</div>').join('') || 'No roles in this workspace') +'</td><td>'+(c.active?'Active':'Revoked')+'</td><td><div class="row">'+
+        '<button class="btn ghost sm" data-edit-staff="'+KEV.esc(c.account.id)+'">Edit roles</button>' + (c.active?showPasswordButton(c,'data-staff-action'):'') +
+        (canRotate?'<button class="btn ghost sm" data-staff-action="reset" data-id="'+KEV.esc(c.id)+'">Reset</button>'+(c.active?'<button class="btn bad sm" data-staff-action="revoke" data-id="'+KEV.esc(c.id)+'">Revoke</button>':''):'')+'</div></td></tr>';
+    }).join('')+'</tbody></table>' + (!rows.length?'<p>No staff accounts yet. Create one above.</p>':'') + '</div></section>';
+  const form = $('staff-access-form');
+  const selected = () => [...form.querySelectorAll('[name="role"]:checked')].map(el=>el.value);
+  const update = event => {
+    const chosen=selected(), judge=chosen.includes('judge');
+    $('staff-station-field').hidden=!judge;
+    form.elements.station.required=judge;form.elements.station.disabled=!judge;
+    $('staff-access-preview').textContent=chosen.length?'Dashboards: '+chosen.map(roleName).join(', '):'Choose at least one role.';
+    const shared=$('staff-shared-confirm');
+    if(shared){shared.hidden=!chosen.some(role=>role!=='judge');form.elements.confirm_shared_roles.required=!shared.hidden;
+      if(event?.target.name==='role')form.elements.confirm_shared_roles.checked=false;}
+  };
+  form.oninput=()=>{staffDirty=true;};form.onchange=update;update();
+  const change = async (body, button) => {
+    if(issuing)return;
+    issuing=true;button.disabled=true;
+    try {
+      const result=await post('/api/admin/credentials',body);
+      if(!active || generation!==sectionKey)return;
+      staffDirty=false;
+      const issued=result.password?[{...result.credential,password:result.password,issuance_grant:result.issuance_grant}]:[];
+      try{await vAccess(body.action==='revoke'?'Staff password revoked.':'Staff password saved.');}
+      catch(error){if(!issued.length)throw error;setStatus('Password saved. Refresh the staff list when ready.');}
+      if(active && generation===sectionKey && issued.length)showIssued(issued);
+    } catch(error){if(generation===sectionKey)fail(error,generation);}
+    finally{issuing=false;button.disabled=false;}
+  };
+  form.onsubmit = event => {
+    event.preventDefault();
+    const chosen=selected();
+    if(!chosen.length){$('staff-form-error').textContent='Choose at least one staff role.';return;}
+    const grants=chosen.map(role=>role==='judge'?{role,station:Number(form.elements.station.value)}:{role});
+    if(chosen.includes('judge') && !form.elements.station.value){$('staff-form-error').textContent='Choose an available judging station.';return;}
+    if(rehearsal && chosen.some(role=>role!=='judge') && !form.elements.confirm_shared_roles.checked){$('staff-form-error').textContent='Confirm that shared staff roles apply in Live and Rehearsal.';return;}
+    change({action:'create-staff',label:form.elements.label.value.trim(),password:form.elements.password.value || undefined,grants,
+      ...(rehearsal?{confirm_shared_roles:!!form.elements.confirm_shared_roles.checked}:{})},event.submitter || form.querySelector('[type="submit"]'));
+  };
+  $('main').querySelectorAll('[data-staff-action]').forEach(button=>button.onclick=()=>{
+    if(button.dataset.staffAction==='reveal'){showPassword(button,generation);return;}
+    const row=rows.find(c=>c.id===button.dataset.id);
+    if(confirm('This '+button.dataset.staffAction+'s the password for '+row.account.label+' and signs them out of all dashboards. Continue?'))change({action:button.dataset.staffAction,id:row.id},button);
+  });
+  $('main').querySelectorAll('[data-edit-staff]').forEach(button=>button.onclick=async()=>{
+    await select('accounts',true);
+    if(tab==='people' && people==='accounts')$('main').querySelector('[data-account-id="'+button.dataset.editStaff+'"]')?.click();
+  });
+  setStatus(message);
+}
+
+async function vProfiles() {
+  const generation = sectionKey;
+  const {targets} = await get('/api/admin/profiles');
+  if (!active || generation !== sectionKey) return;
+  const requested = new URLSearchParams(location.search).get('view');
+  const dashboard = target => target.dashboard || target.role;
+  const availableRoles = ['guest','participant','judge','registration','organizer','scoring','desk'].filter(role => targets.some(target=>dashboard(target)===role));
+  $('main').innerHTML = '<section class="card"><h2>Preview and Support</h2><p>Preview is read-only. Support mode lets you help with the selected person’s permitted actions. Activity records both identities.</p>' +
+    '<form id="profile-form"><div class="form-row"><label class="field">Role<select id="profile-role">' + availableRoles.map(role => '<option value="' + role + '">' + roleName(role) + '</option>').join('') +
+    '</select></label><label class="field grow">Profile<select id="profile-target" required></select></label></div>' +
+    '<label class="field">Access mode<select id="profile-mode"><option value="preview">Preview — read only</option><option value="support">Support — allow permitted changes</option></select></label>' +
+    '<p class="small mut">A banner stays visible with the active profile and a Return to Admin button. This view lasts up to 15 minutes and stays within this browser tab.</p><button class="btn" id="profile-open">Open preview</button><p id="profile-status" role="alert"></p></form></section><details class="card"><summary>Recover saved judge work on this device</summary><p>Download an export for manual review. Saved sheets are never automatically submitted under another profile.</p><button class="btn ghost" id="profile-recover">Download recovery file</button><p id="recovery-status" role="status"></p></details>';
+  $('profile-recover').onclick = async () => { try { const count = await KEV.profile.recoverSavedWork(); $('recovery-status').textContent = count + ' saved records exported for review.'; } catch (error) { $('recovery-status').textContent = error.message; } };
+  const options = () => {
+    const role = $('profile-role').value;
+    $('profile-target').innerHTML = targets.flatMap((t, index) => dashboard(t) !== role ? [] : ['<option value="' + index + '"' + (t.available === false ? ' disabled' : '') + '>' + KEV.esc(t.label) + (t.station ? ' · Station ' + t.station : t.pair ? ' · Team ' + t.pair + ', person ' + t.member : '') + '</option>']).join('');
+    $('profile-open').disabled = !$('profile-target').options.length || [...$('profile-target').options].every(o => o.disabled);
+    $('profile-status').textContent = $('profile-open').disabled ? 'Add a named participant to the roster before opening this view.' : '';
+  };
+  if (availableRoles.includes(requested)) $('profile-role').value = requested;
+  $('profile-role').onchange = options;
+  $('profile-mode').onchange = () => { $('profile-open').textContent = $('profile-mode').value === 'preview' ? 'Open preview' : 'Open support mode'; };
+  options();
+  $('profile-form').onsubmit = async event => {
+    event.preventDefault();
+    const target = targets[Number($('profile-target').value)];
+    if (!target || target.available === false) return;
+    const mode = $('profile-mode').value;
+    if (mode === 'support' && !confirm('Open support mode for ' + target.label + '? Your actions can change event data and will be recorded as Admin support.')) return;
+    $('profile-open').disabled = true;
+    try {
+      await KEV.profile.start({role: target.role, dashboard: dashboard(target), ...(target.credential_id ? {credential_id: target.credential_id} : {}), ...(target.station ? {station: target.station} : {}), ...(target.pair ? {pair: target.pair, member: target.member} : {}), mode});
+    } catch (error) { if (generation === sectionKey) $('profile-status').textContent = error.message; }
+    finally { if (generation === sectionKey) $('profile-open').disabled = false; }
+  };
+}
+
+
+async function vSystem() {
+  const generation = sectionKey;
+  const [status, settings, workspace, setup] = await Promise.all([get('/api/desk/state'), get('/api/desk/links'), get('/api/admin/workspace'), get('/api/admin/configuration')]);
+  if (generation !== sectionKey) return;
+  DS = status;
+  links = settings;
+  const networkHost = links.host || links.ip;
+  const base = links.hosted || !networkHost ? location.origin : location.protocol + '//' + networkHost + ':' + links.port;
+  $('main').innerHTML = configurationForm(setup, workspace) + workspaceSettings(workspace) +
+    '<section class="card"><h2>Event configuration</h2><div class="table-scroll"><table><tbody>' +
+    '<tr><th scope="row">Deployment</th><td>' + (links.hosted ? 'Hosted event' : 'Local judging kit') + '</td></tr>' +
+    '<tr><th scope="row">Event address</th><td>' + KEV.esc(base) + '</td></tr>' +
+    '<tr><th scope="row">App version</th><td>' + KEV.esc(DS.versions.app) + '</td></tr>' +
+    '<tr><th scope="row">Content version</th><td>' + KEV.esc(DS.versions.content) + '</td></tr>' +
+    '<tr><th scope="row">Judge stations</th><td>' + KEV.esc(links.stations) + '</td></tr>' +
+    '<tr><th scope="row">AI drafts</th><td>' + (DS.ai ? 'OpenAI-compatible AI service ready · ' + KEV.esc(DS.model) : 'Templates available') + '</td></tr>' +
+    (!links.hosted ? '<tr><th scope="row">Organiser PIN</th><td>' + KEV.esc(links.desk_pin) + '</td></tr><tr><th scope="row">Event password</th><td>' + KEV.esc(links.password || '—') +
+    '</td></tr><tr><th scope="row">Public view key</th><td>' + KEV.esc(links.view_key || '—') + '</td></tr>' : '') +
+    '</tbody></table></div>' +
+    (links.hosted ? '<p class="small mut">Use People &amp; access to manage Participant and Staff passwords.</p>' :
+    '<p class="small mut">Connect judges to the same private network and open <b>' + KEV.esc(base) + '/judge</b> to choose a station.</p>') + '</section>' +
+    (workspace.mode === 'rehearsal' ? '' : '<section class="card"><h2>Reset judging data</h2><p class="small mut">Clear score sheets, timers, finals and calibration for a fresh run. The team roster is kept. Download the event backup first.</p>' +
+    '<div class="row section-tools"><button class="btn ghost sm" data-export="backup">Download backup</button></div>' +
+    '<form id="reset-form" class="form-row"><label class="field">Type RESET to confirm<input type="text" id="rtx" required pattern="RESET" autocomplete="off"></label><button class="btn bad" id="rrs">Reset judging data</button></form></section>');
+  if (workspace.mode === 'rehearsal') {
+    $('main').insertAdjacentHTML('beforeend','<section class="card" id="prepare-live"></section>');
+    window.PitchLiveTransition?.mount($('prepare-live'),(path,body)=>post(path,body));
+  }
+  bindConfiguration(setup, workspace, generation);
+  $('main').querySelectorAll('[data-workspace]').forEach(button => {
+    button.onclick = () => confirmWorkspace(button);
+  });
+  if ($('reset-form')) $('reset-form').onsubmit = async e => {
+    e.preventDefault();
+    if ($('rtx').value !== 'RESET') return;
+    const button = $('rrs');
+    button.disabled = true;
+    try {
+      await post('/api/desk/reset', {confirm: 'RESET'});
+      if (generation === sectionKey) {
+        $('rtx').value = '';
+        setStatus('Judging data reset.');
+      }
+    } catch (error) { fail(error, generation); }
+    finally { button.disabled = false; }
+  };
+  if (KEV.staff.hosted) guestSettings(workspace, generation).catch(error => fail(error, generation));
+}
+
+async function guestSettings(workspace, generation) {
+  const {credentials}=await get('/api/admin/credentials');
+  if(!active || generation!==sectionKey)return;
+  const guest=credentials.find(c=>c.role==='guest');
+  const section=document.createElement('section');section.className='card';
+  section.innerHTML='<h2>Shared Guest access</h2><p>Guests use one shared password for the public event guide. This is separate from Participant and Staff accounts.</p>'+
+    (workspace.mode==='rehearsal'?'<p class="mut">Switch to Live Event Data to create or reset shared Guest access.</p>':
+    '<form id="guest-form" class="form-row"><label class="field">New guest password<input name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Leave blank to generate"></label><button class="btn alt">'+(guest?'Reset guest password':'Create guest password')+'</button></form>');
+  $('main').append(section);
+  if($('guest-form'))$('guest-form').onsubmit=async event=>{
+    event.preventDefault();if(issuing)return;
+    if(guest && !confirm('Reset Guest access and sign out everyone using it?'))return;
+    issuing=true;const button=event.currentTarget.querySelector('button');button.disabled=true;
+    try{
+      const password=event.currentTarget.elements.password.value || undefined;
+      const result=await post('/api/admin/credentials',guest?{action:'reset',id:guest.id,password}:{action:'create',role:'guest',label:'Event guests',password});
+      if(active && generation===sectionKey)showIssued([{...result.credential,password:result.password,issuance_grant:result.issuance_grant}]);
+    }catch(error){fail(error,generation);}finally{issuing=false;button.disabled=false;}
+  };
+}
+
+
+function configurationForm(setup, workspace) {
+  const c = setup.configuration, rehearsal = workspace.mode === 'rehearsal';
+  const locked = !setup.editable && !rehearsal;
+  return '<section class="card"><h2>Event size and teams</h2><p class="mut">' + (rehearsal ? 'Preview how the new size affects practice teams, judging stations and saved work.' : 'Set the participant count, members per team and judging stations. Each judge has a stable station identity. Existing team scenarios and access are preserved.') + '</p>' +
+    '<form id="event-config-form"><div class="grid">' + [['participant-count','Participants',c.participant_count,1000],['team-size','Members per team',c.team_size,10],['judge-count','Judges / stations',c.judge_count,32]].map(([id,label,value,max])=>'<label class="field" for="config-' + id + '">' + label + '<input type="number" id="config-' + id + '" min="1" max="' + max + '" step="1" required value="' + value + '"' + (locked ? ' disabled' : '') + '></label>').join('') + '</div>' +
+    '<p id="config-summary" role="status"></p><p id="config-schedule" class="small"></p>' + (!rehearsal && setup.reason ? '<p class="small mut">' + KEV.esc(setup.reason) + '</p>' : '') +
+    '<p id="config-error" class="error" role="alert"></p><button class="btn" id="config-save"' + (locked ? ' disabled' : '') + '>' + (rehearsal ? 'Preview resize' : 'Save event size') + '</button></form>' +
+    (rehearsal ? '<div id="config-plan" class="rehearsal-plan" hidden><h3 id="config-plan-heading" tabindex="-1">Resize preview</h3><div id="config-plan-body"></div><div class="row"><button class="btn" type="button" id="config-apply">Apply resize</button><button class="btn ghost" type="button" id="config-dismiss">Cancel preview</button></div></div>' : '') + '</section>';
+}
+
+function renderResizePlan(plan) {
+  const target = plan.configuration, current = plan.current, summary = plan.summary || {};
+  const countLabels = {
+    retained_members: 'Member records retained', retained_judging_sheets: 'Protected judging sheets retained',
+    retained_credentials: 'Access records retained', retained_checkins: 'Check-ins retained',
+    retained_directory_entries: 'Directory entries retained', removed_sample_members: 'Sample member records removed',
+    removed_sample_sheets: 'Sample sheets removed'
+  };
+  const list = (rows, className) => rows.length ? '<ul class="' + className + '">' + rows.map(row => '<li>' + KEV.esc(row) + '</li>').join('') + '</ul>' : '';
+  const counts = Object.entries(countLabels).filter(([key]) => summary[key] > 0)
+    .map(([key, label]) => '<div><dt>' + label + '</dt><dd>' + KEV.esc(summary[key]) + '</dd></div>').join('');
+  const blockers = (plan.blockers || []).map(item => item.message);
+  const moves = (plan.moves || []).map(move => 'Move team ' + move.from_pair + ' to slot ' + move.to_pair);
+  const size = c => KEV.esc(c.participant_count) + ' participants · ' + KEV.esc(c.team_size) + ' per team · ' + KEV.esc(c.judge_count) + ' judging stations';
+  return '<p><strong>' + size(target) + '</strong></p>' +
+    (current && plan.changed ? '<p class="small mut">Current size is ' + size(current) + '.</p>' : '') +
+    (plan.changed ? '' : '<p>The rehearsal already has this size.</p>') +
+    (blockers.length ? '<h4>Resolve before applying</h4>' + list(blockers, 'error') : '') +
+    (counts ? '<dl class="rehearsal-plan-counts">' + counts + '</dl>' : '') +
+    (moves.length ? '<h4>Team moves</h4>' + list(moves, '') : '') +
+    list(plan.warnings || [], 'small');
+}
+
+function bindConfiguration(setup, workspace, generation) {
+  const form = $('event-config-form'), values = () => ({participant_count:Number($('config-participant-count').value),team_size:Number($('config-team-size').value),judge_count:Number($('config-judge-count').value)});
+  const rehearsal = workspace.mode === 'rehearsal';
+  const previewButton = $('config-save'), errorText = $('config-error');
+  const planPanel = $('config-plan'), apply = $('config-apply'), dismiss = $('config-dismiss');
+  const fields = [...form.querySelectorAll('input')];
+  let attempt = null, busy = false, checking = false;
+  const activeSection = () => generation === sectionKey && form.isConnected;
+  const clearPlan = () => {
+    attempt = null;
+    checking = false;
+    if (planPanel) planPanel.hidden = true;
+  };
+  const preview = () => {
+    clearPlan();
+    errorText.textContent = '';
+    const c = values(); if (!c.participant_count || !c.team_size || !c.judge_count) return;
+    const teams = Math.ceil(c.participant_count/c.team_size), rounds = Math.ceil(teams/c.judge_count), remainder = c.participant_count%c.team_size;
+    $('config-summary').textContent = teams + (teams===1?' team · ':' teams · ') + rounds + (rounds===1?' round · ':' rounds · ') + (rounds*15) + ' minutes of preliminary judging.' + (remainder ? ' The last team has ' + remainder + ' of ' + c.team_size + ' members; complete or review this team before the event.' : '');
+    const published = (C.agenda || []).find(a=>a.scene==='pitch')?.min;
+    $('config-schedule').textContent = published && published !== rounds*15 ? 'Schedule check: the published pitch block is ' + published + ' minutes. Review Event content before changing the programme; saving event size does not change published times.' : 'Published programme times are not changed automatically.';
+    $('config-schedule').classList.toggle('error', Boolean(published && published !== rounds*15));
+  };
+  form.addEventListener('input', preview);
+  preview();
+
+  function controls() {
+    previewButton.disabled = busy || checking || (!setup.editable && !rehearsal);
+    fields.forEach(field => { field.disabled = busy || checking || (!setup.editable && !rehearsal); });
+    if (apply) {
+      apply.disabled = busy || !attempt || KEV.profile.isPreview;
+      apply.textContent = checking ? 'Check resize outcome' : 'Apply resize';
+      dismiss.disabled = busy || checking;
+    }
+  }
+
+  async function saved() {
+    roster = ROWS = null;
+    RDIRTY = false;
+    if (activeSection()) {
+      await vSystem();
+      if (generation === sectionKey) setStatus(rehearsal ? 'Rehearsal size updated. Review the new schedule and assignments.' : 'Event size saved. Review the roster, judge invitations and published schedule.');
+    }
+  }
+
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (busy || checking || !form.reportValidity()) return;
+    const target = values();
+    clearPlan();
+    busy = true;
+    controls();
+    errorText.textContent = '';
+    try {
+      if (!rehearsal) {
+        await post('/api/admin/configuration', target);
+        await saved();
+        return;
+      }
+      const plan = await post('/api/admin/configuration/preview', target);
+      if (!activeSection()) return;
+      if (plan.changed && plan.can_apply && typeof plan.plan_digest === 'string') attempt = {...target, plan_digest: plan.plan_digest};
+      $('config-plan-body').innerHTML = renderResizePlan(plan);
+      planPanel.hidden = false;
+      $('config-plan-heading').focus();
+    } catch (error) {
+      if (activeSection()) errorText.textContent = error.message;
+    } finally {
+      busy = false;
+      if (activeSection()) controls();
+    }
+  };
+  if (!rehearsal) return;
+  dismiss.onclick = () => { clearPlan(); controls(); previewButton.focus(); };
+  apply.onclick = async () => {
+    if (busy || !attempt || KEV.profile.isPreview) return;
+    busy = true;
+    errorText.textContent = '';
+    controls();
+    try {
+      if (checking) await get('/api/admin/configuration');
+      if (!activeSection()) return;
+      await post('/api/admin/configuration', attempt);
+      await saved();
+    } catch (error) {
+      if (!activeSection() || error.code === 'workspace_changed') return;
+      if (!error.status || error.status >= 500) {
+        checking = true;
+        errorText.textContent = 'The connection was interrupted. Check this resize before starting another.';
+      } else {
+        clearPlan();
+        errorText.textContent = error.message;
+      }
+    } finally {
+      busy = false;
+      if (activeSection()) controls();
+    }
+  };
+}
+
+function workspaceSettings(workspace) {
+  const rehearsal = workspace.mode === 'rehearsal';
+  const mode = rehearsal ? 'Rehearsal — sample data' : 'Live event data';
+  return '<section class="card"><h2>Event data</h2><p>Active dataset <strong>' + mode + '</strong></p>' +
+    '<p class="small mut">Each dataset has its own roster, scores, clocks, content, Participant passwords and Staff station accounts. Admin, Organizer and guest accounts work in both datasets.</p>' +
+    '<p class="small mut">After a switch, participants and judges need to sign in again. Reopen Live View and Board links for the active dataset.</p>' +
+    '<div class="row"><button class="btn alt" data-workspace="' + (rehearsal ? 'live">Switch to live event data' : 'rehearsal">Enable rehearsal with sample data') + '</button>' +
+    (rehearsal ? '<button class="btn bad" data-workspace="reset-rehearsal">Reset rehearsal data</button>' : '') +
+    '<a class="btn ghost" href="/live" target="_blank" rel="noopener">Open Live View</a></div></section>';
+}
+
+const WORKSPACE_ACTIONS = {
+  rehearsal: {phrase: 'REHEARSAL', label: 'Enable rehearsal', detail: 'Open the practice roster, sample scores, practice content and a separate clock. Live data is kept. Practice email is disabled.'},
+  live: {phrase: 'LIVE', label: 'Switch to live event data', detail: 'Open the live roster, scores, content and clock. Practice data is kept.'},
+  'reset-rehearsal': {phrase: 'RESET REHEARSAL', label: 'Reset rehearsal data', detail: 'Replace the practice roster, scores, content and clocks with sample data and clear practice Participant passwords. Staff, Admin, Organizer and guest passwords are kept.'}
+};
+function confirmWorkspace(button) {
+  const action = button.dataset.workspace, {phrase, label, detail} = WORKSPACE_ACTIONS[action];
+  const dialog = $('workspace-dialog'), input = $('workspace-confirm'), apply = $('workspace-apply');
+  $('workspace-title').textContent = label;
+  $('workspace-detail').textContent = detail + ' Participant and judge sessions end. Reopen audience display links afterward.';
+  $('workspace-phrase').textContent = phrase;
+  $('workspace-error').textContent = '';
+  input.value = '';
+  apply.disabled = true;
+  apply.textContent = label;
+  input.oninput = () => { apply.disabled = input.value !== phrase; };
+  dialog.showModal();
+  input.focus();
+  $('workspace-cancel').onclick = () => dialog.close();
+  dialog.onclose = () => button.focus();
+  $('workspace-form').onsubmit = async e => {
+    e.preventDefault();
+    if (input.value !== phrase || apply.disabled) return;
+    apply.disabled = input.disabled = $('workspace-cancel').disabled = true;
+    try {
+      const operation = action === 'reset-rehearsal' ? {action} : {mode: action};
+      await post('/api/admin/workspace', {...operation, confirm: phrase});
+      location.reload();
+    } catch (error) {
+      if (error.code === 'workspace_changed') return;
+      $('workspace-error').textContent = error.message;
+      apply.disabled = input.disabled = $('workspace-cancel').disabled = false;
+    }
+  };
+}
+
+start();
+</script>
+</body>
+</html>

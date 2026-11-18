@@ -1,0 +1,56 @@
+[data-workspace="scoring"] .judging-board-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 20px;
+  padding: clamp(18px, 3vw, 30px);
+  margin-bottom: 16px;
+  border: 1px solid #467b7e;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #163e4b, #112b42);
+  color: #eff8fa;
+}
+.judging-board-head :is(h2, p) { margin: 0; }
+.judging-board-head h2 { margin-bottom: 6px; font-size: clamp(1.45rem, 4vw, 2.2rem); letter-spacing: -.03em; }
+.judging-board-head p { color: #c5dce5; }
+.judging-receipt-total { display: grid; gap: 4px; white-space: nowrap; }
+.judging-receipt-total strong { color: #a7f0db; font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.judging-receipt-total span { font-size: .85rem; }
+.judging-stations { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+.judging-station { min-width: 0; margin: 0; padding: 16px; }
+.judging-station :is(h3, p) { margin: 0; }
+.judging-station h3 { font-size: 1rem; }
+.judging-station .judging-team { margin-top: 12px; font-size: 1.08rem; font-weight: 750; overflow-wrap: anywhere; }
+.judging-station .small { margin-top: 4px; }
+.judging-station-clock { margin-top: 10px !important; font-variant-numeric: tabular-nums; }
+.judging-tools summary, .judging-station summary { cursor: pointer; padding-block: 8px; }
+.judging-tools .row { margin-top: 8px; }
+.judging-exception-list { max-height: 30vh; overflow: auto; padding-left: 24px; }
+.judging-exception-list li { margin-bottom: 7px; }
+.judging-readiness { margin-top: 20px; }
+.judging-readiness ul { padding-left: 22px; }
+.judging-readiness li { margin-block: 8px; }
+.judge-phase-note { margin: 10px 0; color: var(--mut); font-size: .89rem; }
+.judge-wrap-section { margin-top: 16px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+.judge-wrap-section h3 { margin: 0 0 8px; }
+.judge-receipt-banner { border-inline-start: 4px solid currentColor; }
+@media (max-width: 690px) {
+  [data-workspace="scoring"] .judging-board-head { grid-template-columns: 1fr auto; gap: 12px; }
+  .judging-board-head > button { grid-column: 1 / -1; }
+  .judging-receipt-total strong { font-size: 1.3rem; }
+  .judging-station .row > .pill { white-space: normal; }
+}
+
+.judging-clock-tools { position: relative; }
+.judging-clock-tools summary { cursor: pointer; padding: 10px; }
+.judging-clock-tools > div {
+  position: absolute;
+  z-index: 12;
+  right: 0;
+  min-width: min(280px, 84vw);
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}

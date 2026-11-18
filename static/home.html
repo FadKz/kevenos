@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Home | KevenOS</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/role-home.css">
+</head>
+<body class="role-home-page">
+  <main class="role-shell kevenos-home">
+    <header class="role-heading">
+      <p id="home-event" class="role-kicker">KevenOS</p>
+      <h1 id="home-title">Home</h1>
+      <p id="home-date"></p>
+    </header>
+    <p id="home-status" role="status">Checking your access…</p>
+    <section id="home-next" class="role-hero" aria-labelledby="home-next-title" hidden>
+      <p class="role-kicker">Event programme</p>
+      <h2 id="home-next-title"></h2>
+      <p id="home-announcement" hidden></p>
+    </section>
+    <section id="home-dashboards" aria-label="Your dashboards" hidden></section>
+    <p id="home-help" class="role-help-note" hidden>Ask the Event Desk if you need help with your password or event access.</p>
+  </main>
+  <script src="/static/common.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const details = {
+      admin: 'Manage people, access, event content and settings.',
+      organizer: 'Run the programme, announcements, quiz and live screen.',
+      scoring: 'Manage judging clocks, sheets, feedback and the Final.',
+      registration: 'Check arrivals, complete teams and help participants sign in.',
+      judge: 'Open your assigned station, score pitches and review submissions.',
+      participant: 'Find your team, prepare your pitch and see released results.',
+      guest: 'See the programme and public event updates.'
+    };
+
+    function clearHome(message) {
+      $('home-title').textContent = 'Your access has changed';
+      $('home-status').textContent = message || 'Sign in again to check your available dashboards.';
+      $('home-dashboards').replaceChildren();
+      $('home-dashboards').hidden = $('home-next').hidden = true;
+      $('home-help').hidden = false;
+    }
+
+    function renderDashboards(me, dashboards) {
+      const last = dashboards.length > 1 && KEV.nav.resume(me);
+      const cards = dashboards.map(({role, label, url}) =>
+        '<a href="' + KEV.esc(url) + '"><strong>' + KEV.esc(label) + '</strong><span>' + KEV.esc(details[role]) + '</span></a>');
+      $('home-dashboards').innerHTML = dashboards.length === 1 ?
+        '<p>' + KEV.esc(details[dashboards[0].role]) + '</p><a class="btn" href="' +
+        KEV.esc(dashboards[0].url) + '">Continue to ' + KEV.esc(dashboards[0].label) + '</a>' :
+        '<h2>Your dashboards</h2>' + (last ? '<a class="btn" href="' + KEV.esc(last) + '">Resume last task</a>' : '') +
+        '<div class="role-action-grid kevenos-home-dashboards">' + cards.join('') + '</div>';
+      $('home-dashboards').hidden = false;
+    }
+
+    async function refreshEvent() {
+      const revision = KEV.profile.revision;
+      const [info, state] = await Promise.allSettled([
+        KEV.api('/api/info'), KEV.api('/api/public?names=0')
+      ]);
+      if (!KEV.profile.active || KEV.profile.revision !== revision) return;
+      if (info.status === 'fulfilled') {
+        const {event, date, venue, rehearsal, workspace} = info.value;
+        $('home-event').textContent = [event || 'KevenOS', (workspace?.mode === 'rehearsal' || rehearsal) ? 'Rehearsal' : 'Live'].join(' · ');
+        $('home-date').textContent = [date, venue].filter(Boolean).join(' · ');
+      }
+      if (state.status !== 'fulfilled') return;
+      const program = state.value.program;
+      const title = program?.items?.[program.index]?.title;
+      const announcement = program?.announce;
+      $('home-next-title').textContent = title || 'Event update';
+      $('home-announcement').textContent = announcement || '';
+      $('home-announcement').hidden = !announcement;
+      $('home-next').hidden = !title && !announcement;
+    }
+
+    async function start() {
+      if (!KEV.profile.hosted) { location.replace('/'); return; }
+      const me = await KEV.profile.mount({onEnd: clearHome});
+      if (!me) { clearHome(KEV.profile.lockMessage || 'Could not check your access. Refresh this page to try again.'); return; }
+      if (!me.authenticated) { location.replace('/'); return; }
+      const dashboards = KEV.nav.dashboards(me);
+      if (KEV.profile.token) {
+        $('home-title').textContent = 'Viewing as ' + me.label;
+        $('home-status').textContent = 'Use the person menu to return to Admin.';
+        const destination = KEV.nav.dashboards({dashboards:[{role:me.dashboard || me.role, label:KEV.profile.label(me.dashboard || me.role), url:me.next}]});
+        if (destination.length) renderDashboards(me, destination);
+        return;
+      }
+      if (!dashboards.length) { clearHome('Ask the Event Desk to check your role assignments.'); return; }
+      if (dashboards.length === 1 && dashboards[0].role === 'participant') { location.replace(dashboards[0].url); return; }
+      $('home-title').textContent = me.account_label || me.label ? 'Welcome, ' + (me.account_label || me.label) : 'Welcome';
+      $('home-status').textContent = '';
+      renderDashboards(me, dashboards);
+      await refreshEvent();
+      setInterval(()=>{if(!document.hidden && KEV.profile.active) refreshEvent();},15000);
+    }
+    start();
+  </script>
+</body>
+</html>

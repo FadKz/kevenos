@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Event overview | KevenOS</title>
+<link href="/static/app.css" rel="stylesheet"/>
+<link href="/static/event.css" rel="stylesheet"/>
+<link href="/static/role-home.css" rel="stylesheet"/></head>
+<body class="role-home-page guest-home-page">
+<main class="event-shell event-main">
+<section aria-labelledby="event-title" class="guest-brand">
+<p class="event-kicker" id="subtitle">Solution at Work</p>
+<h1 id="event-title">KevenOS Competition</h1>
+
+<p class="event-meta" hidden="" id="meta"><time datetime="2000-01-01" id="date"></time><span id="venue"></span></p>
+</section>
+<section aria-labelledby="status-heading" class="card event-section event-status" id="status-box">
+<h2 id="status-heading">Loading the event</h2>
+<p id="status" role="status">Getting the programme.</p>
+<div class="event-actions">
+<a class="btn" hidden="" href="/?access=guest" id="signin">Go to sign-in</a>
+<button class="btn alt" hidden="" id="retry" type="button">Try again</button>
+</div>
+</section>
+<p class="event-form-error" id="signout-error" role="alert"></p>
+<div class="event-actions">
+<button class="btn ghost" data-nav-help="" hidden="" id="guest-help" type="button">Guest guide</button>
+<button class="btn ghost" data-nav-signout="" hidden="" id="signout" type="button">Sign out</button>
+</div>
+<div class="guest-overview" hidden="" id="overview"><nav aria-label="Guest sections" class="role-tabs"><button aria-pressed="true" data-guest-tab="today" type="button">Today</button><button aria-pressed="false" data-guest-tab="agenda" type="button">Agenda</button><button aria-pressed="false" data-guest-tab="about" type="button">About the day</button></nav>
+<section aria-labelledby="now-heading" class="role-hero" data-guest-panel="today"><section class="role-announcement" hidden="" id="guest-announcement"><p class="role-kicker">From the Desk</p><p id="guest-announcement-text"></p></section>
+<span class="event-kicker event-live-label">Live programme</span>
+<h2 id="now-heading">Follow the event</h2>
+<p id="now-description">The scoring desk updates the live display throughout the day.</p><p class="role-next" id="guest-next"></p>
+<div aria-live="polite" id="final-summary"></div><div class="event-actions"><a class="btn" href="/live?names=0">Open Live View</a></div>
+<div class="role-help-note">Here to support the teams? Follow the host, watch the pitches and cheer on the finalists. Results appear only when the Desk releases them.</div></section>
+
+<section class="card event-section event-disclosure" data-guest-panel="agenda" hidden="">
+<h2>Event schedule</h2>
+<p>All times are in event time.</p>
+<ol class="event-list event-agenda" id="agenda"></ol>
+</section><section aria-labelledby="attend-title" class="card event-section" data-guest-panel="about" hidden="">
+<h2 id="attend-title">Attending as a guest</h2>
+<p>Check the event schedule for the latest timings. Join the live example, support the teams in the Final and stay for the awards. Follow the host if plans change during the day.</p>
+<p hidden="" id="intro"></p></section></div>
+<p class="small mut event-privacy" hidden="" id="privacy">Admins can see sign-ins, IP addresses, available country information and site activity for 30 days.</p>
+</main>
+<script src="/static/common.js"></script>
+<script>
+    const $ = id => document.getElementById(id), esc = KEV.esc;
+    let liveCheck = null, profileEnded = false, requestVersion = 0, activePoll = null;
+
+    function currentRequest(version, profileRevision) {
+      return !profileEnded && !KEV.workspaceChanging && version === requestVersion && profileRevision === KEV.profile.revision;
+    }
+
+    function setSchedule(items) {
+      if (!Array.isArray(items)) return;
+      const html = items.map(item => '<li><time datetime="' + esc(item.time) + '">' + esc(item.time) + '</time><div><h3>' +
+        esc(item.title) + '</h3><p>' + esc(item.detail ?? item.line) + '</p>' +
+        (Number.isFinite(item.min) && item.min > 0 ? '<p class="small mut">' + item.min + ' min</p>' : '') + '</div></li>').join('');
+      if ($('agenda').innerHTML !== html) $('agenda').innerHTML = html;
+    }
+
+    function setProgramme(state) {
+      const programme = state?.program;
+      const current = programme?.items?.[programme.index];
+      setSchedule(programme?.items);
+      setFinal(state);
+      if (!current?.title) return;
+      const next = programme.items[programme.index + 1];
+      $('now-heading').textContent = current.title;
+      $('now-description').textContent = current.line || current.detail || 'Follow the host and support the teams.';
+      $('guest-announcement').hidden=!programme.announce;
+      $('guest-announcement-text').textContent=programme.announce || '';
+      $('guest-next').textContent = next ? ['Up next', next.time, next.title].filter(Boolean).join(' · ') : 'Follow the live display for updates.';
+    }
+
+    function setFinal(state) {
+      const f = state?.final, phase = KEV.finalStatus(f), pair = f?.pairs?.[f.current];
+      let html = '';
+      if (phase === 'completed' && state.reveal === 'winners') html = '<h3>Final results</h3><ol class="event-list">' + (state.podium || []).map(p => '<li><strong>' + p.rank + '. Team ' + p.pair + '</strong>' + (p.partner && !/^Pair |^Team /.test(p.partner) ? ' · ' + esc(p.partner) : '') + '</li>').join('') + '</ol>';
+      else if (phase === 'review') html = '<h3>Judges are confirming results</h3><p>The winners will appear once the Desk publishes the results.</p>';
+      else if (pair && ['ready','pitch','collecting'].includes(phase)) html = '<h3>' + KEV.finalLabel(f) + '</h3><p><strong>Team ' + pair.pair + ' · finalist ' + (f.current + 1) + ' of ' + f.pairs.length + '</strong></p><p>Original scenario: ' + esc(f.case_name || f.scenario || '') + '</p>';
+      $('final-summary').innerHTML = html;
+    }
+
+    async function refreshProgramme() {
+      if (document.hidden || profileEnded || activePoll) return;
+      const poll = {version: requestVersion, profileRevision: KEV.profile.revision};
+      activePoll = poll;
+      try {
+        const state = await KEV.api('/api/public?names=0');
+        if (!currentRequest(poll.version, poll.profileRevision)) return;
+        setProgramme(state);
+      } catch (error) {
+        if (!currentRequest(poll.version, poll.profileRevision)) return;
+        if (error.status === 401 || error.status === 403) return load();
+        $('now-description').textContent = 'The live programme could not refresh. Check Live View for updates.';
+      } finally {
+        if (activePoll === poll) activePoll = null;
+      }
+    }
+
+    async function load() {
+      if(profileEnded)return;
+      const version = ++requestVersion, profileRevision = KEV.profile.revision;
+      activePoll = null;
+      clearInterval(liveCheck);
+      $('guest-help').hidden = true;
+      KEV.closeHelp();
+      $('overview').hidden = true;
+      $('status-box').hidden = false;
+      $('status-heading').textContent = 'Loading the event';
+      $('status').textContent = 'Getting the programme.';
+      $('signin').hidden = $('retry').hidden = true;
+      try {
+        const {guide, now, role} = await KEV.api('/api/event');
+        if (!currentRequest(version, profileRevision)) return;
+        if (!guide || !Array.isArray(guide.schedule)) throw new Error('Programme unavailable.');
+        $('subtitle').textContent = guide.subtitle;
+        $('event-title').textContent = guide.title;
+        $('intro').textContent = guide.intro;
+        $('date').textContent = guide.date;
+        $('venue').textContent = guide.venue;
+        setSchedule(guide.schedule);
+        setProgramme(now);
+        $('intro').hidden = $('meta').hidden = $('signout').hidden = $('privacy').hidden = $('overview').hidden = false;
+        $('guest-help').hidden = role !== 'guest';
+        KEV.nav.render();
+        if(KEV.staff.hosted)$('signout').hidden=true;
+        $('status-box').hidden = true;
+        liveCheck = setInterval(refreshProgramme, 15000);
+      } catch (error) {
+        if (!currentRequest(version, profileRevision)) return;
+        const needsSignin = error.status === 401 || error.status === 403;
+        $('status-heading').textContent = needsSignin ? 'Sign in to view the event' : 'Programme unavailable';
+        $('status').textContent = needsSignin ? 'Choose Guest and enter the shared guest password to continue.' : 'The event programme could not be loaded. Try again.';
+        $('intro').hidden = $('meta').hidden = true;
+        if (needsSignin) $('signout').hidden = true;
+        $('signin').hidden = !needsSignin;
+        $('retry').hidden = needsSignin;
+      }
+    }
+
+    $('retry').onclick = load;
+    KEV.bindHelp($('guest-help'));
+    $('signout').onclick = () => KEV.profile.signOut();
+    if(KEV.staff.hosted)KEV.profile.mount({onEnd:message=>{
+      profileEnded=true;requestVersion++;activePoll=null;clearInterval(liveCheck);KEV.closeHelp();
+      for(const id of ['intro','date','venue','agenda','now-heading','now-description','final-summary','guest-next','guest-announcement-text'])$(id).replaceChildren();
+      $('overview').hidden=$('intro').hidden=$('meta').hidden=$('guest-help').hidden=$('signout').hidden=true;
+      $('status-box').hidden=false;$('status-heading').textContent='Sign in to continue';$('status').textContent=message;$('signin').hidden=false;$('retry').hidden=true;
+    }});
+    document.addEventListener('visibilitychange', () => {
+      if (!$('overview').hidden) refreshProgramme();
+    });
+    load();
+  </script>
+<script>
+document.querySelectorAll('[data-guest-tab]').forEach(button=>button.onclick=()=>{
+ document.querySelectorAll('[data-guest-panel]').forEach(panel=>panel.hidden=panel.dataset.guestPanel!==button.dataset.guestTab);
+ document.querySelectorAll('[data-guest-tab]').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)));
+ const heading=document.querySelector('[data-guest-panel="'+button.dataset.guestTab+'"] h2');
+ heading.tabIndex=-1;heading.focus({preventScroll:true});window.scrollTo(0,0);
+});
+</script></body>
+</html>

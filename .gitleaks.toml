@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Source manifest digests and exact non-secret literals: audience storage key and synthetic MCP/transition idempotency UUIDs."
+paths = ['''(^|/)assistant-service/source-manifest\.json$''']
+
+regexTarget = "secret"
+regexes = ['''^audience_questions_v1$''', '''^5d97132e-81f1-41cd-b640-a2d7ea87292e$''', '''^4de80844-e380-4a15-95eb-fb83ac973f58$''']

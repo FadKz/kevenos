@@ -1,0 +1,377 @@
+{
+  "version": "5.22.0",
+  "roles": {
+    "judge": {
+      "title": "How to judge",
+      "summary": "Start on Today to check your team, scenario, programme and submission status. Open Scorecard to score; returning to Today keeps your draft.",
+      "steps": [
+        {
+          "title": "Open Judging",
+          "body": "Open event.example.com and enter your event password. Open Judging from Home and check your name and assigned station. Ask the Event Desk if you need help signing in."
+        },
+        {
+          "title": "Check the assignment and clock",
+          "body": "Check the station, team, customer and dataset at the top. Use Customer scenario to read your role. In a judge-paced round, select Start pitch when the team is ready. With the Desk clock, wait for the timekeeper."
+        },
+        {
+          "title": "Tick as the team pitches",
+          "body": "Follow Discover, Solution at Work, Solve and Close. Tap a criterion to tick it and its info button for Counts when. Stage guide has the current stage’s prompts. Award each tick only when you heard all its required parts."
+        },
+        {
+          "title": "Review and submit",
+          "body": "In Wrap up, check your ticks, the AI bonus and whether all team members spoke. Choose 1–5 stars for the preliminary tiebreak. Ask “Which type, and why?” Give one thing that worked and one thing to improve. Check the approval box when the feedback is ready for the Desk to share, then submit the sheet."
+        },
+        {
+          "title": "Confirm the receipt and move on",
+          "body": "Wait for Accepted by the Desk. In a judge-paced round, use Next team when you are ready and another team is assigned. With the Desk clock, wait for the Desk to advance. If receipt is unconfirmed, follow Receipts and recovery before moving on."
+        }
+      ],
+      "sections": [
+        {
+          "title": "Sign-in and device",
+          "items": [
+            "Home shows the dashboards assigned to you. If you have several roles, the dashboard switcher keeps you signed in as the same person.",
+            "Check whether the dataset is Live or Rehearsal. Rehearsal has separate assignments, clocks and sheets. After a dataset change, confirm your station before scoring.",
+            "Drafts stay in this browser on this device. Keep the same browser and device while judging. Keep draft notes and downloaded sheets with the judging team."
+          ]
+        },
+        {
+          "title": "Regular-round clock",
+          "items": [
+            "0:00–2:00 Discover, 2:00–5:00 Solution at Work, 5:00–8:00 Solve, 8:00–10:00 Close.",
+            "10:00–13:00 Feedback. Ask which type and why, give feedback and finish the ticks.",
+            "13:00–15:00 Changeover. Check your submission receipt and prepare for the next team."
+          ]
+        },
+        {
+          "title": "References and scoring",
+          "items": [
+            "Customer scenario shows your persona and what makes the customer lean in. In Stage guide, tap a question to log it and reveal the matching answer. The Solve stage shows the IT and business worries and lets you log how the team handled them.",
+            "Question and worry logs can suggest ticks. Check Counts when before accepting a suggestion. Your score uses the ticks you confirm.",
+            "A regular sheet has 10 criteria worth 10 points each. The judge-only AI tick adds 2 points for customer-specific on-device AI. The app adds the roster badge bonus automatically at 2 points per eligible member, capped at 4 per team.",
+            "Wrap up also requires 1–5 stars for overall impression and team confidence. The preliminary total ranks teams first; this star rating separates equal totals before Solve and Discover. Exactly three teams advance.",
+            "Notes, feedback and All team members spoke are recorded separately from points. Draft feedback and Tidy my notes (AI) use the text you provide. Review their output before you submit."
+          ]
+        },
+        {
+          "title": "Receipts and recovery",
+          "items": [
+            "Accepted by the Desk means the server saved the sheet. To correct it while the same assignment is open, edit, choose Resubmit, and check the receipt again.",
+            "Pending on this device means the Desk has yet to confirm receipt. Keep the page open and reconnect so the app can retry. You can also choose Retry now.",
+            "Needs Desk review means the Desk did not accept the sheet. Choose Download sheet and take the file to the scoring desk. If an earlier sheet is flagged, use its download option.",
+            "Hold the current assignment until the sheet is accepted or the Desk has taken over recovery. If the Scoring Desk records an exception and moves the station, a queued sheet can still arrive for that team while preliminary scoring is open.",
+            "For a delayed Final sheet, open More → Review an earlier Final sheet. Choose the team and submit its sheet. This changes only your device; choose Return to on-stage team when finished."
+          ]
+        },
+        {
+          "title": "Calibration and final",
+          "items": [
+            "When the Desk opens Calibration, open Customer scenario for the mock pitch, score it and submit the practice sheet. The Desk reviews the practice sheets against its answer key.",
+            "In the Final, each of the three teams pitches its original customer scenario. Every assigned panel judge gives each finalist one independent score from 1 to 5 stars. The panel average determines first, second and third place; only an equal average needs a recorded panel decision. The Desk starts the shared eight-minute clock. After acceptance, wait for the Desk. When the Final is complete, your screen stays on Judging complete."
+          ]
+        }
+      ],
+      "downloads": [
+        {
+          "id": "judge-app-guide",
+          "label": "Visual judge guide (PDF)"
+        },
+        {
+          "id": "judge-guide",
+          "label": "Event judging rules (PDF)"
+        },
+        {
+          "id": "judge-pack-s1",
+          "label": "Your station Judge Pack (PDF)"
+        },
+        {
+          "id": "judge-pack-s2",
+          "label": "Your station Judge Pack (PDF)"
+        },
+        {
+          "id": "judge-pack-s3",
+          "label": "Your station Judge Pack (PDF)"
+        },
+        {
+          "id": "judge-pack-s4",
+          "label": "Your station Judge Pack (PDF)"
+        }
+      ]
+    },
+    "admin": {
+      "title": "How to set up the event",
+      "summary": "Today shows readiness and shortcuts to access, content, settings and reports. Use View as a person for Preview or Support.",
+      "steps": [
+        {
+          "title": "Choose the dataset",
+          "body": "Use System to check the active dataset. Use Rehearsal for practice and switch to Live Event Data for the competition. Reopen event displays and have judges and participants sign in again after a switch."
+        },
+        {
+          "title": "Configure the event",
+          "body": "Set participant capacity, team size and judge count. Check the derived teams, rounds and judging time against the published programme. In Rehearsal, preview the resize before applying it. Edited participants, issued passwords and real judging work are protected; the preview explains any conflict. Reset rehearsal is a separate action that replaces practice data."
+        },
+        {
+          "title": "Preview or support an event role",
+          "body": "Open View as a person. Choose a role and a person or station. Preview is read-only. Support permits actions for the selected role and records both identities. Use Return to Admin when finished."
+        },
+        {
+          "title": "Check the team roster",
+          "body": "In People & access, open Team roster. Check team members, their assignments and any product vendor Sales Coach badge credit before issuing participant passwords."
+        },
+        {
+          "title": "Prepare and share passwords",
+          "body": "In People & access, Participant passwords are generated from named roster members. Staff passwords creates a named person with any combination of Judge, Registration, Organizer, Scoring Desk and Admin roles. Judge needs an available station. One password opens every assigned dashboard; change roles later in People and roles. In Rehearsal, confirm shared operational roles explicitly. Copy or download new passwords, or use Email this password in Live after checking the recipient. Shared Guest access is in System."
+        },
+        {
+          "title": "Open an operational dashboard",
+          "body": "Use Event Operations for the programme, announcements, quiz and audience display. Use Judging Operations for clocks, sheets, calibration, feedback and the Final. Your Home lists the dashboards assigned to you."
+        }
+      ],
+      "sections": [
+        {
+          "title": "Email and reports",
+          "items": [
+            "Notifications sends real email in Live Event Data. Check the recipient and message before sending. Rehearsal keeps email disabled.",
+            "Reports contains score exports, feedback cards and event backup."
+          ]
+        }
+      ],
+      "downloads": [
+        {
+          "id": "organizers-pack",
+          "label": "Organizers Pack (PDF)"
+        },
+        {
+          "id": "judge-app-guide",
+          "label": "Visual judge guide (PDF)"
+        }
+      ]
+    },
+    "desk": {
+      "title": "How to run event and judging operations",
+      "summary": "Use Event Operations for the programme, communications, quiz and audience display. Use Judging Operations for clocks, sheets, calibration, feedback and the Final.",
+      "steps": [
+        {
+          "title": "Check readiness and open Stations",
+          "body": "From Today, check the dataset, assignments and practice receipts. In Stations, choose a clock mode before the first pitch. With a shared clock, start rounds here. With judge-paced rounds, follow each station and help when needed."
+        },
+        {
+          "title": "Confirm sheets before advancing",
+          "body": "Use Stations to check accepted sheets. A judge can retry a queued sheet or download one for Desk review. If the event must continue without a sheet, review the affected stations and record why."
+        },
+        {
+          "title": "Run Calibration and Final",
+          "body": "In Final, confirm exactly three finalist teams, their original scenarios and the judging panel. Start each eight-minute pitch when ready and collect every judge’s 1–5 star score. The panel average determines first, second and third place. Resolve only equal averages, then publish the reviewed winners once for both audience screens."
+        },
+        {
+          "title": "Preview the audience screen",
+          "body": "In Event Operations, use Run of show to preview the room display and advance cues. Use Messages for projector banners or phone announcements."
+        }
+      ],
+      "sections": [
+        {
+          "title": "Sign-in and setup",
+          "items": [
+            "Ask Registration about arrivals or team changes. Ask Admin about role assignments and staff passwords.",
+            "The dataset banner identifies whether you are running practice or the live event."
+          ]
+        },
+        {
+          "title": "Participant phones",
+          "items": [
+            "Keep the programme on the current event step. Participant instructions also follow each station clock. Check both when moving from registration or preparation into the pitch rounds. Use Assistant to change an agenda section start or duration. Say whether later sections should move, review every affected time and confirm. Agenda changes do not reset judging timers.",
+            "Under Event Operations → Messages, choose Participant phones or Room banner. Include the team or station and exactly what to do. Clear old messages from the same destination.",
+            "Use Event Operations → Messages → Event feed for posted updates. Open Attendee support → Customer nominations to review submissions before exporting.",
+            "After the preliminaries, go to Scores & Feedback in Judging Operations. Review and correct scores in Score review. Open Feedback release to share judge-approved comments with their teams."
+          ]
+        }
+      ],
+      "downloads": [
+        {
+          "id": "scoring-desk",
+          "label": "Scoring Desk Pack (PDF)"
+        }
+      ]
+    },
+    "organizer": {
+      "title": "How to run Event Operations",
+      "summary": "Keep the programme, announcements and audience display in step with the room.",
+      "steps": [
+        {
+          "title": "Check the programme",
+          "body": "Open Today to check Rehearsal or Live, the current cue, the next cue and venue readiness. If a start time or duration changes, preview the new schedule before confirming."
+        },
+        {
+          "title": "Update the room",
+          "body": "Use Run of show to check the room, advance to the next cue or return to the programme. Open Messages to show a room banner or send a phone announcement. Use Attendee support for nominations and help."
+        },
+        {
+          "title": "Run the quiz with the presenter",
+          "body": "Use Quiz → Question editor to find and edit questions before the event. In Run quiz, preview a question and send it to phones on the presenter’s cue. The timer defaults to 60 seconds. Use Show on room screen separately, and return to the programme from Run of show."
+        }
+      ],
+      "sections": [
+        {
+          "title": "Quiz preparation and event-day controls",
+          "items": [
+            "Run quiz: send questions to phones, show a question on the room screen, stop accepting answers or add time. Choose Question editor to edit future questions or preview them on a phone.",
+            "Timeline: review questions by event section. Set minutes after that section starts and preview any shift to later reminders. Apply only when the before/after list looks right. Reminders never send questions automatically.",
+            "Results: watch responses live, review answer totals and release waiting-time or post-test answers. Choose what appears on the hall screen. The app will explain anything blocking Champion.",
+            "Setup: enable or disable this workspace’s quiz, set the prize and open reset controls. A quiz reset clears its results but keeps participant enrolment, question edits and prize. It leaves the quiz off and does not reset pitch scores, the roster, passwords or event agenda."
+          ]
+        },
+        {
+          "title": "Recover carefully",
+          "items": [
+            "Cancel and Reset question exclude the old question’s points; previous answers remain in history. The presenter can send the question again when its event section allows it.",
+            "Reset the whole quiz only after checking Live versus Rehearsal and reading the affected counts. Enter the exact confirmation and a reason. Save any needed result export first.",
+            "Undo the most recent reset only while the app offers it. New quiz activity makes undo unavailable. Restore leaves the quiz disabled, closes old open prompts and hides the hall so nothing is broadcast unexpectedly. The last three reset snapshots are retained."
+          ]
+        },
+        {
+          "title": "Audience questions: feedback without points",
+          "items": [
+            "Open Audience questions to create a short choice, rating or written-feedback pack. Save and review the draft before sending. You can also ask the Assistant or Hermes to draft it.",
+            "Choose an answer window or leave the pack open until you close it. Use Drafts for preparation, Open to monitor responses and History to review closed packs. Only one pack can be open at a time.",
+            "Close keeps responses; Cancel withdraws the pack. Share results publishes aggregate choice and rating results after closing. Written feedback stays with event staff. These packs never affect quiz or pitch points."
+          ]
+        },
+        {
+          "title": "Participant updates and support",
+          "items": [
+            "Post event information in Messages → Event feed. Use Send a message for a time-sensitive phone announcement or a room banner.",
+            "Help inbox shows open and claimed requests. Claim a request, write a private reply and resolve it when the participant has what they need.",
+            "Nominations shows the submission window and team progress. Open Messages → Delivery to check which alerts the push service accepted."
+          ]
+        }
+      ],
+      "downloads": []
+    },
+    "scoring": {
+      "title": "How to run Judging Operations",
+      "summary": "Monitor station clocks, review judging sheets, release feedback and run the Final.",
+      "steps": [
+        {
+          "title": "Check clocks and incoming sheets",
+          "body": "Confirm the dataset, station assignments and clock mode in Run. Check that the expected sheets arrived before advancing. Use Scores for a reasoned correction when needed."
+        },
+        {
+          "title": "Prepare feedback",
+          "body": "Use Calibration for practice scoring. After preliminaries, open Participants to review judge-approved feedback and release the ready results."
+        },
+        {
+          "title": "Run the Final",
+          "body": "Confirm the finalist teams and assigned panel. Start each eight-minute pitch when ready, collect each panel judge’s 1–5 star score and resolve equal averages before publishing the reviewed winners."
+        }
+      ],
+      "sections": [],
+      "downloads": [
+        {
+          "id": "scoring-desk",
+          "label": "Scoring Desk Pack (PDF)"
+        }
+      ]
+    },
+    "participant": {
+      "title": "How to prepare for your pitch",
+      "summary": "Arrived without preparing? Start with your team and customer brief. Your page tells you what to do next.",
+      "steps": [
+        {
+          "title": "Find your team first",
+          "body": "Sign in with your personal participant password. Check your name, team members, round and station. Find your teammates. If anything is missing or incorrect, ask the event Desk before you start."
+        },
+        {
+          "title": "Read your customer brief together",
+          "body": "Open your customer brief in My Pitch or the assigned scenario pack in More → Guides & references. Use the shared team worksheet to decide who speaks and save a few cues for each step. You can start when you arrive."
+        },
+        {
+          "title": "Build one pitch with four parts",
+          "body": "Discover: ask questions and understand the customer. Solution at Work: connect useful solution device capabilities to their work. Solve: recommend an approach that addresses their needs. Close: agree a concrete next step. Divide the speaking parts so every team member contributes. Use the timings shown on your page."
+        },
+        {
+          "title": "Follow Today",
+          "body": "Today shows your current session, quiz, Desk announcements and available team actions. Go to your station when called, open Pitch Mode, and follow your judge’s clock. After pitching, stay for feedback until directed."
+        },
+        {
+          "title": "Check results and the Final",
+          "body": "Open Results after the Desk releases your team’s preliminary score breakdown and judge-approved feedback. If selected for the Final, use the same customer scenario and cues for your eight-minute stage pitch."
+        },
+        {
+          "title": "Nominate three customers",
+          "body": "Before leaving, open More → Customer nominations, or the shortcut on Today when the Desk opens submissions. Enter three company names and describe who they are and why you would pitch to them. One team member can submit for everyone."
+        }
+      ],
+      "sections": [
+        {
+          "title": "The optional event quiz",
+          "items": [
+            "Look for the Event quiz card on your participant page. Question ready means you can answer now. Choose one option, then tap Submit answer before the timer ends. You can change your selection before submitting, but a submitted answer is final.",
+            "Answer saved confirms your response reached the server. Use Next question when offered, or return to your day. New questions appear when the Event Desk sends them; keep the page open and connected.",
+            "Your quiz results explains whether each answer is waiting, ready or cancelled. Practice is worth no points and its answers appear after the post-test is released. Waiting-time and post-test results need the Desk to release them; predictions wait for the outcome.",
+            "Quiz points are personal and separate from your team’s pitch score. During your pitch and other protected event moments the quiz is hidden so you can focus. If disconnected, wait for reconnection and check the saved receipt before trying again."
+          ]
+        },
+        {
+          "title": "Messages, updates and connection",
+          "items": [
+            "Desk announcements appear on Today. For mobile device alerts, add the app to your Home Screen in Safari, open it there, then use More → Updates & notifications to enable notifications. Permission is required; delivery depends on device and network settings.",
+            "If the page says updates have stopped, reconnect and use Retry. Follow the host, judge or event Desk while your phone is offline.",
+            "A paused timer means wait for the judge or host. Do not start early or move stations based on an old screen."
+          ]
+        },
+        {
+          "title": "Scores and privacy",
+          "items": [
+            "The score belongs to your whole team. A waiting or under-review message is not a score of zero.",
+            "Results shows your released preliminary breakdown and approved feedback. Finalists also see their published Final score and placing."
+          ]
+        },
+        {
+          "title": "Assignment or sign-in help",
+          "items": [
+            "If your assignment is missing or looks wrong, ask the event Desk to check the roster.",
+            "If Event information opens, use the person menu to sign in as someone else, then enter your individual password. Keep that password private."
+          ]
+        },
+        {
+          "title": "Audience questions: optional feedback",
+          "items": [
+            "The Audience questions card is separate from the quiz. These questions have no points and no right or wrong answer.",
+            "Open the pack, choose an option, rate 1–5 or type a short response, then save. You may skip any question. A saved confirmation means the event team received your answer. Keep the page open and connected.",
+            "The event team decides whether to share group results after the pack closes. Written feedback is not shown to other participants. Responses are linked to your account to prevent duplicates; staff reports do not show your name."
+          ]
+        }
+      ],
+      "downloads": [
+        {
+          "id": "participant-guide",
+          "label": "Participant Guide (PDF)"
+        }
+      ]
+    },
+    "guest": {
+      "title": "How to follow the event",
+      "summary": "Use Today for the current session and Desk announcements, Agenda for timings and About the day for context. Only published results are shown.",
+      "steps": [
+        {
+          "title": "Open the guest overview",
+          "body": "Use the shared guest password from the organiser to see the event details and programme."
+        },
+        {
+          "title": "Check what’s on",
+          "body": "Read the Event schedule and Live programme for current event information."
+        },
+        {
+          "title": "Follow Live View",
+          "body": "Open Live View to see the audience display with participant names hidden. The Scoring Desk controls when scores and awards are shown."
+        },
+        {
+          "title": "Follow the Final",
+          "body": "Watch the current finalist and shared countdown in Live View. Results appear only after the Desk confirms and publishes them."
+        }
+      ],
+      "sections": [],
+      "downloads": []
+    }
+  }
+}

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 128" role="img" aria-labelledby="title">
+  <title id="title">KevenOS</title>
+  <defs>
+    <linearGradient id="signal" x1="18" y1="28" x2="108" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="#07111F"/>
+  <path d="M30 26h18v31l29-31h24L65 63l38 39H78L48 70v32H30V26Z" fill="url(#signal)"/>
+  <path d="M18 64h20l8-10 12 22 11-27 12 20 9-5h20" fill="none" stroke="#F8FAFC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="158" y="84" fill="#07111F" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="67" font-weight="760" letter-spacing="-2">KevenOS</text>
+</svg>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Registration Desk | KevenOS</title>
+<link href="/static/app.css" rel="stylesheet"/>
+<link href="/static/event.css" rel="stylesheet"/>
+<link href="/static/registration.css" rel="stylesheet"/>
+<link href="/static/role-home.css" rel="stylesheet"/><link href="/static/event-operations.css" rel="stylesheet"/></head>
+<body class="role-home-page">
+<main class="event-shell event-main registration">
+<header class="event-heading">
+<h1>Registration Desk</h1>
+<p>Find the person, confirm their team, then check them in.</p>
+</header>
+<p id="registration-status" role="status">Loading registration…</p>
+<a class="btn" hidden="" href="/?access=registration" id="registration-signin">Registration sign-in</a>
+<div hidden="" id="registration-app"><div class="registration-report-action"><button class="btn ghost" id="open-registration-report" type="button">Export PDF</button></div><nav aria-label="Registration sections" class="role-tabs"><button aria-pressed="true" id="registration-home-tab" type="button">Today</button><button aria-pressed="false" id="registration-people-tab" type="button">Participants</button></nav>
+<section id="registration-home"><section class="role-hero"><p class="role-kicker">Registration team</p><h2>A smooth start for every team</h2><p>Find each arrival, confirm their team and help them open their personal workspace.</p><button class="btn" data-registration-action="all" type="button">Find &amp; check in a participant</button></section><section aria-label="Registration totals" class="registration-summary">
+<div class="card"><strong id="total-present"></strong><span>Checked in</span></div>
+<div class="card"><strong id="total-expected"></strong><span>Awaiting arrival</span></div>
+<div class="card"><strong id="total-open"></strong><span>Open slots</span></div>
+</section><div class="role-action-grid"><button data-registration-action="waiting" type="button"><strong>Expected arrivals</strong><span>See who still needs checking in</span></button><button data-registration-action="access" type="button"><strong>Sign-in help</strong><span>Find participants who need a password</span></button><button data-registration-action="incomplete" type="button"><strong>Team composition</strong><span>Review teams with open places</span></button><button id="registration-home-add" type="button"><strong>Register a walk-in</strong><span>Assign an available team slot</span></button></div><div id="registration-operations"></div><p id="registration-home-status" role="status"></p></section>
+<section aria-labelledby="arrivals-heading" class="card" hidden="" id="registration-workspace">
+<div class="row registration-tools">
+<div class="grow"><h2 id="arrivals-heading">Participants</h2><p class="small mut">Find a name, company, or team number.</p></div>
+<button class="btn" id="add-participant" type="button">Register walk-in</button>
+<button class="btn ghost" id="refresh-registration" type="button">Refresh</button>
+</div>
+<div class="registration-filters">
+<label class="field">Find participant<input autocomplete="off" id="registration-search" type="search" placeholder="Name, company or team number"/></label>
+<label class="field">Filter<select id="registration-filter"><option value="all">All participants</option><option value="waiting">Awaiting arrival</option><option value="present">Checked in</option><option value="access">Needs a password</option><option value="incomplete">Teams with open slots</option></select></label>
+</div>
+<div class="registration-list-meta"><p class="small mut" id="registration-count" role="status"></p><p class="small mut" id="registration-updated"></p><button type="button" class="btn sm ghost" id="registration-clear">Clear search &amp; filters</button></div>
+<section class="registration-receipt" id="registration-receipt" hidden aria-labelledby="registration-receipt-title"><div><p class="registration-eyebrow">Arrival saved</p><h3 id="registration-receipt-title" tabindex="-1"></h3><p id="registration-receipt-assignment"></p><p class="small">Confirm their team and show the sign-in QR privately if they need access.</p></div><div class="row" id="registration-receipt-actions"></div><button class="btn ghost" type="button" id="registration-next">Next arrival</button></section>
+<div id="registration-list"></div>
+</section>
+<details class="card">
+<summary>Event-day checklist</summary>
+<ol>
+<li>Look up the participant. For a walk-in, confirm their name and choose an open team slot.</li>
+<li>Check them in and tell them their team, station, and round. If a teammate is missing, use the open-slot filter to find options.</li>
+<li>Show their QR privately and ask them to confirm the Participant page opens. Issue a typed password if they cannot scan.</li>
+<li>Use a fresh QR for sign-in help. Confirm identity before a password reset or team move. A move requires new access at the destination.</li>
+<li>Send any changes to teams already judging or scored to the Scoring Desk.</li>
+</ol>
+</details>
+</div>
+</main>
+<section id="registration-report" aria-labelledby="registration-report-title" hidden>
+<div class="registration-report-toolbar row">
+<button class="btn ghost" id="close-registration-report" type="button">Back to Registration Desk</button>
+<button class="btn" id="print-registration-report" type="button">Print / Save PDF</button>
+<p class="small mut">Choose Save as PDF in your browser’s print dialog to share a copy.</p>
+</div>
+<article id="registration-report-content"></article>
+</section>
+<dialog id="registration-detail" aria-labelledby="registration-detail-title"><div class="registration-detail-heading"><p class="registration-eyebrow">Participant details</p><button type="button" class="btn sm ghost" id="registration-detail-close">Close</button></div><div id="registration-detail-content"></div><p id="registration-detail-error" role="alert"></p></dialog>
+<dialog aria-labelledby="registration-edit-title" id="registration-edit">
+<form id="registration-form">
+<h2 id="registration-edit-title"></h2>
+<p class="mut" id="registration-edit-help"></p>
+<label class="field" id="registration-slot-field">Team and slot<select name="slot"></select></label>
+<label class="field" id="registration-name-field">Participant name<input autocomplete="off" maxlength="80" name="participant"/></label>
+<label class="field" id="registration-company-field">Company for a new team<input autocomplete="off" maxlength="80" name="company"/></label>
+<label id="registration-checkin-field"><input name="checked_in" type="checkbox"/> Check in now</label>
+<p id="registration-edit-error" role="alert"></p>
+<div class="row"><button class="btn" type="submit">Save</button><button class="btn ghost" id="registration-edit-close" type="button">Cancel</button></div>
+</form>
+</dialog>
+<dialog aria-labelledby="registration-access-title" id="registration-access">
+<h2 id="registration-access-title">Participant access</h2>
+<p id="registration-access-name"></p>
+<div hidden="" id="registration-qr-box">
+<p>Ask the participant to scan this QR and open the link on their phone. Their workspace opens without a password.</p>
+<img alt="One-time participant sign-in QR" id="registration-qr"/>
+<p class="small mut" id="registration-expiry"></p>
+<button class="btn ghost" id="registration-copy-link" type="button">Copy sign-in link</button>
+</div>
+<div hidden="" id="registration-password-box">
+<label class="field">Participant password<input autocomplete="off" id="registration-password" readonly="" type="text"/></label>
+<p class="small mut">Share this password only with this participant. It is shown once.</p>
+</div>
+<p id="registration-copy-status" role="status"></p>
+<button class="btn" id="registration-access-close" type="button">Done</button>
+</dialog>
+<script src="/static/common.js"></script>
+<script src="/static/event-operations.js"></script>
+<script src="/static/registration.js"></script>
+</body>
+</html>

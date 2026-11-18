@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in | KevenOS</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/event.css">
+</head>
+<body>
+  <main class="event-shell event-main event-login">
+    <section class="event-hero" aria-labelledby="event-title">
+      <p class="event-kicker">product vendor and implementation partner</p>
+      <h1 id="event-title">KevenOS Competition</h1>
+      <p>A day of Solution at Work training and live pitches.</p>
+      <p class="event-meta"><time datetime="2000-01-01">Event date configured by organizer</time><span>Example Venue</span></p>
+    </section>
+    <section class="card" aria-labelledby="signin-title">
+      <h2 id="signin-title">Sign in</h2>
+      <p id="signin-help" class="mut">Enter the password you received for this event. Ask the Event Desk if you need help signing in.</p>
+      <form id="signin" method="post" aria-describedby="signin-help">
+        <label class="event-field" for="password">Password
+          <input id="password" name="password" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" maxlength="128" required>
+        </label>
+        <button class="btn" id="continue" type="submit">Sign in</button>
+        <p id="signin-error" class="event-form-error" role="alert"></p>
+      </form>
+      <button class="btn ghost" id="local-signout" type="button" data-nav-signout hidden>Sign out</button>
+      <p class="small mut event-privacy">Admins can see sign-ins, IP addresses, available country information and site activity for 30 days.</p>
+
+    </section>
+  </main>
+  <script src="/static/common.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    let signingIn=false;
+    $('signin').onsubmit=async event=>{
+      event.preventDefault();if(signingIn)return;signingIn=true;$('continue').disabled=true;$('signin-error').textContent='';
+      try{
+        await KEV.api('/api/access/login',{body:{password:$('password').value}});
+        $('password').value='';location.replace('/home');
+      }catch(error){$('signin-error').textContent=error.status===403?'That password did not match. Check it and try again.':error.status?error.message:'Cannot reach the event. Try again.';$('password').select();}
+      finally{signingIn=false;$('continue').disabled=false;}
+    };
+    async function resumeSession(){
+      try{
+        const session=await KEV.profile.session();if(signingIn)return;
+        if(KEV.profile.hosted && session?.authenticated){location.replace('/home');return;}
+        if(!KEV.staff.hosted){const info=await KEV.api('/api/info');if(info.authed){$('local-signout').hidden=false;}}
+      }catch(error){if(error.code==='profile_expired')await KEV.profile.mount();}
+    }
+    $('local-signout').onclick=async()=>{try{await KEV.api('/api/site-logout',{body:{}});location.reload();}catch(error){$('signin-error').textContent='Could not sign out. Try again.';}};
+    resumeSession();
+  </script>
+</body>
+</html>

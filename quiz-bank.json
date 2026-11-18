@@ -1,0 +1,1706 @@
+{
+  "meta": {
+    "event": "Synthetic example.",
+    "date": "Synthetic example.",
+    "agenda_version": "Synthetic example.",
+    "questions": 44,
+    "prompts_shown_max": 49,
+    "core": 34,
+    "optional": 10,
+    "max_points": 57,
+    "points_by_category": {
+      "Pulse": 0,
+      "solution device and product vendor knowledge": 15,
+      "Qualification": 30,
+      "Attention": 4,
+      "Trivia": 3,
+      "Fun": 5
+    }
+  },
+  "copy": {
+    "welcome_line": "Synthetic example.",
+    "opt_in_card": "Synthetic example.",
+    "non_player_banner": "Synthetic example.",
+    "prize_display": "Synthetic example.",
+    "closing_reveal": "Synthetic example."
+  },
+  "reveals": [
+    {
+      "time": "12:49",
+      "what": "Synthetic example."
+    },
+    {
+      "time": "13:25 onward",
+      "what": "Synthetic example."
+    },
+    {
+      "time": "13:58",
+      "what": "Synthetic example."
+    }
+  ],
+  "segments": [
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    },
+    {
+      "start": "Synthetic example.",
+      "end": "Synthetic example.",
+      "name": "Synthetic example."
+    }
+  ],
+  "questions": [
+    {
+      "id": "P00",
+      "time": "09:43",
+      "segment": "Registration and coffee",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "opt-in",
+      "type": "mc",
+      "prompt": "Synthetic question 1.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P01",
+      "time": "09:45",
+      "segment": "Registration and coffee",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "check-in",
+      "type": "mc",
+      "prompt": "Synthetic question 2.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "PQ1",
+      "time": "09:48",
+      "segment": "Registration and coffee",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "product-price",
+      "type": "mc",
+      "prompt": "Synthetic question 3.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example.",
+      "schedules": [
+        {
+          "phase": "pre",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 0,
+          "self_paced": true
+        },
+        {
+          "phase": "post",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 2,
+          "self_paced": true
+        }
+      ]
+    },
+    {
+      "id": "PQ2",
+      "time": "09:48",
+      "segment": "Registration and coffee",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "knowledge-management",
+      "type": "mc",
+      "prompt": "Synthetic question 4.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example.",
+      "schedules": [
+        {
+          "phase": "pre",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 0,
+          "self_paced": true
+        },
+        {
+          "phase": "post",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 2,
+          "self_paced": true
+        }
+      ]
+    },
+    {
+      "id": "PQ3",
+      "time": "09:48",
+      "segment": "Registration and coffee",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "knowledge-ai",
+      "type": "tf",
+      "prompt": "Synthetic question 5.",
+      "options": [
+        {
+          "key": "T",
+          "text": "Option 1"
+        },
+        {
+          "key": "F",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "T",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example.",
+      "schedules": [
+        {
+          "phase": "pre",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 0,
+          "self_paced": true
+        },
+        {
+          "phase": "post",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 2,
+          "self_paced": true
+        }
+      ]
+    },
+    {
+      "id": "PQ4",
+      "time": "09:48",
+      "segment": "Registration and coffee",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "type-id",
+      "type": "mc",
+      "prompt": "Synthetic question 6.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example.",
+      "schedules": [
+        {
+          "phase": "pre",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 0,
+          "self_paced": true
+        },
+        {
+          "phase": "post",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 2,
+          "self_paced": true
+        }
+      ]
+    },
+    {
+      "id": "PQ5",
+      "time": "09:48",
+      "segment": "Registration and coffee",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "discovery-question",
+      "type": "mc",
+      "prompt": "Synthetic question 7.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "B",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example.",
+      "schedules": [
+        {
+          "phase": "pre",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 0,
+          "self_paced": true
+        },
+        {
+          "phase": "post",
+          "opens": "Synthetic example.",
+          "closes": "Synthetic example.",
+          "points": 2,
+          "self_paced": true
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "time": "09:55",
+      "segment": "Registration and coffee",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "confidence",
+      "type": "mc",
+      "prompt": "Synthetic question 8.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        },
+        {
+          "key": "E",
+          "text": "Option 5"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "W1",
+      "time": "10:02",
+      "segment": "Welcome",
+      "category": "A",
+      "category_name": "Synthetic example.",
+      "competency": "attention",
+      "type": "mc",
+      "prompt": "Synthetic question 9.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "C",
+      "points": 1,
+      "seconds": 15,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "W2",
+      "time": "10:07",
+      "segment": "Welcome",
+      "category": "A",
+      "category_name": "Synthetic example.",
+      "competency": "attention",
+      "type": "mc",
+      "prompt": "Synthetic question 10.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "B",
+      "points": 1,
+      "seconds": 15,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "M1",
+      "time": "10:11",
+      "segment": "Solution at Work",
+      "category": "T",
+      "category_name": "Synthetic example.",
+      "competency": "trivia",
+      "type": "mc",
+      "prompt": "Synthetic question 11.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "B",
+      "points": 1,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "M0",
+      "time": "10:15",
+      "segment": "Solution at Work",
+      "category": "A",
+      "category_name": "Synthetic example.",
+      "competency": "attention",
+      "type": "mc",
+      "prompt": "Synthetic question 12.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "B",
+      "points": 1,
+      "seconds": 15,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "M2",
+      "time": "10:17",
+      "segment": "Solution at Work",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "knowledge-mac",
+      "type": "mc",
+      "prompt": "Synthetic question 13.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "C",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "M3",
+      "time": "10:18",
+      "segment": "Solution at Work",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "knowledge-security",
+      "type": "mc",
+      "prompt": "Synthetic question 14.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "D",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "M5",
+      "time": "10:21",
+      "segment": "Solution at Work",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "knowledge-management",
+      "type": "mc",
+      "prompt": "Synthetic question 15.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "M4",
+      "time": "10:23",
+      "segment": "Solution at Work",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "knowledge-ai",
+      "type": "mc",
+      "prompt": "Synthetic question 16.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P03",
+      "time": "10:24",
+      "segment": "Solution at Work",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "pace",
+      "type": "mc",
+      "prompt": "Synthetic question 17.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 15,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "S2",
+      "time": "10:28",
+      "segment": "The pitch in four steps",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "trigger",
+      "type": "mc",
+      "prompt": "Synthetic question 18.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 3,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "S1",
+      "time": "10:30",
+      "segment": "The pitch in four steps",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "type-id",
+      "type": "mc",
+      "prompt": "Synthetic question 19.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "B",
+      "points": 3,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P04",
+      "time": "10:34",
+      "segment": "The pitch in four steps",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "pace",
+      "type": "mc",
+      "prompt": "Synthetic question 20.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 15,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "S3",
+      "time": "10:36",
+      "segment": "The pitch in four steps",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "worry-handling",
+      "type": "mc",
+      "prompt": "Synthetic question 21.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 3,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "S4",
+      "time": "10:38",
+      "segment": "The pitch in four steps",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "close",
+      "type": "tf",
+      "prompt": "Synthetic question 22.",
+      "options": [
+        {
+          "key": "T",
+          "text": "Option 1"
+        },
+        {
+          "key": "F",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "F",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "S5",
+      "time": "10:39",
+      "segment": "The pitch in four steps",
+      "category": "A",
+      "category_name": "Synthetic example.",
+      "competency": "attention",
+      "type": "mc",
+      "prompt": "Synthetic question 23.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 1,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "L1",
+      "time": "10:47",
+      "segment": "Live pitch",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "type-id",
+      "type": "mc",
+      "prompt": "Synthetic question 24.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "L2",
+      "time": "10:48",
+      "segment": "Live pitch",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "trigger",
+      "type": "mc",
+      "prompt": "Synthetic question 25.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "L3",
+      "time": "10:49",
+      "segment": "Live pitch",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "feedback",
+      "type": "mc",
+      "prompt": "Synthetic question 26.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "PR1",
+      "time": "11:15",
+      "segment": "Briefing and preparation",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "readiness",
+      "type": "mc",
+      "prompt": "Synthetic question 27.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "PR2",
+      "time": "11:30",
+      "segment": "Briefing and preparation",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "coach-request",
+      "type": "mc",
+      "prompt": "Synthetic question 28.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        },
+        {
+          "key": "E",
+          "text": "Option 5"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R1a",
+      "time": "11:41",
+      "segment": "Pitch rounds",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "type-id",
+      "type": "mc",
+      "prompt": "Synthetic question 29.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "B",
+      "points": 3,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R1b",
+      "time": "11:43",
+      "segment": "Pitch rounds",
+      "category": "T",
+      "category_name": "Synthetic example.",
+      "competency": "trivia",
+      "type": "mc",
+      "prompt": "Synthetic question 30.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "B",
+      "points": 1,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R2a",
+      "time": "11:56",
+      "segment": "Pitch rounds",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "worry-handling",
+      "type": "mc",
+      "prompt": "Synthetic question 31.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 3,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R2b",
+      "time": "11:58",
+      "segment": "Pitch rounds",
+      "category": "F",
+      "category_name": "Synthetic example.",
+      "competency": "fun",
+      "type": "tf",
+      "prompt": "Synthetic question 32.",
+      "options": [
+        {
+          "key": "T",
+          "text": "Option 1"
+        },
+        {
+          "key": "F",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "T",
+      "points": 1,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R3a",
+      "time": "12:11",
+      "segment": "Pitch rounds",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "right-mac",
+      "type": "mc",
+      "prompt": "Synthetic question 33.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 2,
+      "seconds": 25,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R3b",
+      "time": "12:13",
+      "segment": "Pitch rounds",
+      "category": "F",
+      "category_name": "Synthetic example.",
+      "competency": "prediction",
+      "type": "mc",
+      "prompt": "Synthetic question 34.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "RESOLVED_BY_TOOL",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example.",
+      "resolves_from": "Synthetic example.",
+      "reveal_at": "Synthetic example."
+    },
+    {
+      "id": "R4a",
+      "time": "12:26",
+      "segment": "Pitch rounds",
+      "category": "Q",
+      "category_name": "Synthetic example.",
+      "competency": "worry-handling",
+      "type": "mc",
+      "prompt": "Synthetic question 35.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": "A",
+      "points": 3,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "R4b",
+      "time": "12:28",
+      "segment": "Pitch rounds",
+      "category": "T",
+      "category_name": "Synthetic example.",
+      "competency": "ecosystem",
+      "type": "tf",
+      "prompt": "Synthetic question 36.",
+      "options": [
+        {
+          "key": "T",
+          "text": "Option 1"
+        },
+        {
+          "key": "F",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "T",
+      "points": 1,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone except pairs currently at a judge station",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "B2",
+      "time": "12:47",
+      "segment": "Break while scores are tallied",
+      "category": "K",
+      "category_name": "Synthetic example.",
+      "competency": "myth",
+      "type": "tf",
+      "prompt": "Synthetic question 37.",
+      "options": [
+        {
+          "key": "T",
+          "text": "Option 1"
+        },
+        {
+          "key": "F",
+          "text": "Option 2"
+        }
+      ],
+      "correct": "F",
+      "points": 1,
+      "seconds": 15,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "B1",
+      "time": "12:48",
+      "segment": "Break while scores are tallied",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "fun",
+      "type": "mc",
+      "prompt": "Synthetic question 38.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "F1",
+      "time": "12:51",
+      "segment": "The final",
+      "category": "F",
+      "category_name": "Synthetic example.",
+      "competency": "prediction",
+      "type": "mc",
+      "prompt": "Synthetic question 39.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        }
+      ],
+      "correct": "RESOLVED_BY_TOOL",
+      "points": 2,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone except the three finalist pairs",
+      "note": "Synthetic example.",
+      "resolves_from": "Synthetic example.",
+      "reveal_at": "Synthetic example."
+    },
+    {
+      "id": "F2",
+      "time": "13:18",
+      "segment": "The final",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "fun",
+      "type": "mc",
+      "prompt": "Synthetic question 40.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "optional",
+      "audience": "everyone except the three finalist pairs",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P09",
+      "time": "13:55",
+      "segment": "Awards, next three customers, close",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "confidence",
+      "type": "mc",
+      "prompt": "Synthetic question 41.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        },
+        {
+          "key": "E",
+          "text": "Option 5"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P10",
+      "time": "13:56",
+      "segment": "Awards, next three customers, close",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "event-rating",
+      "type": "mc",
+      "prompt": "Synthetic question 42.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        },
+        {
+          "key": "E",
+          "text": "Option 5"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P11",
+      "time": "13:57",
+      "segment": "Awards, next three customers, close",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "event-rating",
+      "type": "mc",
+      "prompt": "Synthetic question 43.",
+      "options": [
+        {
+          "key": "A",
+          "text": "Option 1"
+        },
+        {
+          "key": "B",
+          "text": "Option 2"
+        },
+        {
+          "key": "C",
+          "text": "Option 3"
+        },
+        {
+          "key": "D",
+          "text": "Option 4"
+        }
+      ],
+      "correct": null,
+      "points": 0,
+      "seconds": 20,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    },
+    {
+      "id": "P12",
+      "time": "13:58",
+      "segment": "Awards, next three customers, close",
+      "category": "P",
+      "category_name": "Synthetic example.",
+      "competency": "reveal",
+      "type": "reveal",
+      "prompt": "Synthetic question 44.",
+      "options": [],
+      "correct": null,
+      "points": 0,
+      "seconds": 30,
+      "explanation": "Synthetic example.",
+      "source": "Synthetic example.",
+      "cue": "Synthetic example.",
+      "priority": "core",
+      "audience": "everyone",
+      "note": "Synthetic example."
+    }
+  ]
+}

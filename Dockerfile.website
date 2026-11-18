@@ -1,0 +1,8 @@
+FROM nginx:1.29.3-alpine@sha256:b3c656d55d7ad751196f21b7fd2e8d4da9cb430e32f646adcf92441b72f82b14
+COPY website/index.html /usr/share/nginx/html/index.html
+COPY website/styles.css /usr/share/nginx/html/styles.css
+COPY website/responsive.css /usr/share/nginx/html/responsive.css
+COPY brand/logo-mark.svg /usr/share/nginx/html/logo-mark.svg
+COPY brand/social-card.png /usr/share/nginx/html/social-card.png
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
+EXPOSE 80

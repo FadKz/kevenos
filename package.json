@@ -1,0 +1,15 @@
+{
+  "name": "kevenos",
+  "version": "1.0.0",
+  "private": false,
+  "scripts": {
+    "lint": "find static tools -type f \\( -name '*.js' -o -name '*.cjs' \\) -print0 | xargs -0 -n 1 node --check",
+    "test": "node tools/test-js.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

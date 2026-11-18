@@ -1,0 +1,584 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KevenOS | Live</title>
+<link rel="stylesheet" href="/static/app.css">
+<style>
+/* Live View follows the Scoring Desk. Options in the address:
+   ?top=5 (leaderboard rows on hall screens)   ?rotate=10 (seconds per page, 0 = off)   ?names=0 (hide people's names)
+   ?embed=1 (no top bar)   ?hdr=0 (hide top bar)   ?scene=info|prep|pitch|scores|final|awards|message   ?lang=rtl */
+:root{--bg1:var(--bg);--bg2:var(--navy);--glass:var(--card);--glass2:var(--blue2);
+ --c1:var(--blue);--c2:var(--teal);--c3:var(--warn);--c4:#b7c7ff;--gold:#ffdc75;--silver:#d1dce8;--bronze:#f1af82;--hot:var(--bad)}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{color:var(--ink);font:2vh/1.3 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden;
+ background:radial-gradient(120% 90% at 8% 0%,var(--bg2),var(--bg1) 60%);display:flex;flex-direction:column}
+/* The stage scales within the space remaining below site navigation. */
+#display{display:flex;flex:1;flex-direction:column;min-height:0;container-type:size}
+body.embed{background:transparent}
+body.embed #tl{background:var(--bg1);border-radius:1.4cqh}
+body.embed .hero{background:var(--glass);border-radius:2.2cqh;padding:2cqh 3vw}
+#connection{margin:1cqh 3vw;padding:0.8cqh 1.2vw;background:var(--glass2);border-radius:1cqh;color:var(--ink);align-self:center}
+body::before{content:"";position:fixed;inset:0;background:radial-gradient(40vh 40vh at 92% 8%,color-mix(in srgb,var(--c4) 28%,transparent),transparent),radial-gradient(46vh 46vh at 4% 100%,color-mix(in srgb,var(--c1) 22%,transparent),transparent);pointer-events:none}
+body.embed::before{display:none}
+.card{background:var(--glass);border:1px solid var(--line);border-radius:2.2cqh;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:relative;margin:0;padding:0}
+/* top bar */
+#top{display:flex;align-items:center;gap:2vw;padding:2cqh 3vw 1cqh;position:relative;z-index:1}
+#top h1{margin:0;font-size:3.6cqh;font-weight:800;letter-spacing:-.01em}
+#top .sub{color:var(--mut);font-size:2.1cqh}
+#top .grow{flex:1}
+#clock{font-size:3.6cqh;font-weight:700;font-variant-numeric:tabular-nums}
+#live{font-weight:800;font-size:1.8cqh;letter-spacing:.12em;color:var(--ok);display:flex;align-items:center;gap:0.8cqh}
+#live::before{content:"";width:1.3cqh;height:1.3cqh;border-radius:50%;background:currentColor;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.2;transform:scale(.7)}}
+/* announcement */
+#ann{margin:0 3vw 1.2cqh;padding:1.6cqh 2.4vw;border-radius:2cqh;font-size:3.2cqh;font-weight:700;text-align:center;background:linear-gradient(90deg,var(--c3),var(--hot));color:#1a0b00;position:relative;z-index:1;animation:pop .5s}
+@keyframes pop{from{transform:scale(.97);opacity:0}}
+/* layout */
+#main{flex:1;display:grid;grid-template-columns:1.35fr 1fr;gap:2vw;padding:0 3vw;min-height:0;position:relative;z-index:1}
+body.sc-scores #main,body.sc-awards #main,body.sc-message #main{grid-template-columns:1fr}
+body.sc-scores #left,body.sc-awards #left,body.sc-message #left{display:none}
+body.sc-info #main,body.sc-prep #main,body.sc-final #main{grid-template-columns:1.5fr 1fr}
+#left,#right{display:flex;flex-direction:column;gap:1.6cqh;min-height:0}
+/* now card */
+#now{padding:3cqh 2.6vw;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#now .eyebrow{display:flex;align-items:center;gap:1.2vw;color:var(--mut);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:1.8cqh}
+#now .eyebrow b{color:var(--c1);background:color-mix(in srgb,var(--c1) 18%,transparent);padding:0.5cqh 1.2cqh;border-radius:99px}
+#now h2{margin:1.2cqh 0 0.6cqh;font-size:7cqh;line-height:1.05;font-weight:800;letter-spacing:-.02em;color:var(--ink);overflow-wrap:anywhere}
+#now .line{font-size:2.7cqh;color:var(--mut);max-width:90%}
+#todo{list-style:none;padding:0;margin:2.2cqh 0 0;display:flex;flex-direction:column;gap:1.3cqh}
+#todo li{display:flex;gap:1.4vw;align-items:flex-start;font-size:3cqh;font-weight:600;line-height:1.25}
+#todo li i{flex:none;width:4.6cqh;height:4.6cqh;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:800;font-size:2.4cqh;color:#06121f;background:linear-gradient(135deg,var(--c1),var(--c2))}
+#tbar{margin-top:auto;padding-top:2cqh}
+#tbar .meta{display:flex;justify-content:space-between;color:var(--mut);font-size:1.9cqh;margin-bottom:0.8cqh}
+#tbar .track{height:1.3cqh;border-radius:99px;background:var(--glass2);overflow:hidden}#tbar .track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width 1s}
+#tbar .track.over i{background:linear-gradient(90deg,var(--c3),var(--hot))}
+#next{padding:1.8cqh 2.2vw;display:flex;align-items:center;gap:1.6vw}
+#next .k,#nx .k{color:var(--mut);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:1.6cqh}
+#next .t,#nx .t{font-size:3cqh;font-weight:700}#next .w,#nx .w{margin-left:auto;font-size:2.6cqh;font-weight:700;color:var(--c1);font-variant-numeric:tabular-nums}
+/* pitch steps strip */
+#steps{display:grid;grid-template-columns:repeat(4,1fr);gap:1vw;margin-top:2cqh}
+#steps div{border-radius:1.8cqh;padding:1.4cqh 1.2vw;background:var(--glass2);border-top:0.7cqh solid var(--sc)}
+#steps b{display:block;font-size:2.6cqh}#steps span{color:var(--mut);font-size:1.7cqh}
+#bells{margin-top:1.2cqh;color:var(--mut);font-size:1.9cqh}
+/* right: progress + scores */
+#prog{padding:2cqh 1.8vw}
+#prog .hd{display:flex;align-items:baseline;gap:1vw}#prog h3,#sc h3{margin:0;font-size:1.7cqh;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+#prog .big{margin-left:auto;font-size:3.4cqh;font-weight:800;font-variant-numeric:tabular-nums}#prog .big small{font-size:2cqh;color:var(--mut);font-weight:600}
+#pbar{height:1.5cqh;border-radius:99px;background:var(--glass2);margin:1.2cqh 0 1.6cqh;overflow:hidden}#pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--c2),var(--c1));border-radius:99px;transition:width 1s}
+#stn{display:grid;grid-template-columns:repeat(auto-fit,minmax(5vw,1fr));gap:.7vw}
+#stn div{border-radius:1.2cqh;padding:0.9cqh .3vw;text-align:center;background:var(--glass2);border-bottom:0.5cqh solid var(--sc,transparent);font-size:1.5cqh;color:var(--mut);line-height:1.15}
+#stn b{display:block;color:var(--ink);font-size:2.2cqh}
+#sc{padding:2cqh 1.6vw;flex:1;display:flex;flex-direction:column;min-height:0}
+#sc .hd{display:flex;align-items:baseline;margin-bottom:1.2cqh}#sc .pg{margin-left:auto;color:var(--mut);font-size:1.7cqh}
+#list{position:relative;flex:1;min-height:0}
+.r{position:absolute;left:0;right:0;display:grid;grid-template-columns:5.2cqh 1fr auto;gap:1.2vw;align-items:center;background:var(--glass2);border-radius:1.6cqh;padding:0 1.2vw 0.8cqh;transition:top .9s cubic-bezier(.2,.8,.2,1),opacity .5s,background .8s;overflow:hidden}
+.r .k{font-size:3cqh;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;color:var(--mut)}
+.r.g1 .k{color:var(--gold)}.r.g2 .k{color:var(--silver)}.r.g3 .k{color:var(--bronze)}
+.r.g1{box-shadow:inset 0 0 0 0.3cqh var(--gold)}
+.r .n{min-width:0}.r .n b{display:block;font-size:2.6cqh;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.r .n span{display:block;color:var(--mut);font-size:1.8cqh;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .t{font-size:3.6cqh;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}.r .t small{font-size:1.6cqh;color:var(--mut);font-weight:600;margin-left:.3vw}
+.r .b{position:absolute;left:0;bottom:0;height:0.45cqh;display:flex;width:100%;gap:2px}.r .b i{flex:1;background:var(--sc);opacity:.9}.r .b i.z{opacity:.15}
+.r.up{background:color-mix(in srgb,var(--c2) 28%,transparent)}
+#empty{margin:auto;text-align:center;color:var(--mut);font-size:2.6cqh}
+/* timeline */
+#tl{display:flex;gap:.5vw;padding:1.4cqh 3vw 2cqh;position:relative;z-index:1}
+#tl div{flex:1;min-width:0;text-align:center}
+#tl i{display:block;height:0.9cqh;border-radius:99px;background:var(--glass2);margin-bottom:0.7cqh;transition:background .6s}
+#tl .done i{background:var(--c2)}#tl .now i{background:linear-gradient(90deg,var(--c1),var(--c4));box-shadow:0 0 1.6cqh var(--c1)}
+#tl span{display:block;font-size:1.45cqh;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#tl .now span{color:var(--ink);font-weight:700}
+#tl .done span{opacity:.8}
+body.embed #top{display:none}body.hdr0 #top{display:none}
+body.sc-scores #tl,body.sc-awards #tl,body.sc-message #tl{display:none}
+
+.big{font-variant-numeric:tabular-nums}
+#cd{padding:3cqh 2vw;text-align:center}#cd .k{color:var(--mut);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:1.8cqh}
+#cd .t{font-size:16cqh;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;color:var(--c1)}#cd.over .t{color:var(--c3)}
+@supports (background:linear-gradient(90deg,#000,color-mix(in srgb,#000 60%,#fff))) and ((background-clip:text) or (-webkit-background-clip:text)){
+  #now h2{background:linear-gradient(90deg,var(--ink),color-mix(in srgb,var(--ink) 60%,var(--c1)));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #cd .t{background:linear-gradient(90deg,var(--c1),var(--c2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #cd.over .t{background-image:linear-gradient(90deg,var(--c3),var(--hot));color:transparent}
+}
+#cd .s{color:var(--mut);font-size:2.4cqh}
+.card.pad{padding:2.4cqh 1.8vw}
+#stage{padding:4cqh 2.6vw;flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center}
+#stage .k{color:var(--c3);font-weight:800;letter-spacing:.16em;text-transform:uppercase;font-size:2.2cqh}#stage h2{margin:2cqh 0 1cqh;font-size:9cqh;line-height:1.05;font-weight:800}#stage .n{font-size:3.4cqh;color:var(--mut)}
+.fl div{display:flex;gap:1.2vw;align-items:center;padding:1.6cqh 1.2vw;border-radius:1.6cqh;background:var(--glass2);margin-bottom:1.2cqh;font-size:2.8cqh;font-weight:700}.fl div.cur{box-shadow:inset 0 0 0 0.35cqh var(--gold)}.fl div.d{opacity:.76}.fl small{display:block;color:var(--mut);font-weight:500;font-size:2cqh}.fl i{font-style:normal;font-size:3.4cqh;min-width:4cqh;text-align:center}
+.pod{display:flex;gap:3vw;align-items:flex-end;justify-content:center;margin:auto;padding:3cqh 0}
+.pod>div{background:var(--glass);border:1px solid var(--line);border-radius:2.6cqh;padding:3.4cqh 2.4vw;min-width:24vw;text-align:center}
+.pod .n{font-size:9cqh;font-weight:800;line-height:1}.pod .p{font-size:3.6cqh;font-weight:800;margin-top:1cqh}.pod .m{font-size:2.3cqh;color:var(--mut);margin-top:0.6cqh}
+.pod .r1{border:0.5cqh solid var(--gold);transform:translateY(-3cqh)}.pod .r1 .n{color:var(--gold)}.pod .r2 .n{color:var(--silver)}.pod .r3 .n{color:var(--bronze)}
+.hero{margin:auto;text-align:center;max-width:80vw}.hero .ic{font-size:14cqh}.hero h2{font-size:9cqh;margin:1cqh 0}.hero p{font-size:3.6cqh;color:var(--mut);margin:0}
+.ttl{font-size:3.4cqh;font-weight:800;margin:0 0 1.2cqh;display:flex;gap:2vw;align-items:baseline}.ttl small{margin-left:auto;color:var(--mut);font-weight:600;font-size:2cqh}
+@media (max-aspect-ratio: 1/1) {
+  html,body{height:auto;min-height:100%}
+  body{overflow:auto;font-size:1rem}
+  #display{container-type:normal}
+  body #main,body.sc-info #main,body.sc-prep #main,body.sc-final #main{grid-template-columns:minmax(0,1fr);gap:1.6cqh}
+  #now{overflow:visible}
+  #now h2,#stage h2,.hero h2{font-size:clamp(2rem,8vw,4rem)}
+  #stn{grid-template-columns:repeat(4,minmax(0,1fr))}
+  #steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #list{min-height:30rem}
+  #top .sub{display:none}
+  #tl span{font-size:max(.68rem,1.45cqh)}
+  .hero{padding-block:5cqh}
+  .pod{flex-direction:column;align-items:stretch;width:100%}
+  .pod .r1{transform:none}
+  #tl{margin-top:1.4cqh}
+}
+@media (prefers-reduced-motion: reduce) {
+  *,*::before{animation:none!important;transition:none!important}
+}
+#room-stage { display:contents }
+#main { grid-template-rows:minmax(0,1fr) auto; row-gap:0 }
+#quiz-leaderboard { grid-column:1/-1; margin-top:1cqh; padding:1cqh 1.4vw }
+#quiz-leaderboard h2 { margin:0 0 .45em; font-size:clamp(1rem,2.7cqh,2rem) }
+#quiz-leaderboard ol { display:grid; grid-template-columns:repeat(auto-fit,minmax(9em,1fr)); gap:.5em; list-style:none; padding:0; margin:0 }
+#quiz-leaderboard li { display:flex; gap:.5em; min-width:0; overflow-wrap:anywhere }
+#quiz-leaderboard li b { color:var(--c2) }
+#quiz-leaderboard li strong { margin-inline-start:auto; white-space:nowrap; font-variant-numeric:tabular-nums }
+body.programme-layout #display {
+  background:radial-gradient(ellipse at 83% 0%,color-mix(in srgb,var(--c4) 19%,var(--bg1)),transparent 54%),
+    radial-gradient(ellipse at 0% 100%,var(--bg2),var(--bg1) 55%);
+}
+body.programme-layout #main {
+  grid-template-areas:"stage agenda"; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr); gap:1.3vw; align-items:center;
+}
+body.programme-layout.has-standings #main {
+  grid-template-areas:"stage agenda standings"; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.92fr);
+}
+.programme-layout #room-stage {
+  grid-area:stage; display:grid; gap:1.35cqh; min-width:0; max-height:100%;
+  align-content:safe center; overflow:auto; position:relative;
+  border-radius:2cqh; border:1px solid color-mix(in srgb,var(--c1) 38%,var(--line));
+  background:radial-gradient(ellipse at 106% 18%,color-mix(in srgb,var(--c1) 28%,var(--bg2)),transparent 65%),var(--glass);
+  padding:clamp(.85rem,2.45cqh,2.35rem);
+}
+.programme-layout #room-stage::before {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-radial-gradient(ellipse at 112% 24%,transparent 0 3cqh,color-mix(in srgb,var(--c4) 10%,transparent) 3.1cqh 3.2cqh,transparent 3.4cqh 4.8cqh);
+  mask-image:linear-gradient(90deg,transparent 22%,#000 100%);
+}
+.programme-layout #left { position:relative; min-width:0 }
+.programme-layout #now { padding:0; border:0; background:none; backdrop-filter:none; overflow:visible }
+.programme-layout #now h2 { font-size:clamp(1.8rem,6.1cqh,5.6rem); letter-spacing:-.05em; text-wrap:balance }
+.programme-layout #todo li,.programme-layout #now .line { font-size:clamp(1rem,2.55cqh,2rem) }
+.programme-layout #todo li { gap:.65vw }
+.programme-layout #todo li i { width:3.2cqh; height:3.2cqh; font-size:1.9cqh }
+.programme-layout #right { grid-area:agenda; min-width:0; max-height:100%; overflow:auto }
+.programme-layout #today,.programme-layout #quiz-leaderboard {
+  padding:clamp(.8rem,2cqh,1.9rem); border-radius:2cqh;
+  background:linear-gradient(158deg,color-mix(in srgb,var(--c1) 8%,var(--glass)),var(--glass));
+}
+.programme-layout #today h3,.programme-layout #quiz-leaderboard h2 { margin:0 0 .5em; font-size:clamp(1rem,2.8cqh,2.4rem); letter-spacing:-.025em }
+.agenda-window { display:grid; gap:.35cqh; padding:0; margin:0; list-style:none }
+.agenda-window li {
+  display:grid; grid-template-columns:.65em max-content minmax(0,1fr);
+  min-height:4.6cqh; align-items:center; gap:.55em; padding:.45em .5em;
+  font-size:clamp(.85rem,2.35cqh,1.9rem); border-radius:.68em; overflow-wrap:anywhere;
+}
+.agenda-window li:not(.agenda-empty)::before { content:""; width:.34em; height:.34em; border-radius:50%; background:var(--mut) }
+.agenda-window time { color:var(--mut); white-space:nowrap; font-variant-numeric:tabular-nums }
+.agenda-window .agenda-past { color:var(--mut) }
+.agenda-window li[aria-current] { font-weight:750; background:linear-gradient(90deg,color-mix(in srgb,var(--c2) 23%,var(--glass2)),var(--glass2)) }
+.agenda-window li[aria-current]::before { background:var(--c2); box-shadow:0 0 .5em var(--c2) }
+.agenda-window li[aria-current] time { color:var(--c2) }
+.agenda-edge {
+  display:flex; gap:.5em; align-items:center; color:var(--mut);
+  font-size:clamp(.72rem,1.75cqh,1.5rem); overflow:hidden; white-space:nowrap;
+}
+.agenda-edge span:first-child { flex:none }
+.agenda-edge [aria-hidden] { filter:blur(.13em); opacity:.52; overflow:hidden }
+.programme-layout #quiz-leaderboard {
+  grid-area:standings; margin:0; min-width:0; max-height:100%; overflow:auto;
+}
+.programme-layout #quiz-leaderboard ol { grid-template-columns:minmax(0,1fr); gap:0 }
+.programme-layout #quiz-leaderboard p { display:none }
+.programme-layout #quiz-leaderboard li { padding:.52em .4em; border-bottom:1px solid var(--line); font-size:clamp(.85rem,2.2cqh,1.85rem) }
+.programme-layout #quiz-leaderboard li:first-child { background:var(--glass2); border-color:transparent; border-radius:.6em; font-weight:750 }
+.programme-layout #quiz-leaderboard li:first-child strong { color:var(--c2) }
+.programme-layout #quiz-leaderboard li:last-child { border:0 }
+.programme-layout #quiz-leaderboard li span { min-width:0 }
+@keyframes presenter-shift { from { transform:translateY(.45cqh); opacity:.72 } }
+@media (prefers-reduced-motion:no-preference) {
+  .programme-layout .agenda-window li[aria-current],
+  .programme-layout #quiz-leaderboard li:first-child { animation:presenter-shift .22s ease-out both }
+}
+.programme-layout #tl span { font-size:clamp(.68rem,1.58cqh,1.2rem) }
+.programme-layout.with-media #now h2 { font-size:clamp(1.25rem,3.8cqh,3.3rem) }
+.programme-layout.with-media #todo { margin-top:.75cqh; gap:.45cqh }
+.programme-layout.with-media #todo li { font-size:clamp(.9rem,1.95cqh,1.65rem) }
+.programme-layout.with-media #todo li i { width:2.4cqh; height:2.4cqh; font-size:1.5cqh }
+.programme-layout.with-media #tbar { display:none }
+#room-question { order:-1; padding:1.65cqh 1.35vw; border-top:.35cqh solid var(--c2); min-width:0; background:var(--glass) }
+#room-question[aria-label="Audience question"] { border-top-color:var(--c4) }
+#room-question header { display:flex; gap:1vw; justify-content:space-between; align-items:center; margin-bottom:1.1cqh }
+#room-question .label { color:var(--c2); font-weight:800; font-size:clamp(.9rem,2.2cqh,1.7rem) }
+#room-question .status { color:var(--ink); background:var(--glass2); border-radius:99px; padding:.45cqh .75em; font-weight:800; font-variant-numeric:tabular-nums }
+#room-question h2 { margin:0 0 1.4cqh; font-size:clamp(1.35rem,3.5cqh,3rem); line-height:1.12; overflow-wrap:anywhere }
+#room-question ol { display:grid; gap:.65cqh; padding:0; margin:0; list-style:none }
+#room-question li {
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.7em;
+  padding:.62cqh .8vw; background:var(--glass2); border-radius:.8cqh;
+  font-size:clamp(.9rem,2.3cqh,1.85rem); overflow-wrap:anywhere;
+}
+#room-question li b {
+  color:var(--ink); background:color-mix(in srgb,var(--choice,var(--c1)) 35%,var(--bg2));
+  border-radius:.6cqh; min-width:1.55em; padding:.1em .25em; text-align:center;
+}
+#room-question li:nth-child(4n+2) { --choice:var(--c2) }
+#room-question li:nth-child(4n+3) { --choice:var(--c4) }
+#room-question li:nth-child(4n+4) { --choice:var(--c3) }
+#room-question li[data-correct] { box-shadow:inset .35cqh 0 var(--c2) }
+#room-question li small { color:var(--c2); font-weight:700 }
+#room-question li strong { white-space:nowrap }
+#room-question p { margin:1.15cqh 0 0; color:var(--mut); font-size:clamp(.9rem,2cqh,1.5rem) }
+#kevenos-rehearsal { color:var(--c3); font-size:1.8cqh; font-weight:800 }
+#registration-film { display:grid; overflow:hidden; background:#0b2038; aspect-ratio:16/9; width:min(100%,93cqh); justify-self:center }
+#registration-film[hidden] { display:none }
+#registration-film video { width:100%; height:100%; min-width:0; object-fit:contain }
+#registration-film button {
+  position:absolute; inset:auto .65rem .65rem auto; border:1px solid #83bcff; border-radius:10px;
+  padding:.55em .8em; color:#f5f9ff; background:#0b2038;
+  font:600 clamp(.85rem,1.75cqh,1.2rem) Inter,sans-serif; cursor:pointer;
+}
+@media (max-aspect-ratio: 1/1) {
+  #top { flex-wrap:wrap; gap:.4rem .65rem }
+  #top h1 { min-width:0; font-size:clamp(1rem,4.4vw,1.85rem) }
+  #live,#kevenos-rehearsal { font-size:.72rem }
+  #live::before { width:.45rem; height:.45rem }
+  #clock { font-size:clamp(.85rem,3.8vw,1.45rem) }
+  body.programme-layout #main,body.programme-layout.has-standings #main {
+    grid-template-columns:minmax(0,1fr); grid-template-rows:auto; gap:1rem;
+  }
+  body.programme-layout #main { grid-template-areas:"stage" "agenda" }
+  body.programme-layout.has-standings #main { grid-template-areas:"stage" "agenda" "standings" }
+  .programme-layout #room-stage,.programme-layout #right,.programme-layout #quiz-leaderboard { max-height:none; overflow:visible }
+  .programme-layout #room-stage,#room-question { padding:1rem }
+  #room-question li { padding:.45rem .6rem }
+  #main { grid-template-rows:auto }
+}
+</style><link rel="stylesheet" href="/static/live-hall.css"></head><body>
+<main id="display">
+<div id="hall-display" hidden></div>
+<div id="top"><h1 id="ev">Live View</h1><span class="sub" id="sub"></span><span class="grow"></span><span id="kevenos-rehearsal" hidden>Rehearsal</span><span id="live">LIVE</span><span id="clock"></span></div>
+<div id="connection" role="status">Connecting to Live View…</div>
+<div id="ann" hidden></div>
+<div id="main">
+<div id="room-stage">
+<section id="left"></section>
+<section id="registration-film" class="card" aria-label="Registration welcome video" hidden>
+  <video id="registration-video" loop muted playsinline preload="none" aria-label="KevenOS registration introduction"></video>
+  <button id="registration-audio" type="button" aria-pressed="false">Enable music</button>
+</section>
+<section id="room-question" class="card" hidden></section>
+</div>
+<section id="right"></section>
+<section id="quiz-leaderboard" class="card" aria-label="Quiz leaderboard" hidden></section>
+</div>
+<div id="tl"></div>
+</main>
+<script src="/static/common.js"></script>
+<script src="/static/live-player.js"></script>
+<script>
+const Q = new URLSearchParams(location.search), $ = id => document.getElementById(id);
+const SCENES = ['info', 'prep', 'pitch', 'scores', 'final', 'awards', 'message'];
+const requestedScene = Q.get('scene');
+const LOCK = SCENES.includes(requestedScene) ? requestedScene : Q.get('view') === 'scores' ? 'scores' : Q.get('view') === 'program' ? 'info' : '';
+const TOP = Math.min(12, Math.max(3, Number.parseInt(Q.get('top'), 10) || 8));
+const ROT = Math.max(0, Number(Q.get('rotate')) || 0);
+const NAMES = Q.get('names') !== '0';
+let hall = window.PitchHall && matchMedia('(min-aspect-ratio: 4/3)').matches ? window.PitchHall : null;
+if (hall) document.body.classList.add('hall-enabled');
+if (hall && Q.has('key')) document.body.classList.add('hall-kiosk');
+if (Q.get('embed') === '1') document.body.classList.add('embed');
+if (Q.get('hdr') === '0') document.body.classList.add('hdr0');
+if (Q.get('lang') === 'rtl') document.documentElement.dir = 'rtl';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const SC = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)'];
+const mmss = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const film = $('registration-film'), registrationVideo = $('registration-video'), filmAudio = $('registration-audio');
+registrationVideo.muted = true;
+let filmUnavailable = false;
+let D = null, off = 0, page = 0, prev = {}, els = {}, err = 0, scene = '', profileStopped = false;
+if(KEV.staff.hosted && KEV.nav.trackProfile)KEV.profile.mount({onEnd:message=>{hideRegistrationFilm();profileStopped=true;D=null;prev={};els={};hall?.clear();delete $('connection').dataset.rendered;for(const id of ['left','right','tl','ann','room-question','quiz-leaderboard'])$(id).replaceChildren();$('connection').hidden=false;$('connection').textContent=message;}});
+const displayTime = () => err || Date.now();
+const nowSec = () => (displayTime() + off) / 1000;
+function put(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } }
+
+let pollInFlight = false;
+async function poll() {
+  if(profileStopped || pollInFlight)return;
+  pollInFlight = true;
+  try {
+    D = await KEV.api(NAMES ? '/api/public?presenter=1' : '/api/public?presenter=1&names=0', {signal:AbortSignal.timeout(5000)});
+    fetchedAt = Date.now();
+    off = D.now * 1000 - fetchedAt;
+    err = 0;
+  } catch (e) {
+    if (e.status === 401 || e.status === 403) {
+      hideRegistrationFilm();
+      D = null;
+      hall?.clear();
+      delete $('connection').dataset.rendered;
+      for (const id of ['left','right','tl','ann','room-question','quiz-leaderboard']) { $(id).replaceChildren(); $(id)._h = null; }
+      scene = '';
+    }
+    err ||= Date.now();
+  }
+  pollInFlight = false;
+  $('connection').hidden = !err;
+  if (err) $('connection').textContent = D ? 'Connection lost. Showing the last update.' : 'Unable to connect. Retrying…';
+  try { draw(); } catch (e) { console.error('draw failed: ' + (e.stack || e)); }
+}
+
+// ── building blocks ──
+function nowCard(withSteps) {
+  const P = D.program, items = P.items, i = P.index, a = items[i]; if (!a) return '';
+  const mins = (nowSec() - P.since) / 60, plan = a.min || 0, pct = plan ? Math.min(100, mins / plan * 100) : 0, over = plan && mins > plan;
+  const todo = (a.do && a.do.length ? a.do : (a.line ? [a.line] : []));
+  const normalized = value => String(value || '').trim().replace(/[.!?]+$/, '').toLowerCase();
+  const showSummary = a.line && a.do?.length && normalized(a.line) !== normalized(todo[0]);
+  let h = '<div class="eyebrow"><b>NOW</b><span>Step ' + (i + 1) + ' of ' + items.length + (a.time ? ' · from ' + esc(a.time) : '') + (a.who ? ' · ' + esc(a.who) : '') + '</span></div>' +
+    '<h2>' + esc(a.title) + '</h2>' + (showSummary ? '<div class="line">' + esc(a.line) + '</div>' : '') +
+    '<ul id="todo">' + todo.map((t, k) => '<li><i>' + (todo.length > 1 ? k + 1 : '✓') + '</i><span>' + esc(t) + '</span></li>').join('') + '</ul>';
+  if (withSteps && D.steps.length) h += '<div id="steps">' + D.steps.map((s, k) => '<div style="--sc:' + SC[k % 4] + '"><b>' + esc(s.n) + ' · ' + esc(s.name) + '</b><span>' + esc(s.minutes) + ' min</span></div>').join('') + '</div>' +
+    (D.bells.length ? '<div id="bells">🔔 ' + D.bells.map(b => esc(b.at) + ': ' + esc(b.what)).join(' &nbsp;·&nbsp; ') + '</div>' : '');
+  if (plan) h += '<div id="tbar"><div class="meta"><span>' + (over ? 'Running over: ' + Math.round(mins - plan) + ' min' : Math.max(0, Math.round(plan - mins)) + ' min left') + '</span><span>planned ' + plan + ' min</span></div><div class="track' + (over ? ' over' : '') + '"><i style="width:' + pct + '%"></i></div></div>';
+  return h;
+}
+function nextCard() { const P = D.program, n = P.items[P.index + 1]; return n ? '<span class="k">Up next</span><span class="t">' + esc(n.title) + '</span><span class="w">' + esc(n.time || '') + '</span>' : '<span class="k">Last step of the day</span>'; }
+function agendaRail({index, items}) {
+  const edge = (item, count, label) => item ? '<div class="agenda-edge"><span>' + count + ' ' + label +
+    '</span><span aria-hidden="true">' + esc(item.time || '') + ' ' + esc(item.title) + '</span></div>' : '';
+  const rows = [-2, -1, 0, 1, 2].map(offset => {
+    const item = items[index + offset];
+    if (!item) return '<li class="agenda-empty" aria-hidden="true"></li>';
+    const state = offset === 0 ? ' aria-current="step"' : offset < 0 ? ' class="agenda-past"' : '';
+    return '<li' + state + '><time>' + esc(item.time || '') + '</time><span>' + esc(item.title) + '</span></li>';
+  });
+  return '<h3>Agenda</h3>' + edge(items[index - 3], index - 2, 'earlier') +
+    '<ol class="agenda-window">' + rows.join('') + '</ol>' + edge(items[index + 3], items.length - index - 3, 'later');
+}
+const STATE = {waiting: ['Ready', 'var(--mut)'], pitch: ['Pitching', 'var(--c1)'], feedback: ['Feedback', 'var(--c3)'], change: ['Move', 'var(--c4)'], scored: ['Done', 'var(--ok)'], idle: ['-', 'transparent']};
+function progressCard() {
+  const total = D.pairs, done = D.scored || 0, pct = total ? done / total * 100 : 0;
+  let h = '<div class="hd"><h3>Pitch progress</h3><span class="big">' + done + '<small> of ' + total + ' teams scored</small></span></div><div id="pbar"><i style="width:' + pct + '%"></i></div>' +
+    '<div id="stn">' + D.stations.map(s => { const st = STATE[s.state] || STATE.idle; return '<div style="--sc:' + st[1] + '"><b>' + s.station + '</b>' + (s.state === 'pitch' && s.step != null ? 'Step ' + (s.step + 1) : st[0]) + '</div>'; }).join('') + '</div>';
+  return h;
+}
+function sharedClock() {
+  if (D.mode !== 'desk' || D.clock.kind === 'final') return '';
+  const c = D.clock, e = c.elapsed + (c.running ? (displayTime() - fetchedAt) / 1000 : 0), ph = e < 600 ? 'Pitch' : e < 780 ? 'Feedback' : e < 900 ? 'Change over' : 'Time is up', left = e < 600 ? 600 - e : e < 780 ? 780 - e : e < 900 ? 900 - e : 0;
+  const idle = !c.started_any && !c.running;
+  return '<div id="cd"><div class="k">Round ' + c.round + ' of ' + (D.config?.rounds || D.configuration?.rounds || D.rounds || 1) + ' · ' + (idle ? 'Get ready' : c.running ? ph : 'Paused') + '</div><div class="t">' + (idle ? '--:--' : mmss(left)) + '</div></div>';
+}
+let fetchedAt = Date.now();
+
+// ── scores (persistent elements so rows can slide) ──
+function ensureScores(parent) {
+  if (!$('list')) { parent.innerHTML = '<div class="hd"><h3 id="sct">Leaderboard</h3><span class="pg" id="pg"></span></div><div id="list"></div><div id="empty" hidden></div>'; parent._h = null; els = {}; }
+}
+function drawScores() {
+  const list = $('list'), empty = $('empty');
+  if (D.off) { list.hidden = true; empty.hidden = false; empty.textContent = 'Scores will appear here soon.'; $('pg').textContent = ''; return; }
+  if (!D.rows.length) { list.hidden = true; empty.hidden = false; empty.textContent = 'Waiting for the first scores…'; $('pg').textContent = ''; Object.keys(els).forEach(k => { els[k].remove(); delete els[k]; }); return; }
+  list.hidden = false; empty.hidden = true;
+  const pages = Math.max(1, Math.ceil(D.rows.length / TOP)), cur = ROT > 0 ? page % pages : 0;
+  const show = ROT > 0 ? D.rows.slice(cur * TOP, cur * TOP + TOP) : D.rows.slice(0, TOP);
+  const H = list.clientHeight, gap = H * 0.014, rh = Math.max(10, (H - gap * (TOP - 1)) / TOP), keep = new Set();
+  show.forEach((r, i) => {
+    keep.add(r.pair);
+    let e = els[r.pair];
+    if (!e) { e = els[r.pair] = document.createElement('div'); e.className = 'r'; e.style.opacity = 0; list.appendChild(e); requestAnimationFrame(() => e.style.opacity = 1); }
+    const up = prev[r.pair] != null && prev[r.pair] < r.total;
+    e.style.height = rh + 'px'; e.style.top = i * (rh + gap) + 'px';
+    e.className = 'r' + (r.rank <= 3 ? ' g' + r.rank : '') + (up ? ' up' : '');
+    if (up) setTimeout(() => e.classList.remove('up'), 2600);
+    e.innerHTML = '<div class="k">' + r.rank + '</div><div class="n"><b>' + esc(r.partner) + '</b><span>' + (NAMES ? esc(KEV.members(r) || 'Team ' + r.pair) : 'Team ' + r.pair) + '</span></div>' +
+      '<div class="t">' + r.total + '<small>pts</small></div><div class="b">' + r.groups.map((g, j) => '<i class="' + (g ? '' : 'z') + '" style="--sc:' + SC[j] + '"></i>').join('') + '</div>';
+    prev[r.pair] = r.total;
+  });
+  Object.keys(els).forEach(k => { if (!keep.has(+k)) { els[k].remove(); delete els[k]; } });
+  $('pg').textContent = (pages > 1 && ROT > 0 ? 'Page ' + (cur + 1) + ' of ' + pages + ' · ' : '') + D.scored + ' of ' + D.pairs + ' teams scored';
+}
+
+// ── scenes ──
+function roomScene() {
+  if (D.room?.source === 'quiz' && D.quiz?.display_until &&
+      Date.now() / 1000 + off / 1000 >= D.quiz.display_until) return LOCK || D.scene || 'info';
+  if (D.room) {
+    const lockedAgenda = LOCK && ['agenda','quiz','audience'].includes(D.room.source) &&
+      !['final','awards'].includes(D.room.scene) && !['ready','pitch','collecting','review','completed'].includes(KEV.finalStatus(D.final));
+    return lockedAgenda ? LOCK : D.room.scene;
+  }
+  const lifecycle = KEV.finalStatus(D.final);
+  if (D.quiz && !LOCK) return 'quiz';
+  // An explicit Desk choice wins over stale kiosk URL locks. Auto still follows
+  // the Final lifecycle, so an old pitch URL cannot strand the room display.
+  if (SCENES.includes(D.scene_override)) return D.scene_override;
+  if (lifecycle === 'completed') return 'awards';
+  if (['ready','pitch','collecting','review'].includes(lifecycle)) return 'final';
+  return LOCK || D.scene || 'info';
+}
+function drawScene(sc) {
+  const lifecycle = KEV.finalStatus(D.final);
+  const L = $('left'), R = $('right');
+  if (sc !== scene) { document.body.className = document.body.className.replace(/\bsc-\S+/g, '').trim(); document.body.classList.add('sc-' + sc); scene = sc; L._h = R._h = null; L.innerHTML = R.innerHTML = ''; els = {}; }
+  const P = D.program, a = P.items[P.index] || {};
+  if (sc === 'quiz' || sc === 'audience') {
+    const q = sc === 'quiz' ? D.quiz : D.audience;
+    const rows = q.kind === 'question' ? (q.bars || q.options) : sc === 'audience' ?
+      (q.options || []).map(option => ({...option, count:q.counts?.[option.key]})) : q.rows;
+    put(L,'<div class="card pad"><h2>'+esc(q.prompt || (q.kind==='champion'?(q.tied?'Quiz champions':'Quiz champion'):q.kind==='spotlight'?'Quiz leaderboard':'Quiz top five'))+'</h2>'+
+      (['open','live'].includes(q.status) ? '<p>'+(q.end===null ? 'Open · Respond on your phone' : Math.max(0,Math.ceil(q.end-nowSec()))+' sec left')+'</p>' : '')+
+      (q.results_pending ? '<p>Results pending</p>' : '')+
+      (sc==='audience' && q.count!==undefined ? '<p>'+q.count+' responses</p>' : '')+
+      '<ol>'+rows.map(r=>'<li>'+(q.correct?.includes(r.key)?'<strong>Correct · </strong>':'')+esc(r.text || r.name)+(r.count!==undefined?' · '+r.count:r.earned!==undefined?' · '+r.earned+' pts':'')+'</li>').join('')+'</ol>'+
+      (q.explanation||q.prize?'<p>'+esc(q.explanation||q.prize)+'</p>':'')+'</div>');
+    if (sc==='quiz' && q.bars && q.display_until) renderLeaderboard(R,D.quiz_leaderboard);
+    else put(R,'');
+  } else if (sc === 'info') {
+    if (!L.firstChild) L.innerHTML = '<div class="card" id="now"></div>', R.innerHTML = '<div class="card pad" id="today"></div>';
+    put($('now'), nowCard(false)); put($('today'), agendaRail(P));
+  } else if (sc === 'prep') {
+    if (!L.firstChild) L.innerHTML = '<div class="card" id="now"></div>', R.innerHTML = '<div class="card" id="cd0"></div><div class="card" id="next"></div>';
+    put($('now'), nowCard(false)); put($('next'), nextCard());
+    const plan = (a.min || 0) * 60, left = plan - (nowSec() - P.since), over = left < 0;
+    put($('cd0'), '<div id="cd" class="' + (over ? 'over' : '') + '"><div class="k">' + (over ? 'Over time' : 'Time left to prepare') + '</div><div class="t">' + (over ? '+' : '') + mmss(Math.abs(left)) + '</div><div class="s">' + esc(a.title || '') + '</div></div>');
+  } else if (sc === 'pitch') {
+    if (!L.firstChild) L.innerHTML = '<div class="card" id="now"></div>', R.innerHTML = '<div class="card" id="clk0" hidden></div><div class="card" id="prog"></div><div class="card pad" id="nx"></div>';
+    put($('now'), nowCard(true)); put($('prog'), progressCard()); put($('nx'), nextCard()); $('nx').className = 'card'; $('nx').id = 'nx'; $('nx').style.cssText = 'padding:1.8cqh 2.2vw;display:flex;align-items:center;gap:1.6vw';
+    const c = sharedClock(); $('clk0').hidden = !c; put($('clk0'), c);
+  } else if (sc === 'scores') {
+    if (!$('sc')) R.innerHTML = '<div class="card" id="sc"></div>';
+    ensureScores($('sc')); drawScores();
+  } else if (sc === 'final') {
+    const F = D.final, cur = F.pairs[F.current], phase = KEV.finalStatus(F), active = ['ready','pitch','collecting'].includes(phase) && cur;
+    if (!L.firstChild) L.innerHTML = '<div class="card" id="stage"></div>', R.innerHTML = '<div class="card pad" id="fl" style="flex:1"></div>';
+    const final = active ? KEV.finalClock(D.clock, (displayTime() - fetchedAt) / 1000) : null;
+    put($('stage'), phase === 'review' ? '<div class="k">The Final</div><h2>Judges are confirming results</h2><div class="n">Thank you to every finalist. Results will appear here when the Desk publishes them.</div>' : active ? '<div class="k">Finalist ' + (F.current + 1) + ' of ' + F.pairs.length + '</div><h2>' + esc(cur.partner || 'Team ' + cur.pair) + '</h2><div class="n">' + (NAMES && KEV.members(cur) ? esc(KEV.members(cur)) + ' · ' : '') + 'Team ' + cur.pair + '</div>' +
+      (F.case_name ? '<div class="n">Original scenario · ' + esc(F.case_name) + '</div>' : '') +
+      '<div id="cd"><div class="k">' + KEV.finalLabel(F) + '</div>' + (phase === 'collecting' ? '<div class="n">Please stay on stage for feedback.</div>' : '<div class="t">' + final.time + '</div>') + '</div>' :
+      F.pairs.length ? '<div class="k">The Final</div><h2>Starting soon</h2><div class="n">Finalists pitch their original scenarios on stage.</div>' : '<div class="k">The Final</div><h2>Finalists coming up</h2><div class="n">The selected teams will be announced.</div>');
+    put($('fl'), '<div class="ttl">Stage order</div><div class="fl">' + (F.pairs.length ? F.pairs.map((p, k) => '<div class="' + (active && k === F.current ? 'cur' : p.completed ? 'd' : '') + '"><i>' + (p.completed ? '✓' : k + 1) + '</i><span>' + esc(p.partner || 'Team ' + p.pair) + '<small>' + (NAMES ? esc(KEV.members(p) || 'Team ' + p.pair) : 'Team ' + p.pair) + '</small></span></div>').join('') : '<p style="color:var(--mut)">To be announced.</p>') + '</div>');
+  } else if (sc === 'awards') {
+    const pod = D.podium || [];
+    put(R, pod.length ? '<div class="ttl" style="justify-content:center;font-size:5cqh">' + (D.reveal === 'winners' ? '🏆 Congratulations' : 'Top three') + '</div><div class="pod">' + [1, 2, 3].map(rk => pod.find(p => p.rank === rk)).filter(Boolean).map(p => '<div class="r' + p.rank + '"><div class="n">' + p.rank + '</div><div class="p">' + esc(p.partner) + '</div><div class="m">' + (NAMES ? esc(KEV.members(p)) : 'Team ' + p.pair) + '</div></div>').join('') + '</div>' :
+      '<div class="hero"><div class="ic">🏆</div><h2>' + esc(a.title || 'Awards') + '</h2><p>The winners will be announced shortly.</p></div>');
+  } else {   // message
+    put(R, '<div class="hero"><div class="ic">' + (/lunch/i.test(a.title || '') ? '🍽️' : '👋') + '</div><h2>' + esc(a.title || '') + '</h2>' + (a.line ? '<p>' + esc(a.line) + '</p>' : (a.do && a.do[0] ? '<p>' + esc(a.do[0]) + '</p>' : '')) + '</div>');
+  }
+  if (sc !== 'scores' && els && Object.keys(els).length) els = {};
+}
+function hideRegistrationFilm() {
+  if (film.hidden) return;
+  film.hidden = true;
+  registrationVideo.pause();
+}
+function showRegistrationFilm() {
+  // The reusable package intentionally contains no event-specific media.
+  hideRegistrationFilm();
+  return false;
+}
+registrationVideo.addEventListener('error', () => {
+  filmUnavailable = true;
+  draw();
+});
+filmAudio.onclick = () => {
+  registrationVideo.muted = !registrationVideo.muted;
+  filmAudio.setAttribute('aria-pressed', String(!registrationVideo.muted));
+  filmAudio.textContent = registrationVideo.muted ? 'Enable music' : 'Mute music';
+  registrationVideo.play()?.catch(() => {
+    registrationVideo.muted = true;
+    filmAudio.setAttribute('aria-pressed', 'false');
+    filmAudio.textContent = 'Enable music';
+  });
+};
+function renderRoomQuestion(target, question, audience) {
+  const label = audience ? 'Audience question' : 'Event quiz';
+  target.setAttribute('aria-label', label);
+  const open = ['open', 'live'].includes(question.status);
+  const visibleResults = question.bars || question.counts || Number.isFinite(question.count);
+  const status = open ? (Number.isFinite(question.end) ? mmss(Math.max(0, Math.ceil(question.end - nowSec()))) : 'Open') :
+    visibleResults ? 'Results' : question.results_pending ? 'Results pending' : 'Closed';
+  const options = question.bars || question.options || [];
+  put(target, '<header><span class="label">' + label + '</span><span class="status">' + status + '</span></header>' +
+    '<h2>' + esc(question.prompt) + '</h2><ol>' + options.map(option => {
+      const correct = question.correct?.includes(option.key);
+      const count = option.count ?? question.counts?.[option.key];
+      return '<li' + (correct ? ' data-correct="true"' : '') + '><b>' + esc(option.key) + '</b><span>' + esc(option.text) +
+        (correct ? ' <small>· Correct</small>' : '') + '</span>' + (count == null ? '' : '<strong>' + count + '</strong>') + '</li>';
+    }).join('') + '</ol>' +
+    (open ? '<p>Answer on your phone in KevenOS.</p>' : '') +
+    (Number.isFinite(question.count) ? '<p>' + question.count + (question.count === 1 ? ' response' : ' responses') + '</p>' : '') +
+    (question.explanation ? '<p>' + esc(question.explanation) + '</p>' : ''));
+}
+function renderLeaderboard(target, rows) {
+  put(target, '<h2>Quiz leaderboard</h2><p>Standings so far</p>' + (rows?.length ?
+    '<ol>'+rows.slice(0,5).map(row=>'<li><b>'+row.rank+'</b><span>'+esc(row.name)+'</span><strong>'+row.earned+(row.earned===1?' pt':' pts')+'</strong></li>').join('')+'</ol>' :
+    '<p>Points will appear after a scored question closes.</p>'));
+}
+
+function usePlainDisplay() {
+  const failed = hall;
+  if (!failed) return;
+  hall = null;
+  document.body.classList.remove('hall-enabled');
+  delete $('connection').dataset.rendered;
+  queueMicrotask(() => {
+    try { failed.clear(); } finally { draw(); }
+  });
+}
+
+function draw() {
+  const questionBlock = $('room-question');
+  if (!D || KEV.workspaceChanging) {
+    hideRegistrationFilm();
+    questionBlock.hidden = $('quiz-leaderboard').hidden = true;
+    document.body.classList.remove('programme-layout', 'has-standings', 'with-media');
+    return;
+  }
+  const current = roomScene();
+  const audience = current === 'audience';
+  const question = audience ? D.audience : current === 'quiz' && D.quiz?.kind === 'question' ? D.quiz : null;
+  const registration = showRegistrationFilm();
+  const programmeCard = current === 'info' || Boolean(question);
+  const board = $('quiz-leaderboard');
+  const hasStandings = Array.isArray(D.quiz_leaderboard) && D.quiz_leaderboard.length > 0;
+  const useHall = Boolean(hall) && !programmeCard;
+  questionBlock.hidden = !question;
+  document.body.classList.toggle('programme-layout', programmeCard);
+  document.body.classList.toggle('has-standings', programmeCard && hasStandings);
+  document.body.classList.toggle('with-media', Boolean(question) || registration);
+  document.body.classList.toggle('hall-enabled', useHall);
+  if (useHall) {
+    try {
+      hall.show({data:D, scene:current, now:nowSec(), elapsed:(displayTime()-fetchedAt)/1000, stale:!!err,
+        top:Math.min(TOP,5), page, rotate:ROT > 0, names:NAMES,
+        reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,
+        header:Q.get('embed') !== '1' && Q.get('hdr') !== '0', dir:document.documentElement.dir,
+        onFailure:usePlainDisplay});
+      $('connection').dataset.rendered = 'true';
+      return;
+    } catch {
+      usePlainDisplay();
+      return;
+    }
+  }
+  $('hall-display').hidden = true;
+  delete $('connection').dataset.rendered;
+  $('ev').textContent = D.event;
+  $('kevenos-rehearsal').hidden = !D.rehearsal;
+  $('live').textContent = err ? 'RECONNECTING' : 'CONNECTED'; $('live').style.opacity = err ? .6 : 1;
+  const d = new Date(nowSec() * 1000); $('clock').textContent = d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const ann = D.program.announce; $('ann').hidden = !ann; if (ann) $('ann').textContent = ann;
+  drawScene(question ? 'info' : current);
+  if (question) renderRoomQuestion(questionBlock, question, audience);
+  board.hidden = !hasStandings || ['quiz','audience'].includes(scene);
+  if (!board.hidden) renderLeaderboard(board,D.quiz_leaderboard);
+  const P = D.program; put($('tl'), P.items.map((x, k) => '<div class="' + (k < P.index ? 'done' : k === P.index ? 'now' : '') + '"><i></i><span>' + esc(x.time || '') + (k === P.index ? ' ' + esc(x.title) : '') + '</span></div>').join(''));
+}
+setInterval(poll, 2000); poll(); setInterval(() => { try { D && draw(); } catch (e) { console.error('draw failed: ' + (e.stack || e)); } }, 1000);
+if (ROT > 0) setInterval(() => { if (!err) { page++; if (hall) draw(); else if (D && scene === 'scores') drawScores(); } }, Math.max(2, Math.min(3600, ROT)) * 1000);
+addEventListener('resize', () => D && draw());
+</script></body></html>

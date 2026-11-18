@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Your event companion | KevenOS</title>
+<meta content="#112c4c" name="theme-color"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="KevenOS" name="apple-mobile-web-app-title"/>
+<link href="/participant.webmanifest" rel="manifest"/>
+<link href="/static/participant-icon.png" rel="apple-touch-icon"/>
+<link href="/static/app.css" rel="stylesheet"/>
+<link href="/static/event.css" rel="stylesheet"/>
+<link href="/static/participant-workspace.css" rel="stylesheet"/>
+<link href="/static/event-quiz.css" rel="stylesheet"/>
+<link href="/static/audience-questions.css" rel="stylesheet"/>
+<link href="/static/event-operations.css" rel="stylesheet"/></head>
+<body class="participant-page">
+<main class="event-shell event-main">
+<header class="event-heading">
+<h1 id="participant-page-title">Your day, at a glance</h1>
+<p id="event-meta">KevenOS Competition</p>
+</header>
+<section aria-labelledby="status-heading" class="card event-section event-status" id="status-box">
+<h2 id="status-heading">Loading your day</h2>
+<p id="status" role="status">Getting your next step, team and materials.</p>
+<div class="event-actions">
+<a class="btn" hidden="" href="/?access=participant" id="signin">Go to sign-in</a>
+<button class="btn" hidden="" id="switch-access" type="button">Switch sign-in</button>
+<a class="btn ghost" hidden="" href="/guest" id="guest">Guest overview</a>
+<button class="btn alt" hidden="" id="retry" type="button">Try again</button>
+</div>
+</section>
+<p class="event-form-error" id="signout-error" role="alert"></p>
+<div class="event-actions">
+<button class="btn ghost" data-nav-help="" hidden="" id="participant-help" type="button">App guide</button>
+<button class="btn ghost" data-nav-signout="" hidden="" id="signout" type="button">Sign out</button>
+</div>
+<div hidden="" id="guide">
+<div class="participant-connection" id="connection-bar">
+<span id="connection" role="status">Connecting</span>
+<span id="last-updated"></span>
+<button class="btn ghost" hidden="" id="retry-updates" type="button">Retry updates</button>
+</div>
+<nav aria-label="Participant sections" class="participant-tabs" hidden="" id="team-navigation"><button aria-pressed="true" data-panel="today" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path></svg><span>Today</span></button><button aria-pressed="false" data-panel="pitch" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M4 4h12v16H4zM8 8h4M8 12h4M19 5v14"></path></svg><span>My Pitch</span></button><button aria-pressed="false" data-panel="results" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M4 20V13h4v7M10 20V4h4v16M16 20V9h4v11"></path></svg><span>Results</span></button><button aria-pressed="false" data-panel="more" type="button"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg><span>More</span></button></nav>
+<div class="participant-message-bar"><button class="btn ghost" type="button" id="participant-messages-button" aria-haspopup="dialog">Messages</button></div>
+<div id="participant-message-stash" hidden><div id="event-quiz-player"></div><div id="audience-questions-player" hidden></div></div>
+<dialog class="participant-message-sheet" id="participant-message-sheet" aria-labelledby="participant-message-title">
+<header><button class="btn ghost sm" type="button" data-message-back hidden>Messages</button>
+<h2 id="participant-message-title" tabindex="-1">Messages</h2>
+<button class="btn ghost sm" type="button" data-message-close>Close</button></header>
+<div class="participant-message-list" data-message-list></div>
+<div class="participant-message-content" data-message-detail hidden></div>
+</dialog>
+<div data-team-panel="today"><section aria-labelledby="now-title" class="event-hero participant-now"><div aria-label="Event stage" class="participant-phase" id="participant-phase">Your event companion</div>
+<div class="participant-now-top"><p class="event-kicker" id="now-label">Happening now</p><span hidden="" id="today-team"></span></div>
+<h2 id="now-title">Getting your next step</h2>
+<p id="now-instruction"></p>
+<p class="participant-action-detail" id="now-detail"></p>
+<p class="participant-clock" hidden="" id="now-clock"></p>
+<button class="btn" hidden="" id="open-team-pitch" type="button">Open my pitch</button>
+<div class="participant-next" hidden="" id="next-box"><strong id="next-label">Next</strong><p id="next-title"></p></div>
+</section>
+<section class="participant-updates" aria-labelledby="event-updates-title" id="participant-event-updates">
+<div class="participant-card-heading"><h2 id="event-updates-title">Event updates</h2><button class="btn ghost sm" data-open-panel="updates" type="button">Notification settings</button></div>
+<section aria-labelledby="announcement-title" class="card event-section participant-announcement" hidden="" id="announcement">
+<div class="participant-card-heading"><h2 id="announcement-title">From the event desk</h2><time id="announcement-time"></time></div>
+<p id="announcement-text"></p>
+</section>
+</section>
+<section aria-labelledby="assignment-heading" class="card event-section participant-assignment">
+<div class="participant-card-heading"><h2 id="assignment-heading">Your assignment</h2><span class="assignment-name" id="name"></span></div>
+<dl class="team-location" id="facts"></dl>
+<p id="assignment-note"></p>
+<details class="participant-team-details"><summary>Team members and company</summary><dl class="event-facts" id="team-members"></dl></details>
+</section>
+<section class="card event-section" id="notification-invitation" hidden aria-labelledby="notification-invitation-title">
+<h2 id="notification-invitation-title">Get event alerts</h2>
+<p id="notification-invitation-copy">Get alerts for quiz questions, results, agenda changes and Event Desk replies.</p>
+<div class="row"><button class="btn" id="notification-invitation-enable" type="button">Turn on alerts</button>
+<button class="btn ghost" id="notification-later" type="button">Not now</button></div>
+<p role="status" id="notification-invitation-status"></p>
+</section>
+<div id="participant-operations-help"></div>
+<section aria-labelledby="pitch-prep-title" class="card event-section pitch-prep-card" hidden="" id="pitch-prep-card">
+<div>
+<p class="event-kicker">Pitch Prep</p>
+<h2 id="pitch-prep-title">Get your team ready to pitch</h2>
+<p>Watch a two-minute walkthrough, then write your speaking cues and rehearse together.</p>
+</div>
+<button aria-haspopup="dialog" class="btn" data-watch-prep="" type="button">Watch prep guide</button>
+</section>
+<section aria-label="Available team actions" class="card event-section" hidden="" id="team-actions">
+<div class="row">
+<button class="btn ghost" hidden="" id="open-team-results" type="button">See your score and feedback</button>
+<button class="btn ghost" hidden="" id="open-team-nominations" type="button">Nominate your three customers</button>
+</div>
+</section>
+<details class="card event-section participant-news" hidden="" id="team-news-card">
+<summary>Recent Desk updates</summary><ol class="event-list" id="team-news"></ol>
+</details>
+
+<section class="card event-section" hidden="" id="participant-final"></section>
+<section aria-labelledby="agenda-title" class="card event-section participant-timeline">
+<div class="participant-card-heading"><h2 id="agenda-title">Around now</h2><button class="btn ghost sm" data-open-panel="agenda" type="button">Full agenda</button></div>
+<ol class="timeline-items" id="agenda-current"></ol>
+</section>
+</div>
+<div data-team-panel="agenda" hidden=""><button class="participant-back" data-open-panel="more" type="button">‹ All event tools</button>
+<section aria-labelledby="full-agenda-title" class="card event-section participant-timeline">
+<div class="participant-card-heading"><h2 id="full-agenda-title">Today’s agenda</h2><span class="small mut">event time</span></div>
+<p>Times are planned. The Desk marks what is happening now.</p>
+<ol class="timeline-items timeline-full" id="agenda"></ol>
+</section>
+</div>
+<div data-team-panel="pitch" hidden="">
+<section aria-label="Pitch Mode" class="card event-section" hidden="" id="pitch-focus">
+<div class="participant-focus-head"><div><p class="event-kicker">Pitch Mode</p><h2 id="focus-phase">Waiting for the judge</h2></div><p id="focus-clock">–:––</p></div>
+<p id="focus-status" role="status"></p>
+<p class="focus-live-step" hidden="" id="focus-live-step"></p>
+<button class="btn ghost sm" hidden="" id="follow-pitch" type="button">Return to current step</button>
+</section>
+<section aria-labelledby="worksheet-title" class="card event-section">
+<div class="participant-card-heading"><h2 id="worksheet-title">Build your team’s pitch</h2><span class="small mut" id="worksheet-meta">Shared with your team</span></div>
+<p id="prep-intro">Four steps. One story. Choose a speaker and save short cues for each part, then practise your handoffs together.</p>
+<button aria-haspopup="dialog" class="btn ghost sm" data-watch-prep="" hidden="" id="worksheet-prep-guide" type="button">Watch prep guide</button>
+<details class="worksheet-brief" id="worksheet-brief"><summary>Your customer brief</summary><p id="worksheet-customer"></p><div id="worksheet-pack"></div></details>
+<p class="worksheet-progress" id="worksheet-progress"></p><progress aria-label="Pitch preparation progress" id="prep-progress" max="4" value="0"></progress>
+<div aria-label="Pitch steps" class="participant-step-tabs" id="team-step-tabs" role="group"></div><p class="event-kicker" id="step-counter"></p>
+<h3 id="worksheet-step"></h3><p id="worksheet-prompt"></p>
+<details id="worksheet-reference"><summary>What to ask or say</summary><p id="worksheet-reference-text"></p></details>
+<form id="team-worksheet">
+<label class="participant-field">Who speaks in this step?<input autocomplete="off" id="worksheet-speaker" maxlength="120"/></label>
+<label class="participant-field">Speaking cues<textarea id="worksheet-cues" maxlength="1800" placeholder="Write a few lines you can glance at during the pitch." rows="4"></textarea></label>
+<p id="worksheet-status" role="status"></p>
+<div class="row"><button class="btn" id="worksheet-save" type="submit">Save for the team</button><button class="btn ghost" hidden="" id="worksheet-reload" type="button">Load teammate’s version</button></div>
+</form>
+<div hidden="" id="pitch-speaking"><p id="pitch-speaker"></p><p id="pitch-cues"></p></div>
+<div class="participant-step-controls"><button class="btn ghost" id="previous-pitch-step" type="button">‹ Previous</button><button class="btn ghost" id="next-pitch-step" type="button">Next step ›</button></div><div class="participant-mode-switch"><button aria-pressed="false" class="btn ghost" id="toggle-pitch-focus" type="button">Open Pitch Mode</button></div>
+</section>
+</div>
+<div data-team-panel="results">
+<section aria-labelledby="preliminary-title" class="card event-section" hidden="" id="private-preliminary">
+<h2 id="preliminary-title">Preliminary score and feedback</h2>
+<div id="private-preliminary-body"></div>
+</section>
+<section class="participant-results-intro"><p class="event-kicker">Your progress</p><h2>Learn from your pitch</h2><p>Your team’s private score and approved feedback appear here after the Desk releases them.</p></section><section aria-labelledby="result-title" class="card event-section participant-result" id="result-card">
+<h2 id="result-title">Your team result</h2><p id="result-label">Your result will appear here when the Desk releases it.</p>
+<p hidden="" id="result-score"></p>
+</section>
+<div id="event-quiz-results"></div>
+<div id="audience-question-results"></div>
+</div>
+<div data-team-panel="resources"><button class="participant-back" data-open-panel="more" type="button">‹ All event tools</button>
+<section aria-labelledby="materials-title" class="card event-section participant-materials">
+<h2 id="materials-title">Your customer brief</h2>
+<p id="scenario-title"></p><p id="scenario-summary"></p>
+<p id="materials-note">Start with the customer brief in your scenario pack. It also includes a cheat sheet and worksheet. Use the Participant Guide for the pitch steps and example questions.</p>
+<ul class="event-list" id="documents"></ul>
+<button aria-haspopup="dialog" class="btn ghost" data-watch-prep="" type="button">Watch prep guide</button>
+</section>
+<div class="event-page-grid">
+<div class="event-stack">
+<details class="card event-section event-disclosure">
+<summary id="steps-title">Your four pitch steps · 10 minutes</summary>
+<p id="steps-note">Prepare these four parts together. The timings are a guide; every team member should have a speaking part.</p>
+<ol class="event-list" id="steps"></ol>
+</details>
+<details class="card event-section event-disclosure">
+<summary id="checklist-title">Before you pitch</summary>
+<ul class="event-list" id="checklist"></ul>
+</details>
+<details class="card event-section event-disclosure">
+<summary>How points are awarded</summary>
+<p>The preliminary checklist is worth up to 100 points before bonuses. If totals tie, the judge’s 1–5 rating for overall impression and confidence is the first tiebreaker. In the Final, each panel judge scores the pitch from 1 to 5.</p>
+<ul class="event-list" id="scoring"></ul>
+</details>
+</div>
+<aside aria-label="Schedule and optional reading" class="event-stack">
+<details class="card event-section event-disclosure">
+<summary>Worked practice example</summary>
+<p><strong>A restaurant group moving its head office</strong></p>
+<ol class="event-list">
+<li>Discover who uses laptops, who approves the purchase, and what has to work on moving day.</li>
+<li>Link battery life to field visits, automated setup to IT’s workload, and trade-in to the business case.</li>
+<li>Ask how their existing tools manage laptops. Explain how implementation partner can test the setup with their IT team.</li>
+<li>Ask for a Discovery meeting before the move and agree who from IT joins and when.</li>
+</ol>
+</details>
+<details class="card event-section event-disclosure">
+<summary>Optional product vendor reading</summary>
+<p>Explore these if you have time, during a break or after today. You do not need to read them before taking part.</p>
+<ul class="event-list" id="reading"></ul>
+</details>
+</aside>
+</div>
+</div>
+<p class="participant-support">Need a hand? Ask a coach or visit the event desk.</p>
+<div data-team-panel="more" hidden=""><section aria-label="Event tools" class="participant-more-menu"><button data-open-panel="agenda" type="button"><span>01</span><strong>Agenda<small>Follow the programme and session details</small></strong><b aria-hidden="true">›</b></button><button data-open-panel="resources" type="button"><span>02</span><strong>Guides &amp; references<small>Your scenario, pitch tips and reading</small></strong><b aria-hidden="true">›</b></button><button data-open-panel="nominations" type="button"><span>03</span><strong>Customer nominations<small>Three companies, one team submission</small></strong><b aria-hidden="true">›</b></button><button data-open-panel="updates" type="button"><span>04</span><strong>Updates &amp; notifications<small>Desk news and notification settings</small></strong><b aria-hidden="true">›</b></button></section><details class="card event-section event-disclosure participant-quickstart" id="quickstart">
+<summary>Start here · No preparation needed</summary>
+<p>A judge plays your customer. Your team asks about their needs, explains how solution device and implementation partner can help, and agrees a next step.</p>
+<ol class="participant-day-guide">
+<li><strong>Arrive.</strong> Collect your badge and pack, find your team, then watch the training and example pitch.</li>
+<li><strong>Prepare together.</strong> Read your scenario and plan four speaking cues in My Pitch. Every team member must speak. Ask a coach if you get stuck.</li>
+<li><strong>Pitch when called.</strong> Go to your assigned station. You have 10 minutes to pitch, 3 minutes for feedback, and 2 minutes for changeover.</li>
+<li><strong>Review and nominate.</strong> Look for your private feedback in Results. Three finalists pitch their original scenario again in 8 minutes. Before you leave, nominate three companies as a team.</li>
+</ol>
+<button class="btn ghost sm" data-open-panel="resources" type="button">Open your customer brief</button>
+</details></div><div data-team-panel="nominations" hidden=""><button class="participant-back" data-open-panel="more" type="button">‹ All event tools</button><p class="participant-empty" id="nomination-availability">Customer nominations open when the Desk releases them. Choose three companies together and explain why you would pitch to each.</p><section class="card event-section" hidden="" id="team-nomination">
+<p class="event-kicker">Before you leave</p><h2>Nominate three customers</h2>
+<p>Enter a company name and tell us in your own words who the customer is and why you’d pitch to them. Your team and event organizers can see your submission.</p>
+<form id="team-nomination-form">
+<div id="team-nomination-fields"></div>
+<div class="row"><button class="btn ghost" id="nomination-draft" type="button">Save draft</button><button class="btn" id="nomination-submit" type="submit">Submit three companies</button></div>
+<p id="nomination-status" role="status"></p>
+<button class="btn ghost" hidden="" id="nomination-reload" type="button">Load your team’s saved version</button>
+</form>
+</section></div><div data-team-panel="updates" hidden=""><button class="participant-back" data-open-panel="more" type="button">‹ All event tools</button><section class="card event-section"><h2>Stay in the loop</h2><p>Receive device alerts for new questions and Desk messages. During Rehearsal, use Send test alert to check this device.</p></section><section aria-labelledby="notification-heading" class="card event-section">
+<h2 id="notification-heading">Event notifications</h2>
+<p id="notification-status">Get quiz, results, agenda and Event Desk alerts on this device.</p>
+<button class="btn ghost" hidden="" id="enable-notifications" type="button">Enable notifications</button>
+<button class="btn ghost" hidden="" id="disable-notifications" type="button">Turn off notifications</button>
+<button class="btn ghost" hidden id="test-notifications" type="button">Send test alert</button>
+</section></div></div>
+<dialog aria-labelledby="pitch-prep-dialog-title" class="pitch-prep-dialog" id="pitch-prep-dialog">
+<header><div><h2 id="pitch-prep-dialog-title">Prepare your pitch</h2><p>About 2 minutes · Silent with on-screen text</p></div>
+<button autofocus="" class="btn ghost" id="pitch-prep-close" type="button">Close</button>
+</header>
+<p id="pitch-prep-status" role="status"></p>
+<div id="pitch-prep-player"></div>
+<details class="prep-transcript">
+<summary>Quick prep checklist</summary>
+<ol>
+<li>Read your scenario card together. Pick discovery questions and decide who speaks in each step.</li>
+<li>Connect solution device to this customer’s people, IT and business. Choose a solution device for two roles.</li>
+<li>Rehearse one IT objection and one business objection. Identify a relevant implementation partner service.</li>
+<li>Ask for a free Discovery meeting. Explain why, name who should join and propose a date.</li>
+<li>Save short cues for each step in My Pitch. Rehearse the handoffs aloud once. The deck suggests splitting 45 minutes into 12 for Discover, 12 for Solution at Work, 12 for Solve and Close, and 9 to rehearse.</li>
+</ol>
+<button class="btn" data-prep-worksheet="" type="button">Open team worksheet</button>
+</details>
+</dialog>
+<p aria-atomic="true" aria-live="polite" class="participant-sr-only" id="live-changes" role="status"></p>
+</main>
+<script src="/static/common.js"></script>
+<script src="/static/event-operations.js"></script>
+<script src="/static/participant-messages.js"></script>
+<script defer="" src="/static/participant-push.js"></script>
+<script src="/static/participant-workspace.js"></script>
+<script src="/static/participant-prep.js"></script>
+<script src="/static/event-quiz.js"></script>
+<script src="/static/audience-questions.js"></script>
+<script>
+    const $ = id => document.getElementById(id), esc = KEV.esc;
+    let participantState = null, guideState = null, assignmentKey = '', liveState = null, guideVersion = null;
+    let inFlight = false, signedOut = false, blocked = false, lastSuccess = 0, lastReceived = 0, changeKey = '';
+    let activeRequest = null, timelineKey = '';
+    const detail = item => '<li><h3>' + esc(item.title) + '</h3><p>' + esc(item.text) + '</p></li>';
+    const setText = (id, value) => { const text = String(value ?? ''); if ($(id).textContent !== text) $(id).textContent = text; };
+    const setHTML = (id, value) => { if ($(id).innerHTML !== value) $(id).innerHTML = value; };
+    const timeText = value => Number.isFinite(value) && value > 0 ? new Intl.DateTimeFormat('en-GB', {timeZone:'UTC',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(value * 1000)) + ' event time' : '';
+    const scenarioId = person => person?.scenario?.id ?? person?.scenario;
+
+    // Bound requests so a stalled connection can be retried without overlapping polls.
+    async function request(path) {
+      const controller = new AbortController(); activeRequest = controller;
+      const timer = setTimeout(() => controller.abort(), 10000);
+      try {
+        return await KEV.api(path, {signal:controller.signal});
+      } finally { clearTimeout(timer); if (activeRequest === controller) activeRequest = null; }
+    }
+
+    function assignment(person, scenarios) {
+      const scenario = scenarios.find(item => item.id === scenarioId(person));
+      const allMembers = [person?.name, ...(person?.teammates || (person?.teammate ? [person.teammate] : []))].filter(Boolean);
+      const facts = [['Team members',allMembers.length > 1 ? allMembers.slice(0,-1).join(', ') + ' and ' + allMembers.at(-1) : allMembers.join('')],['Company',person?.partner]].filter(([,value])=>value);
+      setText('name', person?.name || '');
+      setText('assignment-heading', person?.pair ? 'Team ' + person.pair : 'Your assignment is pending');
+      setText('today-team', person?.pair ? 'Team ' + person.pair : '');
+      $('today-team').hidden = !person?.pair;
+      setText('assignment-note', scenario?.title || person?.scenario?.title || 'Ask the event desk about your assignment.');
+      setHTML('facts', [['Station',person?.station],['Round',person?.round]].filter(([,value])=>value)
+        .map(([label,value])=>'<div><dt>'+label+'</dt><dd>'+esc(value)+'</dd></div>').join(''));
+      setHTML('team-members',facts.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join(''));
+      setText('scenario-title', scenario?.title || person?.scenario?.title || 'Your customer brief');
+      setText('scenario-summary', scenario?.summary || 'Your scenario pack contains the customer you will meet.');
+    }
+
+    function documents(resources) {
+      const ownId = scenarioId(participantState);
+      const pdfs = resources.filter(resource => resource.id === 'participant-guide' || (/^participant-pack-s[1-4]$/.test(resource.id) && resource.scenario === ownId));
+      setHTML('documents',pdfs.map(resource=>'<li><button type="button" class="event-download" data-resource="'+esc(resource.id)+'"><strong>'+
+        esc(resource.scenario ? 'Open scenario pack' : 'Open Participant Guide')+'</strong><span>'+esc(resource.scenario ?
+          'Customer card, cheat sheet and worksheet' : 'Pitch steps, sample questions and objections')+
+        '</span><small>PDF · '+esc(resource.version)+'</small></button></li>').join(''));
+      setText('materials-note', !pdfs.length ? 'Ask the event desk for your printed guide and customer scenario pack.' :
+        !pdfs.some(resource=>resource.scenario) ? 'Ask the event desk for your customer brief. You can start with the Participant Guide.' : '');
+      $('materials-note').hidden = !$('materials-note').textContent;
+    }
+
+    function reading(items) {
+      return items.map(item=>{let url;try{url=new URL(item.url);}catch(error){return '';}
+        if(url.origin !== 'https://example.com') return '';
+        return '<li><h3><a href="'+esc(url.href)+'" target="_blank" rel="noopener noreferrer">'+esc(item.title)+'</a></h3><p>'+esc(item.text)+'</p></li>';
+      }).join('');
+    }
+
+    function renderGuide(data) {
+      participantState = data.participant; guideState = data.guide;
+      assignmentKey = JSON.stringify(participantState);
+      guideVersion = guideState.content_version ?? null;
+      setText('event-meta',[guideState.date,guideState.venue].filter(Boolean).join(' · '));
+      assignment(participantState,guideState.scenarios || []); documents(data.resources || []);
+      // Arrival needs no advance preparation. The old pre-event checklist stays in the PDF, not this day guide.
+      setHTML('checklist',(guideState.essentials || []).filter(item=>item.title !== 'Before the event').map(detail).join(''));
+      setHTML('scoring',(guideState.scoring || []).map(detail).join(''));
+      setHTML('reading',reading(guideState.reading || []));
+    }
+
+    function renderTimeline(program) {
+      const items = program?.items || guideState?.schedule || [];
+      const index = Number.isInteger(program?.index) ? program.index : -1;
+      const key = JSON.stringify([items, index]);
+      if (key === timelineKey) return;
+      timelineKey = key;
+      const row = (item, i, full) => {
+        const state = i === index ? 'Now' : index >= 0 && i === index + 1 ? 'Up next' : index >= 0 && i < index ? 'Done' : '';
+        const summary = '<time>' + esc(item.time || '—') + '</time><strong>' + esc(item.title) + '</strong>' +
+          (state ? '<span>' + state + '</span>' : '');
+        const detail = (item.detail ? '<p>' + esc(item.detail) + '</p>' : '') +
+          (Number.isFinite(item.min) && item.min > 0 ? '<p>' + item.min + ' min planned</p>' : '');
+        return '<li data-agenda-index="' + i + '"' + (i === index ? ' aria-current="step"' : '') + '>' +
+          (full && detail ? '<details><summary>' + summary + '</summary><div class="timeline-detail">' + detail + '</div></details>' :
+            '<div class="timeline-summary">' + summary + '</div>') + '</li>';
+      };
+      const expanded = new Set([...$('agenda').querySelectorAll('details[open]')].map(el=>el.closest('li').dataset.agendaIndex));
+      setHTML('agenda-current', items.slice(Math.max(index,0), Math.max(index,0)+2)
+        .map((item,i)=>row(item, Math.max(index,0)+i, false)).join(''));
+      setHTML('agenda', items.map((item,i)=>row(item,i,true)).join(''));
+      for (const el of $('agenda').querySelectorAll('details')) el.open = expanded.has(el.closest('li').dataset.agendaIndex);
+    }
+
+    function setFinal(final) {
+      const selected = final?.qualified === true, phase = KEV.finalStatus(final), teams = final?.pairs || [];
+      const index = teams.findIndex(team => (typeof team === 'object' ? team.pair : team) === participantState?.pair);
+      const code = liveState?.action?.code;
+      const pitched = ['review','completed'].includes(phase) || ['final_submitted','final_feedback'].includes(code);
+      let html = '';
+      if (selected) {
+        let message;
+        if (phase === 'completed') message = 'You pitched your original customer scenario in the eight-minute Final. ' + (liveState?.result?.status === 'released' ? 'Your published result is shown below.' : 'Follow the event desk for the result announcement.');
+        else if (phase === 'review') message = 'You pitched your original customer scenario in the eight-minute Final. The panel is confirming results. Stay nearby for the announcement.';
+        else if (code === 'final_submitted') message = 'Your eight-minute Final pitch is finished. Take a seat and wait for the remaining teams and results.';
+        else if (code === 'final_feedback') message = 'Your eight-minute Final pitch has ended. Listen to the panel’s feedback and wait for the event desk before leaving the stage.';
+        else message = 'Use the same scenario you pitched earlier. Your original scenario pack and customer brief are in More → Guides &amp; references.</p><p><strong>Your 8-minute pitch:</strong> cover Discover, Solution at Work, Solve and Close within one shared eight-minute clock. Every team member must speak. Go to the main stage when the host calls you and stay for panel feedback.';
+        html = '<h2>'+(pitched ? 'Thank you for pitching in the Final' : 'You are in the Final')+'</h2>'+
+          (index >= 0 ? '<p>Team '+esc(participantState.pair)+' · stage order '+(index+1)+' of '+teams.length+'</p>' : '')+'<p>'+message+'</p>';
+        setText('assignment-note',(pitched ? 'Final pitch complete' : 'Final') + ' · main stage' + (index >= 0 ? ' · stage order '+(index+1)+' of '+teams.length : ''));
+      } else if (final?.qualified === false) {
+        html = '<h2>Follow the Final</h2><p>' + (phase === 'completed' ? 'Thank you for supporting the teams. Follow the host for the awards and closing.' : 'You are part of the audience for the stage Final. Support the selected teams as they pitch their original customer scenarios.') + '</p>';
+        setText('assignment-note','Preliminary assignment · Station '+participantState?.station+' · Round '+participantState?.round+'. Follow the Final as part of the audience.');
+      } else setText('assignment-note', $('scenario-title').textContent || 'Ask the event desk where to sit and when to pitch.');
+      for (const label of $('facts').querySelectorAll('dt')) {
+        const original = label.textContent.replace('Preliminary ','');
+        if (['Station','Round','station','round'].includes(original)) {
+          const value = final?.qualified != null ? 'Preliminary '+original.toLowerCase() : original[0].toUpperCase()+original.slice(1);
+          if (label.textContent !== value) label.textContent = value;
+        }
+      }
+      $('participant-final').hidden = !html; setHTML('participant-final',html);
+      setText('steps-title',selected ? 'Your four stages · 8 minutes in total' : 'Your four pitch steps · 10 minutes');
+      setText('steps-note',selected ? 'Use all four parts within one shared eight-minute pitch. Adjust the time you give each part, and make space for everyone.' : 'Prepare these four parts together. The timings are a guide; every team member should have a speaking part.');
+      setHTML('steps',(guideState?.steps || []).map((step,i)=>'<li><div class="event-list-head"><h3>'+(i+1)+'. '+esc(step.title)+'</h3>'+(selected?'':'<span class="pill">'+esc(step.duration)+' min</span>')+'</div><p>'+esc(step.text)+'</p></li>').join(''));
+    }
+
+    function nextStep(state) {
+      const action = state?.action || {};
+      const text = {
+        pitch: 'Stay at your station for your judge’s feedback.',
+        feedback: 'Wait for your judge’s direction, then return to your table.',
+        ready: 'Wait for your judge’s start signal.',
+        paused: 'Wait for your judge to resume the session.',
+        upcoming: 'Go to your assigned station when your team is called.',
+        finished: 'Wait for released results and the Final announcement.',
+        submitted: 'Wait for released results and the Final announcement.',
+        check_desk: 'Follow the event desk’s direction.',
+        final_pitch: 'Stay on stage for the panel’s feedback.',
+        final_paused: 'Wait for the event desk to resume your pitch.',
+        final_feedback: 'Wait for the event desk before leaving the stage.',
+        final_ready: 'Wait for the host’s call and the start signal.',
+        final_upcoming: 'Go to the stage when the host calls your team.',
+        final_submitted: 'Stay for the remaining pitches and results.',
+        final_watch: 'Stay for the results and awards.',
+        final_review: 'Wait for the published results and awards.',
+        final_complete: 'Follow the host for the awards and closing.'
+      }[action.code];
+      return text ? {label:'Next',text} : {label:'Next in the programme',text:state?.program?.next_title || ''};
+    }
+
+    function renderLive(state) {
+      liveState = state;
+      window.ParticipantPrep?.receive(state);
+      renderTimeline(state.program);
+      const action = state.action || {}, result = state.result || {}, announcement = state.announcement;
+      setText('now-title',action.title || 'Follow the host');
+      setText('now-instruction',action.instruction || 'Ask the event desk for your next step.');
+      setText('now-detail',state.workspace && action.code === 'program' ? '' : action.detail || '');
+      $('now-detail').hidden = !$('now-detail').textContent;
+      const next = nextStep(state);
+      setText('next-title',next.text); setText('next-label',next.label); $('next-box').hidden = !next.text;
+      setText('result-title',result.kind === 'final' ? 'Your team’s Final result' : 'Your team’s preliminary result');
+      setText('result-label',(result.label || 'Awaiting your team result.') + (result.status !== 'released' ? ' Your score appears here after the event desk releases it.' : result.kind !== 'final' ? ' This placing can change as more teams are scored.' : ''));
+      const released = result.status === 'released' && Number.isFinite(result.total);
+      $('result-card').dataset.released = String(released);
+      const scoreText = state.workspace && result.kind === 'final' ? result.total + ' / 5' : result.total + ' points';
+      setText('result-score',released ? scoreText + (Number.isFinite(result.rank) ? (result.kind === 'final' ? ' · Place ' : ' · Current place ') + result.rank : '') : '');
+      $('result-score').hidden = !released;
+      $('announcement').hidden = !announcement?.text;
+      setText('announcement-text',announcement?.text || '');
+      setText('announcement-time',announcement?.text ? timeText(announcement.updated_at) || 'Latest message' : '');
+      if (announcement?.updated_at) $('announcement-time').dateTime = new Date(announcement.updated_at * 1000).toISOString();
+      else $('announcement-time').removeAttribute('datetime');
+      setFinal(state.final);
+      // Clock is a server snapshot, never a speculative local countdown.
+      const clock = action.clock;
+      let clockText = '';
+      if (clock && clock.started_any && !clock.ended && clock.phase !== 'over') {
+        const seconds = clock.phase === 'pitch' ? (clock.kind === 'final' ? clock.round_left : Math.max(0,600-clock.elapsed)) : clock.step_left;
+        if(Number.isFinite(seconds)) clockText = ({pitch:'Pitch',feedback:'Feedback',change:'Changeover'})[clock.phase] + ' · ' + KEV.mmss(seconds) + ' left at last update' + (!clock.running ? ' · paused' : '');
+      }
+      setText('now-clock',clockText); $('now-clock').hidden = !clockText;
+      if (state.workspace) {
+        $('now-clock').hidden = true;
+        window.ParticipantWorkspace?.receive(state);
+      }
+      const prepAvailable = !$('pitch-prep-card').hidden;
+      const changes = JSON.stringify([prepAvailable,action.code,action.title,action.instruction,action.detail,next.text,result.status,released?result.total:null,released?result.rank:null,announcement?.text,announcement?.updated_at,state.final?.qualified,state.final?.status]);
+      if (changes !== changeKey) {
+        changeKey = changes;
+        setText('live-changes',[action.title,action.instruction,prepAvailable ? 'The Pitch Prep video is available in Today.' : '',result.label,released?$('result-score').textContent:'',announcement?.text ? 'From the event desk: '+announcement.text : ''].filter(Boolean).join('. '));
+      }
+    }
+
+    function connection(fresh) {
+      $('connection-bar').dataset.stale = String(!fresh);
+      setText('connection',fresh ? 'Connected' : 'Updates interrupted');
+      setText('last-updated',lastSuccess ? 'Last updated ' + timeText(lastSuccess) : 'Waiting for your first update');
+      $('retry-updates').hidden = fresh;
+      setText('now-label',fresh ? 'Now' : 'Last known instruction');
+      setText('next-label',fresh ? nextStep(liveState).label : 'Last known next');
+      if (!fresh) {
+        $('now-clock').hidden = true;
+        window.AudienceQuestions?.pause();
+      }
+      window.ParticipantWorkspace?.connection(fresh);
+    }
+
+    function clearPrivate() {
+      timelineKey = '';
+      KEV.messages?.clear();
+      window.EventQuiz?.clear();
+      window.AudienceQuestions?.clear();
+      window.ParticipantPrep?.clear();
+      for (const id of ['agenda-current', 'team-members']) $(id).replaceChildren();
+      $('today-team').hidden = true;
+      setText('today-team','');
+      window.ParticipantWorkspace?.clear();
+      participantState = guideState = liveState = guideVersion = null; assignmentKey = changeKey = ''; lastSuccess = lastReceived = 0;
+      $('guide').hidden = $('participant-help').hidden = true; KEV.closeHelp(); KEV.nav.render();
+      for (const id of ['name','assignment-heading','assignment-note','facts','scenario-title','scenario-summary','documents','participant-final','now-title','now-instruction','now-detail','now-clock','next-title','result-label','result-score','announcement-text','announcement-time','live-changes','steps','checklist','scoring','reading','agenda','last-updated']) setText(id,'');
+      setText('event-meta','KevenOS Competition');
+    }
+
+    function showAccess(status) {
+      clearPrivate(); blocked = true;
+      $('status-box').hidden = false;
+      setText('status-heading','Participant sign-in required');
+      setText('status',status === 403 ? 'This sign-in is not a participant sign-in. Switch to your individual participant password from the organiser.' : 'Your sign-in has ended. Use your individual participant password to open your team and materials again.');
+      $('signin').hidden = status === 403; $('switch-access').hidden = $('guest').hidden = status !== 403;
+      $('signout').hidden = status !== 403; $('retry').hidden = true;
+    }
+
+    async function refresh() {
+      if (document.hidden || inFlight || signedOut || blocked) return;
+      inFlight = true;
+      const profileRevision = KEV.profile.revision, eventContext = KEV.context;
+      const currentRequest = () => !signedOut && !blocked && !KEV.workspaceChanging && profileRevision === KEV.profile.revision && (!eventContext || eventContext === KEV.context);
+      try {
+        const state = await request('/api/participant/state');
+        if (!currentRequest()) return;
+        if (!state.participant || !state.action) throw new Error('Participant state unavailable');
+        const assignmentChanged = JSON.stringify(state.participant) !== assignmentKey;
+        const contentChanged = state.content_version != null && state.content_version !== guideVersion;
+        if (assignmentChanged || contentChanged) {
+          if (assignmentChanged) {
+            KEV.messages?.clear();
+            window.ParticipantWorkspace?.clear();
+            window.EventQuiz?.clear();
+            window.AudienceQuestions?.clear();
+            window.ParticipantPrep?.clear();
+            // Remove old assignment and protected links before fetching a changed assignment.
+            $('guide').hidden = true; $('participant-help').hidden = true; KEV.closeHelp(); KEV.nav.render();
+            setHTML('documents',''); setHTML('facts',''); setHTML('team-members','');
+          }
+          const data = await request('/api/event');
+          if (!currentRequest()) return;
+          if (data.role !== 'participant') { showAccess(403); return; }
+          if (!data.guide || JSON.stringify(data.participant) !== JSON.stringify(state.participant)) throw new Error('Assignment is updating');
+          if (state.content_version != null && data.guide.content_version !== state.content_version) throw new Error('The programme is updating');
+          renderGuide(data);
+        }
+        renderLive(state);
+        KEV.messages?.receive(state);
+        window.EventQuiz?.participant(state);
+        window.AudienceQuestions?.participant($('audience-questions-player'), KEV.api);
+        lastSuccess = Number.isFinite(state.now) ? state.now : Date.now()/1000; lastReceived = Date.now();
+        connection(true);
+        KEV.operations?.mount($('participant-operations-help'),true);
+        const helpWasHidden = $('participant-help').hidden;
+        $('guide').hidden = $('participant-help').hidden = $('signout').hidden = false;
+        if (helpWasHidden) KEV.nav.render();
+        $('status-box').hidden = true;
+        if(KEV.staff.hosted)$('signout').hidden=true;
+      } catch (error) {
+        if (!currentRequest()) return;
+        if (error.status === 401 || error.status === 403) { showAccess(error.status); return; }
+        connection(false);
+        if ($('guide').hidden) {
+          $('status-box').hidden = false;
+          setText('status-heading','Updates unavailable');
+          setText('status',lastSuccess ? 'Your assignment may be changing. Try again or ask the event desk for help.' : 'Your day could not be loaded. Try again or ask the event desk for your team and printed materials.');
+          $('retry').hidden = false;
+        }
+      } finally { inFlight = false; }
+    }
+
+    async function signout() {
+      if(KEV.staff.hosted)return KEV.profile.signOut({switching:true});
+      signedOut=true;clearPrivate();await KEV.api('/api/access/logout',{body:{}});location.replace('/?access=participant');
+    }
+    if(KEV.staff.hosted)KEV.profile.mount({onEnd:message=>{
+      blocked=true;signedOut=true;if(activeRequest)activeRequest.abort();clearPrivate();
+      $('status-box').hidden=false;setText('status-heading','Sign in to continue');setText('status',message);
+      $('signin').hidden=false;$('switch-access').hidden=$('signout').hidden=$('retry').hidden=true;
+    }});
+
+    $('retry').onclick = $('retry-updates').onclick = refresh;
+    KEV.bindHelp($('participant-help')); $('signout').onclick = $('switch-access').onclick = signout;
+    setInterval(refresh,5000);
+    setInterval(()=>{if(lastReceived && Date.now()-lastReceived > 15000) connection(false);},1000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(lastReceived && Date.now()-lastReceived > 15000) connection(false);refresh();}});
+    refresh();
+  </script>
+</body>
+</html>

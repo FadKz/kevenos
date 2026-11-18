@@ -1,0 +1,16 @@
+data
+config.json
+tests
+README*.md
+run.sh
+compose.yaml
+compose.hosted.yaml
+gateway-relay
+*.zip
+preview-*.png
+__pycache__
+.pytest_cache
+live-display/node_modules
+
+.git
+node_modules

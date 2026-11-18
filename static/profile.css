@@ -1,0 +1,141 @@
+.kevenos-nav {
+  --nav-surface: var(--card, #fff);
+  --nav-ink: var(--ink, #10253f);
+  --nav-muted: var(--muted, #52657b);
+  --nav-line: var(--line, #dbe5ef);
+  --nav-accent: var(--blue, #225bc0);
+  --nav-accent-soft: var(--blue2, #e8f0fc);
+  --nav-warn: var(--warn);
+  --nav-warn-bg: var(--warn2);
+  --nav-bad: var(--bad);
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  flex: none;
+  border-bottom: 1px solid var(--nav-line);
+  background: var(--nav-surface);
+  color: var(--nav-ink);
+  font: 14px/1.4 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.kevenos-nav[hidden], .kevenos-nav [hidden] { display: none !important; }
+.kevenos-nav[data-screen="live"] { --nav-surface: #122d4c; --nav-accent: #9acbff; --nav-accent-soft: #1d4166; --nav-muted: #bacce0; --nav-bad: #ff9aa8; }
+.kevenos-nav-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 5px clamp(12px, 3vw, 40px); }
+.kevenos-nav-brand { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.kevenos-nav .kevenos-nav-brand > a { padding-inline: 0 5px; }
+.kevenos-nav-brand strong { font-size: 15px; }
+.kevenos-nav-mark, .kevenos-nav-avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding-inline: 3px;
+  border-radius: 9px;
+  background: var(--nav-accent-soft);
+  color: var(--nav-accent);
+  font-weight: 750;
+}
+.kevenos-nav-avatar { border-radius: 50%; }
+.kevenos-nav-rehearsal {
+  display: inline-block;
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nav-warn-bg);
+  color: var(--nav-warn);
+  font-size: 11px;
+  font-weight: 750;
+}
+.kevenos-nav-current { margin-inline-start: auto; min-width: 0; }
+.kevenos-nav-label { color: var(--nav-muted); font-weight: 650; }
+.kevenos-nav-account:empty { display: none; }
+.kevenos-nav-current:empty + .kevenos-nav-account { margin-inline-start: auto; }
+.kevenos-nav-disclosure { position: relative; min-width: 0; }
+.kevenos-nav :is(button,a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 650;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.kevenos-nav :is(button,a):hover { background: var(--nav-accent-soft); }
+.kevenos-nav :is(button,a):focus-visible { outline: 2px solid var(--nav-accent); outline-offset: 1px; }
+.kevenos-nav button:disabled { opacity: .65; cursor: wait; }
+.kevenos-nav .kevenos-nav-signin { color: var(--nav-accent); border-color: var(--nav-line); }
+.kevenos-nav-chevron { width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
+.kevenos-nav-toggle[aria-expanded="true"] .kevenos-nav-chevron { transform: translateY(2px) rotate(225deg); }
+.kevenos-nav-panel {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 0;
+  display: grid;
+  width: max-content;
+  min-width: 164px;
+  max-width: min(230px, calc(100vw - 28px));
+  max-height: 65dvh;
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--nav-line);
+  border-radius: 10px;
+  background: var(--nav-surface);
+  box-shadow: 0 8px 22px #071b3530;
+}
+.kevenos-nav-panel :is(button,a) { justify-content: start; text-align: start; }
+.kevenos-nav-panel [aria-current="page"] { background: var(--nav-accent-soft); color: var(--nav-accent); }
+.kevenos-profile { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.kevenos-profile-name { display: grid; text-align: start; min-width: 0; max-width: min(145px, 25vw); }
+.kevenos-profile-name > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kevenos-profile-name span { color: var(--nav-muted); font-size: 11px; font-weight: 500; }
+.kevenos-profile-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font-size: 12px; }
+.kevenos-profile-status [role="status"] { max-width: 24ch; }
+.kevenos-profile[data-mode="preview"] [role="status"] { padding: 3px 6px; border-radius: 6px; background: var(--nav-warn-bg); color: var(--nav-warn); }
+.kevenos-profile[data-mode="support"] [role="status"] { padding: 3px 6px; border-radius: 6px; background: var(--nav-accent-soft); color: var(--nav-accent); }
+.kevenos-profile-status button { color: var(--nav-accent); }
+.kevenos-profile-error { flex-basis: 100%; margin: 0; color: var(--nav-bad); font-size: 13px; }
+.kevenos-profile-error:empty { display: none; }
+.kevenos-nav[data-display="compact"] { position: static; border: 0; background: transparent; }
+.kevenos-nav[data-display="compact"] .kevenos-nav-inner { justify-content: flex-end; padding-block: 3px; }
+.kevenos-nav-shared-help [data-nav-help], [data-nav-signout] { display: none !important; }
+
+@media (max-width: 620px) {
+  .kevenos-nav-inner { column-gap: 7px; }
+  .kevenos-nav-brand { flex: 1; }
+  .kevenos-nav-current { margin-inline-start: 0; }
+  .kevenos-nav-current .kevenos-nav-disclosure { position: static; }
+  .kevenos-nav-current .kevenos-nav-panel { inset-inline-end: 12px; }
+  .kevenos-nav-account { min-width: 0; }
+  .kevenos-nav .kevenos-nav-toggle { padding-inline: 5px; }
+  .kevenos-nav:has(.kevenos-profile-status) .kevenos-nav-account { width: 100%; }
+  .kevenos-nav:has(.kevenos-profile-status) .kevenos-profile .kevenos-nav-panel { inset-inline: 0 auto; }
+}
+@media (max-width: 520px) {
+  .kevenos-nav:has(.kevenos-profile) .kevenos-nav-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .kevenos-nav:has(.kevenos-profile) .kevenos-nav-rehearsal { justify-self: end; }
+  .kevenos-nav:has(.kevenos-profile) .kevenos-nav-current { grid-column: 1; grid-row: 2; }
+  .kevenos-nav:has(.kevenos-profile) .kevenos-nav-account { grid-column: 2; grid-row: 2; }
+  .kevenos-nav:has(.kevenos-profile) .kevenos-nav-current .kevenos-nav-panel { inset-inline: 12px auto; }
+  .kevenos-nav:has(.kevenos-profile-status) .kevenos-nav-account { display: contents; }
+  .kevenos-profile:has(.kevenos-profile-status) { display: contents; }
+  .kevenos-profile:has(.kevenos-profile-status) .kevenos-nav-disclosure { grid-column: 2; grid-row: 2; }
+  .kevenos-nav:has(.kevenos-profile-status) .kevenos-profile .kevenos-nav-panel { inset-inline: auto 0; }
+  .kevenos-profile-status, .kevenos-profile-error { grid-column: 1 / -1; }
+}
+@media print { .kevenos-nav { display: none !important; } }
+
+@supports (padding: max(0px)) {
+  .kevenos-nav-inner { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+}

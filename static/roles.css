@@ -1,0 +1,30 @@
+.kevenos-nav-current { display: flex; align-items: center; gap: 4px; }
+.kevenos-nav-current > [data-kevenos-help] { color: var(--nav-accent); }
+.kevenos-nav-roles { margin: 4px 9px; color: var(--nav-muted); font-size: .9em; }
+.kevenos-home-dashboards > a {
+  padding: 20px;
+  border: 1px solid #37566e;
+  border-radius: 18px;
+  background: #132e45;
+  color: #edf6ff;
+  text-decoration: none;
+}
+.kevenos-home-dashboards > a:hover { border-color: #83cdbc; }
+.kevenos-home-dashboards > a:focus-visible { outline: 3px solid #a4eaff; outline-offset: 2px; }
+.kevenos-home-dashboards > a span { color: #b4cadd; }
+#home-announcement { white-space: pre-wrap; overflow-wrap: anywhere; }
+.kevenos-account-roles { display: grid; gap: 10px; margin: 0 0 16px; border: 0; padding: 0; }
+.kevenos-account-roles legend { margin-bottom: 8px; font-weight: 700; }
+.kevenos-account-role { display: grid; gap: 7px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.kevenos-account-role > label:first-child { display: flex; align-items: baseline; gap: 9px; }
+.kevenos-account-role input[type="checkbox"] { flex: none; width: auto; }
+.kevenos-account-role select, .kevenos-account-link select { width: 100%; max-width: 460px; }
+.kevenos-account-role .field, .kevenos-account-link .field { margin: 0; }
+.kevenos-account-link form { margin-top: 12px; }
+.kevenos-account-editor > form { max-width: 640px; }
+.kevenos-account-editor textarea { max-width: 100%; }
+.kevenos-account-roles [hidden] { display: none !important; }
+@media (max-width: 520px) {
+  .kevenos-nav-current { flex-wrap: wrap; }
+  .kevenos-nav-current > [data-kevenos-help] { min-height: 38px; padding-inline: 4px; }
+}

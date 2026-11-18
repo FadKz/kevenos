@@ -1,0 +1,199 @@
+{
+  "title": "Synthetic example.",
+  "subtitle": "Synthetic example.",
+  "date": "Synthetic example.",
+  "venue": "Synthetic example.",
+  "intro": "Synthetic example.",
+  "schedule": [
+    {
+      "time": "T+0",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+15",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+30",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+45",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+60",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+75",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+90",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+105",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+120",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+135",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    },
+    {
+      "time": "T+150",
+      "title": "Synthetic example.",
+      "detail": "Synthetic example."
+    }
+  ],
+  "essentials": [
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    }
+  ],
+  "steps": [
+    {
+      "title": "Synthetic example.",
+      "duration": 2,
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "duration": 3,
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "duration": 3,
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "duration": 2,
+      "text": "Synthetic example."
+    }
+  ],
+  "scoring": [
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "text": "Synthetic example."
+    }
+  ],
+  "reading": [
+    {
+      "title": "Synthetic example.",
+      "url": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "url": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "url": "Synthetic example.",
+      "text": "Synthetic example."
+    },
+    {
+      "title": "Synthetic example.",
+      "url": "Synthetic example.",
+      "text": "Synthetic example."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "title": "Synthetic example.",
+      "stations": [
+        1,
+        2
+      ],
+      "pairs": [],
+      "summary": "Synthetic example."
+    },
+    {
+      "id": "S2",
+      "title": "Synthetic example.",
+      "stations": [
+        3,
+        4
+      ],
+      "pairs": [],
+      "summary": "Synthetic example."
+    },
+    {
+      "id": "S3",
+      "title": "Synthetic example.",
+      "stations": [
+        5,
+        6
+      ],
+      "pairs": [],
+      "summary": "Synthetic example."
+    },
+    {
+      "id": "S4",
+      "title": "Synthetic example.",
+      "stations": [
+        7,
+        8
+      ],
+      "pairs": [],
+      "summary": "Synthetic example."
+    }
+  ],
+  "resources": []
+}

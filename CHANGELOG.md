@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.1.1 — 2026-11-18
+
+- Fix managed Vercel cold starts by avoiding global workspace and demo-access
+  locks when the shared rehearsal state is already current, preventing the
+  public site from stalling on an `initializing` response. (#23)
+
 ## 1.1.0 — 2026-11-18
 
 - Add selectable SQLite, PostgreSQL and Supabase storage backends while keeping

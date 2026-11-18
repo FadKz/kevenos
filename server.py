@@ -33,7 +33,7 @@ import sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-APP_VERSION = "1.1.0"        # bump with every change to the app; list it in CHANGELOG.md
+APP_VERSION = "1.1.1"        # bump with every change to the app; list it in CHANGELOG.md
 SCHEMA_VERSION = 14          # bump when the database layout changes (open_db migrates)
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -1650,7 +1650,7 @@ class Handler(BaseHTTPRequestHandler):
     def startup_response(self):
         if not STARTING:
             return False
-        if urlparse(self.path).path == '/healthz' and READY.wait(timeout=120):
+        if READY.wait(timeout=120):
             return False
         data = b'{"ok":false,"status":"initializing"}'
         self.send_response(503)
@@ -2199,6 +2199,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(500, {"error": "Internal server error."})
 
 
+def select_startup_workspace(workspace, rehearsal):
+    if rehearsal and workspace.mode != 'rehearsal':
+        workspace.switch('rehearsal', 'REHEARSAL')
+
+
 def main():
     global CONTENT, CFG, DB, WORKSPACE, STARTING
     STARTING = True
@@ -2241,8 +2246,7 @@ def main():
     CONTENT = load_content()
     WORKSPACE = event_workspace.initialize(sys.modules[__name__], a.db, DATA)
     startup_trace('workspace')
-    if a.rehearsal:
-        WORKSPACE.switch("rehearsal", "REHEARSAL")
+    select_startup_workspace(WORKSPACE, a.rehearsal)
     startup_trace('workspace-selection')
     event_access.seed_guest(sys.modules[__name__])
     event_access.seed_demo_roles(sys.modules[__name__])

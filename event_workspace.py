@@ -213,6 +213,13 @@ class Controller:
     def switch(self, mode, confirm):
         if mode not in ('live','rehearsal') or confirm != mode.upper():
             raise ValueError('Confirm LIVE or REHEARSAL to select the event workspace.')
+        with self.s.LOCK:
+            saved = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
+            control = json.loads(saved['v']) if saved else None
+        if (control and self.mode == mode and control.get('mode') == mode
+                and control.get('context') == self._selection_context):
+            self._refresh_context()
+            return self.status()
         with self.write(), self.s.LOCK, database.named_lock(self.live, 'workspace-switch'):
             saved = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
             control = json.loads(saved['v']) if saved else None

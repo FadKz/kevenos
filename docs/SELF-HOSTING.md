@@ -17,7 +17,7 @@ manager or environment, without committing them:
 - `KEVENOS_DATABASE_URL`: PostgreSQL URL for user `kevenos`, database `kevenos`
   and host `db`; its password must match the database password file. URL-encode
   special characters in the password.
-- `KEVENOS_POSTGRES_PASSWORD_FILE`: absolute path to a file containing the
+- `KEVENOS_DB_SECRET_PATH`: absolute path to a file containing the
   database password. PostgreSQL initializes it only on a new data volume;
   changing this file alone does not rotate an existing database password.
 - `KEVENOS_SECRETS_PATH`: absolute directory containing readable secret files

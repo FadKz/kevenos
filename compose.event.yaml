@@ -52,4 +52,4 @@ volumes:
   caddy_config:
 secrets:
   postgres_password:
-    file: ${KEVENOS_POSTGRES_PASSWORD_FILE:?Set KEVENOS_POSTGRES_PASSWORD_FILE}
+    file: ${KEVENOS_DB_SECRET_PATH:?Set KEVENOS_DB_SECRET_PATH}

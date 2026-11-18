@@ -29,6 +29,9 @@ host and Docker access accordingly. Caddy and PostgreSQL data use persistent
 named volumes; the app's `/data` volume must also be preserved. Start with
 `docker compose -f compose.event.yaml up -d --build` and inspect service health
 and logs before opening the event. Optional integrations are off by default.
+Use `/healthz` for process liveness and `/api/health` for database-aware
+readiness. The latter returns HTTP 503 when the active database or event recovery
+guard is unavailable.
 
 ## Recovery and qualification
 

@@ -1689,6 +1689,25 @@ class Handler(BaseHTTPRequestHandler):
                 return
         if self.startup_response():
             return
+        if path == '/api/health':
+            ready = False
+            try:
+                if DB is not None and not (WORKSPACE and WORKSPACE.guard.blocked):
+                    DB.execute('SELECT 1').fetchone()
+                    if WORKSPACE and WORKSPACE.live is not DB:
+                        WORKSPACE.live.execute('SELECT 1').fetchone()
+                    ready = True
+            except Exception:
+                ready = False
+            data = json.dumps({'ok': ready}).encode()
+            self.send_response(200 if ready else 503)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            if self.command != 'HEAD':
+                self.wfile.write(data)
+            return
         if path == '/healthz':
             data = b'{"ok": true}'
             self.send_response(200)

@@ -12,6 +12,6 @@ RUN addgroup --system app && adduser --system --ingroup app app \
 ENV KEVENOS_DATA=/data KEVENOS_PORT=8080 PYTHONUNBUFFERED=1
 VOLUME /data
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=2)" || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/api/health',timeout=2)" || exit 1
 USER app
 ENTRYPOINT ["python", "database_guard.py"]

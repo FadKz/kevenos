@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import uuid
 
 import audience_questions
+import database
 import event_access
 import event_config
 import event_quiz
@@ -82,13 +83,16 @@ def _write(path, data):
         temp.unlink(missing_ok=True)
 
 
-def _content(s, folder):
+def _content(s, folder, db=None):
+    if db is not None and database.is_server(db):
+        row = db.execute("SELECT v FROM kv WHERE k='content_current'").fetchone()
+        return json.loads(row[0]) if row else s.bundled_content()
     file = folder / 'content.json'
     return json.loads(file.read_text()) if file.exists() else s.bundled_content()
 
 
 def _snapshot(db):
-    tables = sorted(r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'"))
+    tables = sorted(database.list_tables(db))
     result = {}
     for table in tables:
         if table in TRANSIENT:
@@ -128,14 +132,15 @@ def _plan(s, guest_policy):
         raise Conflict('Select Rehearsal before preparing Live.')
     blockers = []
     for name, db in [('Live', c.live), ('Rehearsal', c.rehearsal)]:
-        tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if _get(db, 'schema_version') != 14 or tables != TABLES:
+        tables = database.list_tables(db)
+        expected = TABLES - ({'sqlite_sequence'} if database.is_server(db) else set())
+        if _get(db, 'schema_version') != 14 or tables != expected:
             blockers.append(name + ' has an unreviewed database schema. Use the matching transition release.')
         if db.execute("SELECT count(*) FROM notifications WHERE status='sending'").fetchone()[0]:
             blockers.append(name + ' has a notification still sending. Wait for its receipt.')
         if db.execute("SELECT count(*) FROM assistant_jobs WHERE status NOT IN ('completed','failed','unknown','cancelled','expired')").fetchone()[0]:
             blockers.append(name + ' has active Assistant work. Complete or cancel it first.')
-    source = _content(s, c.root / 'rehearsal')
+    source = _content(s, c.root / 'rehearsal', c.rehearsal)
     blockers.extend(s.validate_content(source))
     clock_values = [json.loads(r[0]) for r in c.rehearsal.execute("SELECT v FROM kv WHERE k='clock' OR k LIKE 'sclock:%'")]
     clock_values.append((_get(c.rehearsal, 'final', {}) or {}).get('clock') or {})
@@ -168,7 +173,7 @@ def _plan(s, guest_policy):
     # Include raw content file bytes (and config files) as well as semantic data;
     # an inactive Live edit must invalidate even a seemingly unrelated plan.
     files = {}
-    for folder in (c.root, c.root/'rehearsal'):
+    for folder in (() if database.is_server(c.live) else (c.root, c.root/'rehearsal')):
         for name in ('content.json', 'config.json'):
             path = folder/name
             files[str(path.relative_to(c.root))] = _hash(path.read_bytes()) if path.exists() else None
@@ -202,16 +207,19 @@ def _backup(c):
     os.chmod(folder.parent, 0o700)
     manifest = {}
     for name, db in [('live', c.live), ('rehearsal', c.rehearsal)]:
-        target = folder/(name+'.db')
-        # Create private before SQLite opens it, avoiding an umask exposure window.
+        target = folder/(name+('.json' if database.is_server(db) else '.db'))
+        # Create private before the database writer opens it, avoiding an umask exposure window.
         target.touch(mode=0o600)
-        backup = sqlite3.connect(target)
-        try:
-            db.backup(backup)
-            if backup.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
-                raise Conflict('Backup verification failed. No Live changes were made.')
-        finally:
-            backup.close()
+        if database.is_server(db):
+            database.export_snapshot(db, target)
+        else:
+            backup = sqlite3.connect(target)
+            try:
+                db.backup(backup)
+                if backup.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
+                    raise Conflict('Backup verification failed. No Live changes were made.')
+            finally:
+                backup.close()
         with target.open('rb') as stream:
             os.fsync(stream.fileno())
         manifest[target.name] = _hash(target.read_bytes())
@@ -229,6 +237,8 @@ def _backup(c):
 
 def recover(c):
     """Finish/roll back content publication using the SQLite commit marker."""
+    if database.is_server(c.live):
+        return
     journal = c.root/JOURNAL
     if not journal.exists():
         return
@@ -296,7 +306,8 @@ def apply(s, plan_digest, confirm, operation_id, actor, guest_policy='revoke'):
         journal = {'version':1, 'transition_id':transition_id, 'backup':str(backup.relative_to(c.root)),
                    'next_digest':_hash(new_content),
                    'previous_digest':_hash((backup/'live-content.json').read_bytes()) if (backup/'live-content.json').exists() else None}
-        _write(c.root/JOURNAL, _json(journal).encode())
+        if not database.is_server(c.live):
+            _write(c.root/JOURNAL, _json(journal).encode())
         control = {'mode':'live', 'context':uuid.uuid4().hex}
         result = {'applied':True, 'replayed':False, 'transition_id':transition_id,
                   'operation_id':operation_id, 'actor':actor, 'plan_digest':plan_digest,
@@ -310,7 +321,7 @@ def apply(s, plan_digest, confirm, operation_id, actor, guest_policy='revoke'):
         credential_changes,credential_blockers=_staff_credential_changes(db,staff_accounts)
         if credential_blockers:raise Conflict(' '.join(credential_blockers))
         try:
-            db.execute('BEGIN IMMEDIATE')
+            database.begin_immediate(db)
             for table in ('roster','roster_members','team_assignments','sheets','participant_teams','judge_invites','registration_links','role_sessions','agent_confirmations'):
                 db.execute('DELETE FROM '+table)
             db.execute('UPDATE access_profiles SET revoked=1')
@@ -338,6 +349,9 @@ def apply(s, plan_digest, confirm, operation_id, actor, guest_policy='revoke'):
                       'mode':'desk', 'clock':s._fresh_clock(), 'public':'off', 'reveal':'hidden',
                       'program':{'i':0,'since':time.time(),'mode':'manual','scene':'auto','announce':''},
                       event_quiz.KEY:quiz, audience_questions.KEY:{'rev':0,'packs':packs}, RECEIPT:result}
+            if database.is_server(db):
+                values['content_current'] = content
+                values['content_history:%d' % int(content.get('content_version', 1))] = content
             for key, value in values.items():
                 _put(db, key, value)
             scenario_source = SimpleNamespace(CONTENT=content)
@@ -345,7 +359,8 @@ def apply(s, plan_digest, confirm, operation_id, actor, guest_policy='revoke'):
                            [(pair,(pair-1)%8+1,(pair-1)//8+1,event_config._default_scenario(scenario_source,pair,8)) for pair in range(1,21)])
             db.execute('INSERT INTO audit(ts,actor,action,detail) VALUES(?,?,?,?)',
                        (time.time(),actor,'live-transition',_json({'transition_id':transition_id,'plan_digest':plan_digest,'backup_reference':result['backup_reference']})))
-            _write(c.root/'content.json', new_content)
+            if not database.is_server(db):
+                _write(c.root/'content.json', new_content)
             _after_publish()
             db.commit()
             _after_commit()

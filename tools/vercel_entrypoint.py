@@ -43,6 +43,8 @@ def prepare(environment: MutableMapping[str, str], scratch: Path = Path("/tmp/ke
         KEVENOS_ASSISTANT_ENABLED="0",
         KEVENOS_SMTP_ENABLED="0",
         KEVENOS_PUSH_ENABLED="0",
+        KEVENOS_DEMO_ROLE_PASSWORDS="1",
+        KEVENOS_STABLE_DEMO_CONTEXT="1",
         KEVENOS_DATA=str(data_dir),
         KEVENOS_SECRETS_DIR=str(secret_dir),
         KEVENOS_PORT=environment.get("PORT", "8080"),
@@ -56,7 +58,8 @@ def prepare(environment: MutableMapping[str, str], scratch: Path = Path("/tmp/ke
 
 
 def main() -> None:
-    command = prepare(os.environ)
+    scratch = Path(os.environ.pop("KEVENOS_DEMO_SCRATCH", "/tmp/kevenos"))
+    command = prepare(os.environ, scratch)
     os.execv(command[0], command)
 
 

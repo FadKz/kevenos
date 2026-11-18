@@ -2,6 +2,7 @@
 import json
 import secrets
 import sqlite3
+import database
 from contextlib import closing
 import time
 
@@ -181,7 +182,7 @@ def validated(s,body):
 
 
 def revoke_sessions(db,aid):
-    if db.execute("SELECT 1 FROM sqlite_master WHERE name='registration_links'").fetchone():
+    if database.table_exists(db, 'registration_links'):
         db.execute('DELETE FROM registration_links WHERE credential_id IN (SELECT id FROM access_credentials WHERE account_id=?)',(aid,))
     db.execute('UPDATE access_profiles SET revoked=1 WHERE parent_digest IN (SELECT digest FROM role_sessions WHERE credential_id IN (SELECT id FROM access_credentials WHERE account_id=?))',(aid,))
     db.execute('DELETE FROM role_sessions WHERE credential_id IN (SELECT id FROM access_credentials WHERE account_id=?)',(aid,))

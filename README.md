@@ -41,20 +41,29 @@ when AI is unavailable.
 ## Container
 
 ```bash
-docker build -t kevenos:1.0.1 .
-docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.0.1
+docker build -t kevenos:1.1.0 .
+docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.1.0
 ```
 
 Open `http://localhost:8080`. Use a reverse proxy with HTTPS for a hosted
 deployment. The separate public landing page builds from `Dockerfile.website`.
 
+## Database choice
+
+KevenOS supports SQLite, PostgreSQL and Supabase. SQLite remains the default for
+a single container with a persistent volume. PostgreSQL and Supabase share the
+same PostgreSQL-compatible implementation and are the supported choice for
+multiple application instances or serverless/container scale-out. Live and
+Rehearsal use separate schemas in the same database. Configuration, migration,
+qualification and recovery guidance is in [`docs/DATABASES.md`](docs/DATABASES.md).
+
 ## Disposable Vercel demo
 
 `Dockerfile.vercel` runs the real application as a branded synthetic rehearsal
-on Vercel Containers. It is intentionally a low-traffic, disposable demo: a
-cold start can reset sample data and scale-out can split sessions and changes
-between instances. Use the normal container deployment for reliable or durable
-events. Setup, verification and rollback are documented in
+on Vercel Containers. The production demo uses a shared Supabase database so
+cold starts and scale-out preserve sessions and rehearsal changes. Role-named
+synthetic credentials keep the public demo easy to enter; do not use them for a
+real event. Setup, verification and rollback are documented in
 [`docs/VERCEL-DEMO.md`](docs/VERCEL-DEMO.md).
 
 ## Verify
@@ -65,7 +74,7 @@ PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'test_*.py'
 npm ci
 npm run lint
 npm test
-docker build --platform linux/amd64 -t kevenos:1.0.1 .
+docker build --platform linux/amd64 -t kevenos:1.1.0 .
 ```
 
 Bundled content and quiz files are synthetic examples. Replace them for each
@@ -97,8 +106,8 @@ a release or pushes a container image automatically.
 Prepare and inspect the same artifacts locally:
 
 ```bash
-python tools/release.py validate --tag v1.0.0
-python tools/release.py build --tag v1.0.0 --output dist
+python tools/release.py validate --tag v1.1.0
+python tools/release.py build --tag v1.1.0 --output dist
 sha256sum --check dist/SHA256SUMS
 ```
 

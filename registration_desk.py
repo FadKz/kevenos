@@ -7,6 +7,7 @@ import os
 import re
 import secrets
 import sqlite3
+import database
 
 PATH = '/api/registration'
 REDEEM = '/api/access/registration-link'
@@ -284,7 +285,7 @@ def handle(s, h, path, body=None):
             h.send(409, {'error': str(error)})
         except ValueError as error:
             h.send(400, {'error': str(error)})
-        except sqlite3.IntegrityError:
+        except database.integrity_errors():
             h.send(409, {'error': 'Participant access changed. Refresh before retrying.'})
         else:
             h.send(200, result)

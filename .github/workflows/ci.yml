@@ -18,6 +18,18 @@ jobs:
     name: Tests and policy checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -33,6 +45,11 @@ jobs:
         run: python -m pip install --requirement agent-requirements.txt
       - name: Run Python tests
         run: PYTHONPATH=.:tests python -m unittest discover -s tests -p 'test_*.py'
+      - name: Qualify shared PostgreSQL backend
+        env:
+          KEVENOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+          KEVENOS_TEST_SCHEMA_PREFIX: kevenos_ci
+        run: python tools/qualify_postgres.py
       - name: Install Node dependencies
         run: npm ci
       - name: Install live-display dependencies

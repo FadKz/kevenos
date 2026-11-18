@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import smtplib
 import sqlite3
+import database
 import socket
 import ssl
 import time
@@ -355,7 +356,7 @@ def check(s: Any, h: Any) -> None:
         h.send(503, {'error': UNAVAILABLE})
         return
     with s.LOCK, s.DB:
-        s.DB.execute('BEGIN IMMEDIATE')
+        database.begin_immediate(s.DB)
         limited = rate_limited(s, time.time())
         if not limited:
             s.DB.execute('INSERT INTO notification_checks(created) VALUES(?)', (time.time(),))
@@ -446,7 +447,7 @@ def submit_delivery(s: Any, ident: dict, key: str, recipient: str, subject: str,
     response = None
     actor = ident.get('credential_id') or 'owner-recovery'
     with s.LOCK, s.DB:
-        s.DB.execute('BEGIN IMMEDIATE')
+        database.begin_immediate(s.DB)
         previous = s.DB.execute('SELECT * FROM notifications WHERE id=?', (key,)).fetchone()
         if previous:
             if (not hmac.compare_digest(previous['fingerprint'], digest)
@@ -473,7 +474,7 @@ def submit_delivery(s: Any, ident: dict, key: str, recipient: str, subject: str,
             s.DB.execute('SAVEPOINT notification_issuance')
             try:
                 subject, message = issue()
-            except (ValueError, sqlite3.IntegrityError) as exc:
+            except (ValueError, *database.integrity_errors()) as exc:
                 s.DB.execute('ROLLBACK TO notification_issuance')
                 response = 409, {'error': (str(exc) if isinstance(exc, ValueError) else
                                           'An active access record already exists. Use reset for that record.')}

@@ -376,13 +376,17 @@ def written_page(s,state,query):
 
     offset, limit = number('offset',0,0,10000), number('limit',50,1,50)
     base = ANSWER_PREFIX+pack['id']
-    path = '$.'+qid
     summary = s.kv_get(SUMMARY_PREFIX+pack['id'],{})
-    rows = s.DB.execute("""SELECT json_extract(v, ?) AS text FROM kv
-        WHERE k >= ? AND k < ? AND json_type(v, ?) = 'text'
-        ORDER BY text COLLATE BINARY LIMIT ? OFFSET ?""",
-        (path,base+':',base+';',path,limit,offset))
-    return {'texts':[row[0] for row in rows],'total':summary.get(qid,{}).get('count',0),
+    values = []
+    for row in s.DB.execute("SELECT v FROM kv WHERE k >= ? AND k < ?", (base+':',base+';')):
+        try:
+            value = json.loads(row[0]).get(qid)
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if isinstance(value, str):
+            values.append(value)
+    values.sort()
+    return {'texts':values[offset:offset+limit],'total':summary.get(qid,{}).get('count',0),
             'offset':offset,'limit':limit}
 
 

@@ -36,6 +36,8 @@ class VercelEntrypointTests(unittest.TestCase):
             self.assertEqual(environment["KEVENOS_PORT"], "4321")
             self.assertEqual(environment["KEVENOS_DATA"], str(Path(folder) / "data"))
             self.assertEqual(environment["KEVENOS_PUBLIC_URL"], "https://kevenos-demo.example.vercel.app")
+            self.assertEqual(environment["KEVENOS_DEMO_ROLE_PASSWORDS"], "1")
+            self.assertEqual(environment["KEVENOS_STABLE_DEMO_CONTEXT"], "1")
             self.assertEqual(command[-1], "--rehearsal")
             self.assertTrue(command[-2].endswith("database_guard.py"))
 

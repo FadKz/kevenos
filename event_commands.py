@@ -541,14 +541,8 @@ def _edit_schedule(s, args, actor, principal):
 
 
 def _content_version(s, version):
-    if version == s.CONTENT.get('content_version', 1):
-        return s.CONTENT
-    path = Path(s.DATA, 'content-history', f'content-v{version}.json')
-    if version == 1 and not path.is_file():
-        return s.bundled_content()
     try:
-        with path.open(encoding='utf-8') as source:
-            return json.load(source)
+        return s.content_version(version)
     except FileNotFoundError:
         _missing('The content version was not found.')
 

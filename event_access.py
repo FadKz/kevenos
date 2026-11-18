@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
+import database
 import time
 from urllib.parse import unquote, urlparse
 
@@ -123,12 +124,17 @@ def seed_guest(s):
     # Seed once. Subsequent Admin resets take precedence over the bootstrap mount.
     if not s.CFG.get('guest_password'):
         return
-    with s.LOCK, auth_db(s):
-        if not auth_db(s).execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
-            create_credential(s, 'guest', 'Event guests', password=s.CFG['guest_password'], cid='guest')
+    db = auth_db(s)
+    with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
+        if not db.execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
+            create_credential(s, 'guest', 'Event guests', password=s.CFG['guest_password'], cid='guest', demo=_demo_passwords())
 
 
-def create_credential(s, role, label, pair=0, member=0, password=None, cid=None, station=0, revision=1):
+def _demo_passwords():
+    return os.environ.get('KEVENOS_DEMO_ROLE_PASSWORDS') == '1'
+
+
+def create_credential(s, role, label, pair=0, member=0, password=None, cid=None, station=0, revision=1, demo=False):
     if role not in ROUTES:
         raise ValueError('Choose a valid access role.')
     label = str(label or '').strip()
@@ -151,7 +157,8 @@ def create_credential(s, role, label, pair=0, member=0, password=None, cid=None,
     else:
         station = 0
     password = password if password is not None else secrets.token_urlsafe(12)
-    if not isinstance(password,str) or not (8 if role=='guest' else 10) <= len(password) <= 128:
+    simple_demo = demo and _demo_passwords() and password == role
+    if not isinstance(password,str) or not simple_demo and not (8 if role=='guest' else 10) <= len(password) <= 128:
         raise ValueError('Use a password of 8–128 characters for guests or 10–128 for individual access.')
     if s.match_secret(password,s.CFG['password']):
         raise ValueError('Choose a different password from the owner recovery password.')
@@ -166,6 +173,25 @@ def create_credential(s, role, label, pair=0, member=0, password=None, cid=None,
     event_roles.ensure_account(auth_db(s), auth_db(s).execute('SELECT * FROM access_credentials WHERE id=?',(cid,)).fetchone())
     row = dict(auth_db(s).execute('SELECT '+CREDENTIAL_FIELDS+' FROM access_credentials WHERE id=?',(cid,)).fetchone())
     return {'credential':row,'password':password}
+
+
+def seed_demo_roles(s):
+    """Create documented synthetic role logins only in the disposable demo."""
+    if not _demo_passwords():
+        return
+    roles = (
+        ('organizer', 'Demo Organizer', {}),
+        ('scoring', 'Demo Scoring Desk', {}),
+        ('registration', 'Demo Registration Desk', {}),
+        ('judge', 'Demo Judge', {'station': 1}),
+        ('participant', 'Demo Participant', {'pair': 1, 'member': 1}),
+    )
+    db = auth_db(s)
+    with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
+        for role, label, fields in roles:
+            cid = 'demo-' + role
+            if not db.execute('SELECT 1 FROM access_credentials WHERE id=?', (cid,)).fetchone():
+                create_credential(s, role, label, password=role, cid=cid, demo=True, **fields)
 
 
 
@@ -685,7 +711,7 @@ def handle_post(s,h,path,b):
                 result=s.event_mail.decorate_issuance(s,ident,result)
         h._activity_action='credentials-'+action
         h.send(200,result)
-    except (ValueError,sqlite3.IntegrityError) as e:
+    except (ValueError, *database.integrity_errors()) as e:
         message=str(e) if isinstance(e,ValueError) else 'That password or participant already has an access record. Use reset for an existing record.'
         h.send(400,{'error':message})
     return True

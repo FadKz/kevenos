@@ -5,6 +5,7 @@ package_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 deny='pitchperfect[^ ]*hostme\.fyi|git\.tmflix\.com|llm\.infra\.tmflix\.com|tmadmin/kevenos|tmwhead/kelzia-brain|/etc/tmos|fadikelzia|Fadi Kelzia|Taj Dubai|Business Bay|Redington|Marina Key Realty|Al Waha Trading|Gulf Interiors Group|Jebel Freight Logistics|PitchPerfectAE_bot|ImprovMX'
 
 if rg -n -i --hidden \
+  --glob '!.git' \
   --glob '!.git/**' \
   --glob '!.venv/**' \
   --glob '!node_modules/**' \

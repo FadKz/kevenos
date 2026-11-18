@@ -62,6 +62,37 @@ docker build --platform linux/amd64 -t kevenos:1.0.0 .
 Bundled content and quiz files are synthetic examples. Replace them for each
 event and review every public-facing string before deployment.
 
+## Tests and releases
+
+Every pull request and push to `main` runs the Python and browser-unit suites,
+dependency audit, sanitization policy, version consistency checks, both Docker
+builds, and release packaging. A qualified candidate archive is retained as a
+GitHub Actions artifact for 14 days.
+
+To prepare a public release, update the version in `package.json`, `server.py`,
+`package-lock.json`, `Dockerfile`, `compose.yaml`, and `CHANGELOG.md`, merge the green change, then
+push the matching tag (for example `v1.1.0`). GitHub reruns the complete
+qualification suite and prepares a 90-day release candidate containing:
+
+- the complete source archive;
+- a standalone website and brand archive;
+- release notes extracted from the changelog;
+- a machine-readable manifest; and
+- SHA-256 checksums.
+
+Final GitHub Releases require deliberate review and publication by FadKZ, so
+the public release is attributed to the project owner rather than an automation
+account. The workflow has read-only repository permission and never publishes
+a release or pushes a container image automatically.
+
+Prepare and inspect the same artifacts locally:
+
+```bash
+python tools/release.py validate --tag v1.0.0
+python tools/release.py build --tag v1.0.0 --output dist
+sha256sum --check dist/SHA256SUMS
+```
+
 ## License
 
 KevenOS is released under the [MIT License](LICENSE). The KevenOS name and

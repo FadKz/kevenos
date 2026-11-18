@@ -67,6 +67,15 @@ class DisposableDemoAccessTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(first), 32)
 
+    def test_current_demo_access_skips_the_cross_process_seed_lock(self):
+        with patch.object(
+            S.event_access.database,
+            'named_lock',
+            side_effect=AssertionError('warm startup must not queue behind the seed lock'),
+        ):
+            S.event_access.seed_guest(S)
+            S.event_access.seed_demo_roles(S)
+
     def test_demo_seed_repairs_a_participant_grant_removed_by_rehearsal_reset(self):
         credential = S.AUTH_DB.execute(
             "SELECT account_id FROM access_credentials WHERE id='demo-participant'"

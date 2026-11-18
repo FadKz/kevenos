@@ -5,6 +5,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 import test_api as T
 import event_access as A
 
@@ -162,6 +163,19 @@ class Workspace(unittest.TestCase):
         self.assertEqual(w.context,context)
         self.assertEqual(w.mode,'rehearsal')
         self.assertEqual(S.DB.execute('SELECT p1 FROM roster WHERE pair=1').fetchone()[0],'Practice edit')
+
+    def test_idempotent_switch_skips_the_cross_process_workspace_lock(self):
+        import event_workspace as W
+
+        w = self.start()
+        w.switch('rehearsal', 'REHEARSAL')
+        with patch.object(
+            W.database,
+            'named_lock',
+            side_effect=AssertionError('an already-selected workspace must not queue behind the switch lock'),
+        ):
+            result = w.switch('rehearsal', 'REHEARSAL')
+        self.assertEqual(result['mode'], 'rehearsal')
 
     def test_mode_switch_denies_desk_and_participant(self):
         import event_workspace as W

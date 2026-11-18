@@ -125,6 +125,8 @@ def seed_guest(s):
     if not s.CFG.get('guest_password'):
         return
     db = auth_db(s)
+    if db.execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
+        return
     with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
         if not db.execute("SELECT 1 FROM access_credentials WHERE id='guest'").fetchone():
             create_credential(s, 'guest', 'Event guests', password=s.CFG['guest_password'], cid='guest', demo=_demo_passwords())
@@ -132,6 +134,46 @@ def seed_guest(s):
 
 def _demo_passwords():
     return os.environ.get('KEVENOS_DEMO_ROLE_PASSWORDS') == '1'
+
+
+def _demo_roles(s):
+    return (
+        ('organizer', 'Demo Organizer', {}),
+        ('scoring', 'Demo Scoring Desk', {}),
+        ('registration', 'Demo Registration Desk', {}),
+        ('judge', 'Demo Judge', {'station': 1}),
+        ('participant', 'Demo Participant', {'pair': 1, 'member': 1}),
+    )
+
+
+def _demo_roles_current(s, roles):
+    db = auth_db(s)
+    for role, label, fields in roles:
+        cid = 'demo-' + role
+        existing = db.execute('SELECT * FROM access_credentials WHERE id=?', (cid,)).fetchone()
+        dataset = credential_dataset(s, role)
+        pair, member, station = fields.get('pair', 0), fields.get('member', 0), fields.get('station', 0)
+        if role == 'participant':
+            roster = event_config.roster_row(s, pair)
+            label = roster['members'][member - 1]['name'] if roster else ''
+        if not existing or not existing['active'] or not existing['account_id']:
+            return False
+        if (existing['label'], existing['role'], existing['dataset'], existing['station'], existing['pair'], existing['member']) != (
+                label, role, dataset, station, pair, member):
+            return False
+        if not s.match_secret(existing['lookup'], lookup(s, role)):
+            return False
+        account = db.execute('SELECT label,active FROM person_accounts WHERE id=?', (existing['account_id'],)).fetchone()
+        grant = db.execute(
+            'SELECT station,pair,member,subject FROM account_grants WHERE account_id=? AND role=? AND dataset=?',
+            (existing['account_id'], role, dataset),
+        ).fetchone()
+        if not account or not account['active'] or account['label'] != label or not grant:
+            return False
+        if (grant['station'], grant['pair'], grant['member'], grant['subject']) != (
+                station, pair, member, label if role == 'participant' else ''):
+            return False
+    return True
 
 
 def create_credential(s, role, label, pair=0, member=0, password=None, cid=None, station=0, revision=1, demo=False):
@@ -179,15 +221,13 @@ def seed_demo_roles(s):
     """Create documented synthetic role logins only in the disposable demo."""
     if not _demo_passwords():
         return
-    roles = (
-        ('organizer', 'Demo Organizer', {}),
-        ('scoring', 'Demo Scoring Desk', {}),
-        ('registration', 'Demo Registration Desk', {}),
-        ('judge', 'Demo Judge', {'station': 1}),
-        ('participant', 'Demo Participant', {'pair': 1, 'member': 1}),
-    )
+    roles = _demo_roles(s)
     db = auth_db(s)
+    if _demo_roles_current(s, roles):
+        return
     with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
+        if _demo_roles_current(s, roles):
+            return
         for role, label, fields in roles:
             cid = 'demo-' + role
             existing = db.execute('SELECT * FROM access_credentials WHERE id=?', (cid,)).fetchone()

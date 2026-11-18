@@ -20,26 +20,26 @@ concurrency:
 
 jobs:
   qualify-and-draft:
-    name: Qualify and prepare draft
+    name: Qualify and prepare candidate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: agent-requirements.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Verify the requested tag exists
         run: git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}"
@@ -56,14 +56,14 @@ jobs:
           ./tools/verify-sanitized.sh
           python tools/release.py validate --tag "$RELEASE_TAG"
       - name: Build application image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
           tags: kevenos:${{ env.RELEASE_TAG }}
           cache-from: type=gha,scope=application
       - name: Build website image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.website
@@ -73,7 +73,7 @@ jobs:
       - name: Prepare deterministic release artifacts
         run: python tools/release.py build --tag "$RELEASE_TAG" --output dist
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kevenos-${{ env.RELEASE_TAG }}
           path: dist/

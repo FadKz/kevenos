@@ -1,5 +1,6 @@
 {
   "name": "/live-display",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit --strict --skipLibCheck --jsx react-jsx --target ES2022 --moduleResolution bundler --module esnext event-quiz.tsx",

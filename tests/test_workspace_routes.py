@@ -167,7 +167,7 @@ class WorkspaceRoutes(unittest.TestCase):
                 self.assertIn(b'data-event-mode="rehearsal"', attrs)
                 self.assertIn(f'data-event-context="{self.context}"'.encode(), attrs)
                 self.assertEqual(headers[CONTEXT.lower()], [self.context])
-        for path, status in [("/healthz", 200), ("/api/desk/state", 401), ("/static/no-file", 404)]:
+        for path, status in [("/api/desk/state", 401), ("/static/no-file", 404)]:
             _, headers = self.get(path, status)
             self.assertEqual(headers[CONTEXT.lower()], [self.context])
 

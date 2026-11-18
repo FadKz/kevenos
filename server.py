@@ -33,10 +33,16 @@ import sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-APP_VERSION = "1.1.1"        # bump with every change to the app; list it in CHANGELOG.md
+APP_VERSION = "1.2.0"        # bump with every change to the app; list it in CHANGELOG.md
 SCHEMA_VERSION = 14          # bump when the database layout changes (open_db migrates)
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
+PUBLIC_ASSETS = frozenset((
+    'event-operations.js', 'event-operations.css', 'judging-operations.css', 'live-transition.js', 'live-transition.css', 'agenda.js', 'agenda.css', 'accounts.js', 'roles.css', 'role-home.css', 'app.css', 'common.js', 'event.css', 'profile.css', 'assistant.css', 'assistant.js',
+    'participant-workspace.css', 'participant-workspace.js', 'participant-messages.js', 'participant-desk.js',
+    'participant-prep.js', 'participant-prep-player.js', 'participant-push.js', 'participant-icon.png', 'event-quiz.js', 'event-quiz.css', 'audience-questions.js', 'audience-questions.css',
+    'registration.css', 'registration.js', 'registration-join.js', 'live-hall.css', 'live-player.js',
+))
 DATA = os.environ.get("KEVENOS_DATA") or os.path.join(HERE, "data")    # KEVENOS_DATA: a mounted volume when run in a container
 ROUND_SECONDS = 900          # 10 pitch + 3 feedback + 2 change over
 FINAL_SECONDS = 480
@@ -1664,7 +1670,53 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def do_GET(self):
+        path = urlparse(self.path).path
+        if path.startswith('/static/') and path[8:] in PUBLIC_ASSETS:
+            name = path[8:]
+            file_path = os.path.join(STATIC, name)
+            if os.path.isfile(file_path):
+                with open(file_path, 'rb') as source:
+                    data = source.read()
+                content_type = {'css': 'text/css; charset=utf-8', 'js': 'application/javascript', 'png': 'image/png'}[name.rsplit('.', 1)[-1]]
+                self.send_response(200)
+                self.send_header('Content-Type', content_type)
+                self.send_header('Content-Length', str(len(data)))
+                self.send_header('Cache-Control', 'public, max-age=0, s-maxage=60')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.end_headers()
+                if self.command != 'HEAD':
+                    self.wfile.write(data)
+                return
         if self.startup_response():
+            return
+        if path == '/api/health':
+            ready = False
+            try:
+                if DB is not None and not (WORKSPACE and WORKSPACE.guard.blocked):
+                    DB.execute('SELECT 1').fetchone()
+                    if WORKSPACE and WORKSPACE.live is not DB:
+                        WORKSPACE.live.execute('SELECT 1').fetchone()
+                    ready = True
+            except Exception:
+                ready = False
+            data = json.dumps({'ok': ready}).encode()
+            self.send_response(200 if ready else 503)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            if self.command != 'HEAD':
+                self.wfile.write(data)
+            return
+        if path == '/healthz':
+            data = b'{"ok": true}'
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            if self.command != 'HEAD':
+                self.wfile.write(data)
             return
         try:
             if WORKSPACE:
@@ -1754,12 +1806,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.registration_video()
             if path.startswith("/static/"):     # only the shared style and helper script; pages are served through their routes
                 n = os.path.basename(path)
-                assets = ("event-operations.js", "event-operations.css", "judging-operations.css", "live-transition.js", "live-transition.css", "agenda.js", "agenda.css", "accounts.js", "roles.css", "role-home.css", "app.css", "common.js", "event.css", "profile.css", "assistant.css", "assistant.js",
-                          "participant-workspace.css", "participant-workspace.js", "participant-messages.js", "participant-desk.js",
-                          "participant-prep.js", "participant-prep-player.js", "participant-push.js", "participant-icon.png", "event-quiz.js", "event-quiz.css", "audience-questions.js", "audience-questions.css",
-                          "registration.css", "registration.js", "registration-join.js",
-                          "live-hall.css", "live-player.js")
-                return self.page(n) if n in assets else self.send(404, {"error": "not found"})
+                return self.page(n) if n in PUBLIC_ASSETS else self.send(404, {"error": "not found"})
             if path == "/api/stations":     # the judge page lists stations and who is on them
                 if not authed and not hosted():
                     return self.send(401, {"error": "password needed"})

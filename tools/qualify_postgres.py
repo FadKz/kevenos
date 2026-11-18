@@ -48,7 +48,7 @@ def wait_ready(port: int) -> str:
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         try:
-            status, _, _, context = request(port, "GET", "/healthz")
+            status, _, _, context = request(port, "GET", "/api/access/me")
             if status == 200 and context:
                 return context
         except (ConnectionError, OSError, json.JSONDecodeError):
@@ -118,7 +118,7 @@ def main() -> int:
                                                     {"mode": "live", "confirm": "LIVE"}, cookie, headers)
             if status != 200 or live.get("mode") != "live":
                 raise RuntimeError(f"Could not switch process A to Live: {live!r}")
-            status, _, _, observed_context = request(ports[1], "GET", "/healthz")
+            status, _, _, observed_context = request(ports[1], "GET", "/api/access/me")
             if status != 200 or observed_context != live_context:
                 raise RuntimeError("Process B did not adopt the shared Live workspace context.")
             headers["X-Event-Context"] = live_context
@@ -131,7 +131,7 @@ def main() -> int:
                                                        {"action": "reset-rehearsal", "confirm": "RESET REHEARSAL"}, cookie, headers)
             if status != 200 or not reset.get("seeded"):
                 raise RuntimeError(f"Shared Rehearsal reset failed: {reset!r}")
-            status, _, _, observed_context = request(ports[1], "GET", "/healthz")
+            status, _, _, observed_context = request(ports[1], "GET", "/api/access/me")
             if status != 200 or observed_context != reset_context:
                 raise RuntimeError("Process B did not adopt the reset Rehearsal context.")
             print("PostgreSQL qualification passed: shared context, sessions, content, workspace changes, reset and demo roles.")

@@ -27,8 +27,9 @@ dedicated PostgreSQL/Supabase project is supported for real deployments.
 - Production URL: `https://kevenos-demo.vercel.app`
 - Production branch: `main`
 - Container target: `Dockerfile.vercel`
-- Compute region: `bom1` (the nearest currently available Vercel region to the
-  Dubai Supabase project; static assets remain on Vercel's global CDN)
+- Compute region: `dub1`, alongside the current demo database in `eu-west-1`.
+  Change this setting if the database moves. Public static responses allow a
+  short shared-cache lifetime; confirm cache hits on the deployed platform.
 - Health route: `/healthz`
 - Optional integrations: disabled
 
@@ -42,12 +43,18 @@ never committed:
 - `KEVENOS_SESSION_SECRET`
 - `KEVENOS_DB_BACKEND=supabase`
 - `POSTGRES_URL` (injected by the Supabase Marketplace integration)
-- `KEVENOS_DB_SCHEMA_PREFIX` (use distinct Preview and Production prefixes)
+- `KEVENOS_DB_SCHEMA_PREFIX` (Production schema prefix)
 
 `tools/vercel_entrypoint.py` validates all four values before writing anything,
 projects them into mode-0600 files under `/tmp`, removes the values from the
 application environment, adopts Vercel's assigned `$PORT`, and starts the app
 in hosted Rehearsal mode.
+
+Preview deployments require Vercel's full Git commit SHA and use a schema
+prefix derived from it, overriding the configured prefix. This keeps Preview
+state separate from Production and from other commits. Each commit creates its
+own pair of schemas; an administrator must review and remove obsolete preview
+schemas separately. A Preview without a commit SHA fails before startup.
 
 The synthetic demo passwords are deliberately simple and equal to the selected
 role: `admin`, `organizer`, `scoring`, `registration`, `judge`, `participant`

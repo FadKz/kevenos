@@ -48,6 +48,11 @@ docker run --rm -p 8080:8080 -v kevenos_data:/data kevenos:1.1.1
 Open `http://localhost:8080`. Use a reverse proxy with HTTPS for a hosted
 deployment. The separate public landing page builds from `Dockerfile.website`.
 
+For a small hosted event, [`compose.event.yaml`](compose.event.yaml) provides
+one app, PostgreSQL and a Caddy HTTPS proxy. See
+[`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md) for sizing, secrets, backups and
+qualification. The minimal SQLite configuration remains available.
+
 ## Database choice
 
 KevenOS supports SQLite, PostgreSQL and Supabase. SQLite remains the default for

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 import sys
 from typing import MutableMapping
 
@@ -21,6 +22,12 @@ def prepare(environment: MutableMapping[str, str], scratch: Path = Path("/tmp/ke
     missing = [name for name in SECRET_NAMES if not environment.get(name)]
     if missing:
         raise RuntimeError("Missing required Vercel demo secret(s): " + ", ".join(missing))
+
+    if environment.get('VERCEL_ENV') == 'preview':
+        commit = environment.get('VERCEL_GIT_COMMIT_SHA', '')
+        if not re.fullmatch(r'[0-9a-fA-F]{40}', commit):
+            raise RuntimeError('Preview requires a full VERCEL_GIT_COMMIT_SHA for database isolation.')
+        environment['KEVENOS_DB_SCHEMA_PREFIX'] = 'kevenos_preview_' + commit[:24].lower()
 
     root = Path(__file__).resolve().parents[1]
     secret_dir = scratch / "secrets"

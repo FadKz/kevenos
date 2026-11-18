@@ -17,6 +17,24 @@ def load_entrypoint():
 
 
 class VercelEntrypointTests(unittest.TestCase):
+    def test_preview_uses_commit_specific_schema(self):
+        entrypoint = load_entrypoint()
+        environment = dict.fromkeys(entrypoint.SECRET_NAMES, 'synthetic-value')
+        environment.update(VERCEL_ENV='preview', VERCEL_GIT_COMMIT_SHA='a' * 40,
+                           KEVENOS_DB_SCHEMA_PREFIX='production_prefix')
+        with tempfile.TemporaryDirectory() as folder:
+            entrypoint.prepare(environment, Path(folder))
+        self.assertEqual(environment['KEVENOS_DB_SCHEMA_PREFIX'], 'kevenos_preview_' + 'a' * 24)
+
+    def test_preview_without_commit_fails_before_secret_files(self):
+        entrypoint = load_entrypoint()
+        environment = dict.fromkeys(entrypoint.SECRET_NAMES, 'synthetic-value')
+        environment['VERCEL_ENV'] = 'preview'
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(RuntimeError, 'VERCEL_GIT_COMMIT_SHA'):
+                entrypoint.prepare(environment, Path(folder))
+            self.assertFalse((Path(folder) / 'secrets').exists())
+
     def test_prepares_disposable_hosted_rehearsal_without_leaving_secrets_in_environment(self):
         entrypoint = load_entrypoint()
         environment = {

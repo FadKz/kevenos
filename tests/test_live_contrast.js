@@ -41,8 +41,10 @@ async function render(query, verify) {
     await render(query, window => {
       const theme = window.getComputedStyle(window.document.documentElement);
       assert.equal(theme.colorScheme, 'dark');
-      assert.equal(theme.getPropertyValue('--card').trim(), '#122d4c');
-      assert.equal(theme.getPropertyValue('--glass').trim(), 'var(--card)');
+      const card = theme.getPropertyValue('--card').trim();
+      const glass = theme.getPropertyValue('--glass').trim();
+      assert.equal(card, '#122d4c');
+      assert.equal(glass === 'var(--card)' ? card : glass, card);
       assert(!window.document.body.classList.contains('light'));
     });
   }

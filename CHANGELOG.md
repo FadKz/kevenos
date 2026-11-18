@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Upgrade the supported runtime baseline to Python 3.15 and Node.js 26 LTS.
+- Upgrade the Nginx, React tooling, Remotion, TypeScript, esbuild, jsdom,
+  HTTPX2 and Web Push dependency stack to current releases.
+- Add CI type-checking, deterministic bundle verification and dependency audits
+  for the live-display application.
+
 ## 1.0.0 — 2026-11-18
 
 - First public KevenOS release.

@@ -396,6 +396,8 @@ async function checkJudgeReferences(desk, judge) {
     const guide = () => $(dom, '#bhelp');
     const customer = () => $(dom, '#bcustomer');
     await until(() => !!$(dom, '#steps [data-s="0"]'));
+    click(dom, '#judge-home-open');
+    await until(() => !$(dom, '#judge-workspace').hidden);
     check('judge references are visible and closed before the pitch',
       guide()?.textContent === 'Stage guide' && customer()?.textContent === 'Customer scenario' &&
       panel().hidden && !panel().open && [guide(), customer()].every(b => b.getAttribute('aria-expanded') === 'false'));

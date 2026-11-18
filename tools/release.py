@@ -41,6 +41,11 @@ def validate_version(root: Path, tag: str | None = None) -> str:
             r'org\.opencontainers\.image\.version="([^"]+)"',
             "Dockerfile",
         ),
+        "Dockerfile.vercel": match_version(
+            root / "Dockerfile.vercel",
+            r'org\.opencontainers\.image\.version="([^"]+)"',
+            "Dockerfile.vercel",
+        ),
         "compose.yaml": match_version(root / "compose.yaml", r"image:\s*kevenos:([^\s]+)", "compose.yaml"),
     }
     mismatches = [f"{name}={value}" for name, value in sources.items() if value != version]

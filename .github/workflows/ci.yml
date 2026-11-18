@@ -71,6 +71,18 @@ jobs:
           tags: kevenos:${{ github.sha }}
           cache-from: type=gha,scope=application
           cache-to: type=gha,mode=max,scope=application
+      - name: Build disposable Vercel demo image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.vercel
+          push: false
+          load: true
+          tags: kevenos-demo:${{ github.sha }}
+          cache-from: type=gha,scope=vercel-demo
+          cache-to: type=gha,mode=max,scope=vercel-demo
+      - name: Smoke disposable Vercel demo image
+        run: ./tools/smoke-vercel-container.sh kevenos-demo:${{ github.sha }}
       - name: Build website image
         uses: docker/build-push-action@v7
         with:

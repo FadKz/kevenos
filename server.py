@@ -32,7 +32,7 @@ import sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-APP_VERSION = "1.0.0"        # bump with every change to the app; list it in CHANGELOG.md
+APP_VERSION = "1.0.1"        # bump with every change to the app; list it in CHANGELOG.md
 SCHEMA_VERSION = 14          # bump when the database layout changes (open_db migrates)
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")

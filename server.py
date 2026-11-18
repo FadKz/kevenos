@@ -1650,7 +1650,7 @@ class Handler(BaseHTTPRequestHandler):
     def startup_response(self):
         if not STARTING:
             return False
-        if urlparse(self.path).path == '/healthz' and READY.wait(timeout=120):
+        if READY.wait(timeout=120):
             return False
         data = b'{"ok":false,"status":"initializing"}'
         self.send_response(503)

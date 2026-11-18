@@ -5,7 +5,7 @@ import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import test_api as T
 import event_access as A
 
@@ -185,6 +185,20 @@ class Workspace(unittest.TestCase):
                 raise AssertionError('startup must not compute an unused workspace status')
 
         S.select_startup_workspace(CurrentWorkspace(), rehearsal=True)
+
+    def test_startup_waits_for_ready_before_answering_page_requests(self):
+        class Request:
+            path = '/'
+            command = 'GET'
+
+            def send_response(self, *_):
+                raise AssertionError('a ready application must serve the requested page')
+
+        ready = Mock()
+        ready.wait.return_value = True
+        with patch.object(S, 'STARTING', True), patch.object(S, 'READY', ready):
+            self.assertFalse(S.Handler.startup_response(Request()))
+        ready.wait.assert_called_once_with(timeout=120)
 
     def test_mode_switch_denies_desk_and_participant(self):
         import event_workspace as W

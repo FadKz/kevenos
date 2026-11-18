@@ -190,8 +190,31 @@ def seed_demo_roles(s):
     with s.LOCK, database.named_lock(db, 'demo-access-seed'), db:
         for role, label, fields in roles:
             cid = 'demo-' + role
-            if not db.execute('SELECT 1 FROM access_credentials WHERE id=?', (cid,)).fetchone():
+            existing = db.execute('SELECT * FROM access_credentials WHERE id=?', (cid,)).fetchone()
+            if not existing:
                 create_credential(s, role, label, password=role, cid=cid, demo=True, **fields)
+                continue
+            dataset = credential_dataset(s, role)
+            pair, member, station = fields.get('pair', 0), fields.get('member', 0), fields.get('station', 0)
+            if role == 'participant':
+                roster = event_config.roster_row(s, pair)
+                label = roster['members'][member - 1]['name']
+            desired = dict(role=role, dataset=dataset, station=station, pair=pair, member=member)
+            aid = event_roles.ensure_account(db, existing)
+            event_roles.validate_unique(s, desired, aid)
+            digest_ok = s.match_secret(existing['lookup'], lookup(s, role)) and s.match_secret(
+                existing['password_hash'], password_hash(role, existing['password_hash'].split(':', 1)[0]))
+            revision = existing['revision'] + (0 if digest_ok else 1)
+            password_box = existing['password_box'] if digest_ok else seal_password(s, role, cid, revision, dataset)
+            db.execute('UPDATE access_credentials SET label=?,role=?,pair=?,member=?,station=?,dataset=?,active=1,lookup=?,password_hash=?,password_box=?,revision=? WHERE id=?',
+                       (label, role, pair, member, station, dataset, lookup(s, role),
+                        existing['password_hash'] if digest_ok else password_hash(role), password_box, revision, cid))
+            db.execute('UPDATE person_accounts SET label=?,active=1 WHERE id=?', (label, aid))
+            db.execute('DELETE FROM account_grants WHERE account_id=? AND role=?', (aid, role))
+            db.execute('INSERT INTO account_grants VALUES(?,?,?,?,?,?,?)',
+                       (aid, role, dataset, station, pair, member, label if role == 'participant' else ''))
+            if not digest_ok:
+                event_roles.revoke_sessions(db, aid)
 
 
 

@@ -67,6 +67,22 @@ class DisposableDemoAccessTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(first), 32)
 
+    def test_demo_seed_repairs_a_participant_grant_removed_by_rehearsal_reset(self):
+        credential = S.AUTH_DB.execute(
+            "SELECT account_id FROM access_credentials WHERE id='demo-participant'"
+        ).fetchone()
+        S.AUTH_DB.execute(
+            "DELETE FROM account_grants WHERE account_id=? AND role='participant'",
+            (credential['account_id'],),
+        )
+        S.AUTH_DB.commit()
+
+        S.event_access.seed_demo_roles(S)
+
+        status, body, _ = request('POST', '/api/access/login', {'password': 'participant'})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body['role'], 'participant')
+
 
 if __name__ == '__main__':
     unittest.main()

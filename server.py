@@ -131,9 +131,15 @@ def open_db(path):
         # Refuse future schemas before changing journal mode or creating tables.
         if database.table_exists(db, "kv"):
             row=db.execute("SELECT v FROM kv WHERE k='schema_version'").fetchone()
-            if row and int(json.loads(row[0]))>SCHEMA_VERSION:
+            current_version = int(json.loads(row[0])) if row else 0
+            if current_version>SCHEMA_VERSION:
                 db.close()
                 raise RuntimeError('Database schema is newer than this application. Use the matching release.')
+            # Managed PostgreSQL cold starts must not replay every historical
+            # migration. A schema version is written only after all migrations
+            # complete, so an exact match is a safe constant-time fast path.
+            if database.is_server(db) and current_version == SCHEMA_VERSION:
+                return db
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript("""
     CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);

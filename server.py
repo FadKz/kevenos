@@ -52,6 +52,7 @@ DB = None
 AUTH_DB = None
 WORKSPACE = None
 STARTING = False
+READY = threading.Event()
 LIVE = {}                    # station -> last heartbeat
 AI_SLOTS = threading.Semaphore(2)
 INVITE_TTL = 48 * 3600
@@ -1649,6 +1650,8 @@ class Handler(BaseHTTPRequestHandler):
     def startup_response(self):
         if not STARTING:
             return False
+        if urlparse(self.path).path == '/healthz' and READY.wait(timeout=120):
+            return False
         data = b'{"ok":false,"status":"initializing"}'
         self.send_response(503)
         self.send_header('Content-Type', 'application/json')
@@ -2199,6 +2202,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     global CONTENT, CFG, DB, WORKSPACE, STARTING
     STARTING = True
+    READY.clear()
     startup_started = time.monotonic()
     def startup_trace(stage):
         if hosted():
@@ -2263,6 +2267,7 @@ def main():
     print("  AI        %s" % ("OpenAI-compatible AI service (%s)" % GATEWAY_ROLE if gateway_enabled() else "Templates"))
     print("  Database  %s" % database.resolve_backend().name)
     STARTING = False
+    READY.set()
     try:
         server_thread.join()
     except KeyboardInterrupt:

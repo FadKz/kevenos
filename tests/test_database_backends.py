@@ -29,6 +29,12 @@ class DatabaseBackendConfigurationTests(unittest.TestCase):
                 self.assertEqual(config.schema_prefix, "demo_1")
                 self.assertTrue(config.server)
 
+    def test_marketplace_and_conventional_postgres_url_names_are_supported(self):
+        for key in ("POSTGRES_URL", "DATABASE_URL"):
+            with self.subTest(key=key):
+                config = self.resolve(KEVENOS_DB_BACKEND="supabase", **{key: "postgresql://marketplace/db"})
+                self.assertEqual(config.url, "postgresql://marketplace/db")
+
     def test_server_backends_fail_closed_without_a_postgres_url(self):
         from database import resolve_backend
 

@@ -38,11 +38,11 @@ def resolve_backend(environment: Mapping[str, str] | None = None) -> BackendConf
     prefix = str(values.get("KEVENOS_DB_SCHEMA_PREFIX", "kevenos") or "kevenos").strip().lower()
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,47}", prefix):
         raise ValueError("KEVENOS_DB_SCHEMA_PREFIX must be a safe lowercase SQL identifier.")
-    url = str(values.get("KEVENOS_DATABASE_URL", "") or "").strip() or None
+    url = str(values.get("KEVENOS_DATABASE_URL") or values.get("POSTGRES_URL") or values.get("DATABASE_URL") or "").strip() or None
     if name == "sqlite":
         return BackendConfig(name=name, schema_prefix=prefix)
     if not url or not re.match(r"^postgres(?:ql)?://", url, re.I):
-        raise ValueError("PostgreSQL and Supabase backends require a postgresql:// KEVENOS_DATABASE_URL.")
+        raise ValueError("PostgreSQL and Supabase backends require a postgresql:// KEVENOS_DATABASE_URL, POSTGRES_URL or DATABASE_URL.")
     return BackendConfig(name=name, url=url, schema_prefix=prefix)
 
 

@@ -35,7 +35,7 @@ never committed:
 - `KEVENOS_VIEW_KEY`
 - `KEVENOS_SESSION_SECRET`
 - `KEVENOS_DB_BACKEND=supabase`
-- `KEVENOS_DATABASE_URL`
+- `POSTGRES_URL` (injected by the Supabase Marketplace integration)
 - `KEVENOS_DB_SCHEMA_PREFIX=kevenos_demo`
 
 `tools/vercel_entrypoint.py` validates all four values before writing anything,

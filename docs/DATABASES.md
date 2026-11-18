@@ -10,12 +10,17 @@ containers or serverless scale-out.
 | Backend | Configuration | Intended use |
 |---|---|---|
 | SQLite | `KEVENOS_DB_BACKEND=sqlite` | Local development or one container with a persistent `/data` volume |
-| PostgreSQL | `KEVENOS_DB_BACKEND=postgres` plus `KEVENOS_DATABASE_URL` | Self-hosted or managed PostgreSQL |
-| Supabase | `KEVENOS_DB_BACKEND=supabase` plus `KEVENOS_DATABASE_URL` | Supabase-managed PostgreSQL, including Vercel deployments |
+| PostgreSQL | `KEVENOS_DB_BACKEND=postgres` plus a database URL | Self-hosted or managed PostgreSQL |
+| Supabase | `KEVENOS_DB_BACKEND=supabase` plus a database URL | Supabase-managed PostgreSQL, including Vercel deployments |
 
 `KEVENOS_DB_SCHEMA_PREFIX` defaults to `kevenos` and must be a lowercase SQL
 identifier. KevenOS creates `<prefix>_live` and `<prefix>_rehearsal` schemas so
 both workspaces remain isolated while sharing one server database.
+
+The URL is resolved in this order: `KEVENOS_DATABASE_URL`, `POSTGRES_URL`, then
+`DATABASE_URL`. The Vercel Supabase Marketplace integration supplies
+`POSTGRES_URL`, so only the backend and schema prefix need KevenOS-specific
+configuration there.
 
 Example (values belong in a deployment secret manager):
 

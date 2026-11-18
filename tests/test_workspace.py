@@ -177,6 +177,15 @@ class Workspace(unittest.TestCase):
             result = w.switch('rehearsal', 'REHEARSAL')
         self.assertEqual(result['mode'], 'rehearsal')
 
+    def test_startup_does_not_reselect_an_active_rehearsal_workspace(self):
+        class CurrentWorkspace:
+            mode = 'rehearsal'
+
+            def switch(self, *_):
+                raise AssertionError('startup must not compute an unused workspace status')
+
+        S.select_startup_workspace(CurrentWorkspace(), rehearsal=True)
+
     def test_mode_switch_denies_desk_and_participant(self):
         import event_workspace as W
         from unittest.mock import patch

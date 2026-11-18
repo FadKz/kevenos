@@ -2199,6 +2199,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(500, {"error": "Internal server error."})
 
 
+def select_startup_workspace(workspace, rehearsal):
+    if rehearsal and workspace.mode != 'rehearsal':
+        workspace.switch('rehearsal', 'REHEARSAL')
+
+
 def main():
     global CONTENT, CFG, DB, WORKSPACE, STARTING
     STARTING = True
@@ -2241,8 +2246,7 @@ def main():
     CONTENT = load_content()
     WORKSPACE = event_workspace.initialize(sys.modules[__name__], a.db, DATA)
     startup_trace('workspace')
-    if a.rehearsal:
-        WORKSPACE.switch("rehearsal", "REHEARSAL")
+    select_startup_workspace(WORKSPACE, a.rehearsal)
     startup_trace('workspace-selection')
     event_access.seed_guest(sys.modules[__name__])
     event_access.seed_demo_roles(sys.modules[__name__])

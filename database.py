@@ -17,6 +17,7 @@ import re
 import sqlite3
 import threading
 from typing import Iterable, Mapping, MutableMapping, Sequence
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,18 @@ def resolve_backend(environment: Mapping[str, str] | None = None) -> BackendConf
     if not url or not re.match(r"^postgres(?:ql)?://", url, re.I):
         raise ValueError("PostgreSQL and Supabase backends require a postgresql:// KEVENOS_DATABASE_URL, POSTGRES_URL or DATABASE_URL.")
     return BackendConfig(name=name, url=url, schema_prefix=prefix)
+
+
+def postgres_client_url(url: str) -> str:
+    """Remove provider metadata that is not a libpq connection option.
+
+    Vercel's Supabase Marketplace appends ``supa`` to identify the selected
+    pooler.  The parameter belongs to the integration, not PostgreSQL, and
+    psycopg correctly rejects it as an unknown libpq option.
+    """
+    parts = urlsplit(url)
+    query = urlencode([(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key != "supa"])
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
 
 
 def schema_for_path(path: str | os.PathLike[str], prefix: str) -> str:
@@ -284,7 +297,7 @@ def connect(path: str | os.PathLike[str], config: BackendConfig | None = None):
         raise RuntimeError("Install psycopg[binary] to use PostgreSQL or Supabase.") from error
 
     schema = schema_for_path(path, selected.schema_prefix)
-    raw = psycopg.connect(selected.url, prepare_threshold=None, connect_timeout=10, autocommit=True)
+    raw = psycopg.connect(postgres_client_url(selected.url), prepare_threshold=None, connect_timeout=10, autocommit=True)
     with raw.cursor() as cursor:
         cursor.execute("SELECT pg_advisory_lock(hashtext(%s))", ("kevenos:schema:" + schema,))
         try:

@@ -54,6 +54,14 @@ class DatabaseBackendConfigurationTests(unittest.TestCase):
         self.assertEqual(schema_for_path(root / "judging.db", "kevenos"), "kevenos_live")
         self.assertEqual(schema_for_path(root / "rehearsal" / "judging.db", "kevenos"), "kevenos_rehearsal")
 
+    def test_supabase_marketplace_metadata_is_not_passed_to_psycopg(self):
+        from database import postgres_client_url
+
+        self.assertEqual(
+            postgres_client_url("postgresql://user:secret@pooler.example/app?sslmode=require&supa=base-pooler.x"),
+            "postgresql://user:secret@pooler.example/app?sslmode=require",
+        )
+
 
 class PostgresDialectTests(unittest.TestCase):
     def test_translates_the_sqlite_constructs_used_by_kevenos(self):

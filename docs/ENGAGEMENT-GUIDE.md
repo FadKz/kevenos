@@ -18,6 +18,8 @@ unaffected. This event setting is separate from the deployment feature flag.
    points for each quiz question; the default is one. Polls have no points.
    An optional explanation is visible to attendees only after reveal. Use **Move
    earlier** and **Move later** to arrange the series, then save the draft.
+   **Preview question** displays the current unsaved text and a simulated
+   reveal; it does not publish, send or score anything.
 3. Review the draft and publish a version. Edits after publication do not
    change that version or an already started run.
 4. Start a run. Choose a duration from 1 to 3,600 seconds; the default is 15.

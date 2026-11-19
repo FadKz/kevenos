@@ -98,13 +98,35 @@ async function port() {
     await page.getByLabel('Correct option numbers, separated by commas').fill('1');
     await page.getByLabel('Points for a correct answer').fill('3');
     await page.getByLabel('Explanation shown after reveal (optional)').fill('Synthetic explanation for the correct answer.');
+    await page.getByRole('button', {name:'Preview question'}).click();
+    const preview = page.locator('dialog.engagement-preview[open]');
+    await preview.getByText('Which answer is correct?').waitFor();
+    if (process.env.KEVENOS_TEST_SCREENSHOT_DIR) {
+      await fs.mkdir(process.env.KEVENOS_TEST_SCREENSHOT_DIR, {recursive:true});
+      await page.screenshot({path:path.join(process.env.KEVENOS_TEST_SCREENSHOT_DIR, 'question-preview.png')});
+    }
+    const previousSize = page.viewportSize();
+    await page.setViewportSize({width:390,height:844});
+    const mobilePreview = await preview.evaluate(element => ({width:element.getBoundingClientRect().width, radius:getComputedStyle(element).borderRadius}));
+    assert(Math.abs(mobilePreview.width - 390) < 1 && mobilePreview.radius === '0px', 'mobile preview fills the viewport');
+    if (process.env.KEVENOS_TEST_SCREENSHOT_DIR) {
+      await page.screenshot({path:path.join(process.env.KEVENOS_TEST_SCREENSHOT_DIR, 'question-preview-mobile.png')});
+    }
+    await page.setViewportSize(previousSize);
+    assert(!(await preview.innerText()).includes('Synthetic explanation'), 'preview keeps explanation hidden before reveal');
+    await preview.getByRole('button', {name:'Preview reveal'}).click();
+    await preview.getByText(/Synthetic explanation/).waitFor();
+    await preview.getByRole('button', {name:'Close preview'}).click();
     await page.getByRole('button', {name:'Save draft'}).click();
     await page.getByRole('button', {name:'Publish draft'}).click();
     await page.getByRole('button', {name:'Start run'}).click();
     await page.getByLabel('Question duration in seconds (leave blank for no timer)').fill('120');
     await page.getByRole('button', {name:'Open question'}).click();
     await page.getByRole('button', {name:'Share on hall'}).click();
-    await phone1.page.locator('dialog.engagement-dialog[open]').getByLabel('Correct answer').check();
+    const phoneDialog = phone1.page.locator('dialog.engagement-dialog[open]');
+    await phoneDialog.getByLabel('Correct answer').check();
+    const phoneLayout = await phoneDialog.evaluate(element => ({width:element.getBoundingClientRect().width, radius:getComputedStyle(element).borderRadius}));
+    assert(Math.abs(phoneLayout.width - phone1.page.viewportSize().width) < 1 && phoneLayout.radius === '0px', 'phone question fills the viewport');
     await page.getByRole('button', {name:'Pause question'}).click();
     await until(async () => (await phone1.api('/api/engagement/player')).question?.delivery?.status === 'paused', 'pause reaches phones');
     await until(async () => (await phone1.page.locator('dialog.engagement-dialog').innerText()).includes('paused'), 'phone shows pause');

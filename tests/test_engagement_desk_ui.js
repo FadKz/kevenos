@@ -4,6 +4,32 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('Organizer can preview unsaved question and reveal without sending it', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open',''); };
+  w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
+  w.eval(readFileSync(join(__dirname,'../static/engagement-desk.js'),'utf8'));
+  const root = w.document.querySelector('#desk'), writes = [];
+  await w.EngagementDesk.mount(root, async () => ({revision:0,activities:[],runs:[]}), async (path,body) => { writes.push(body); });
+  const kind = root.querySelector('[name=kind]'); kind.value = 'quiz'; kind.dispatchEvent(new w.Event('change',{bubbles:true}));
+  root.querySelector('[name=prompt]').value = 'Unsaved question?';
+  root.querySelector('[name=options]').value = 'First\nSecond';
+  root.querySelector('[name=correct]').value = '2';
+  root.querySelector('[name=explanation]').value = 'A helpful explanation.';
+  [...root.querySelectorAll('button')].find(button => button.textContent === 'Preview question').click();
+  const dialog = w.document.querySelector('dialog[open]');
+  assert.match(dialog.textContent,/Unsaved question/); assert.doesNotMatch(dialog.textContent,/A helpful explanation/);
+  [...dialog.querySelectorAll('button')].find(button => button.textContent === 'Preview reveal').click();
+  assert.match(dialog.textContent,/Correct answer: Second/); assert.match(dialog.textContent,/A helpful explanation/);
+  assert.equal(writes.length,0); assert.equal(root.querySelector('[name=prompt]').value,'Unsaved question?');
+  [...dialog.querySelectorAll('button')].find(button => button.textContent === 'Close preview').click();
+  assert.equal(w.document.querySelector('dialog'), null);
+  [...root.querySelectorAll('button')].find(button => button.textContent === 'Preview question').click();
+  w.EngagementDesk.clear();
+  assert.equal(w.document.querySelector('dialog'), null, 'profile change clears private preview content');
+});
+
 test('Organizer sees that quiz launches are disabled but can still start polls', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close());

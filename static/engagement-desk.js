@@ -129,6 +129,38 @@
       copy.querySelector('[name=type]').dispatchEvent(new Event('change', {bubbles:true}));
       box.after(copy); dirty = true;
     }));
+    box.append(button('Preview question', () => {
+      const dialog = element('dialog', null, 'engagement-preview');
+      dialog.setAttribute('aria-labelledby','engagement-preview-title');
+      const title = element('h2','Attendee preview'); title.id = 'engagement-preview-title';
+      const description = element('p','Preview only — nothing is published, sent or scored.');
+      const prompt = box.querySelector('[name=prompt]').value.trim() || 'Your question will appear here.';
+      const selectedType = type.value;
+      const choices = selectedType === 'true_false' ? ['True','False'] : selectedType === 'rating' ? ['1','2','3','4','5'] :
+        ['single','multi'].includes(selectedType) ? options.querySelector('textarea').value.split('\n').map(value => value.trim()).filter(Boolean) : [];
+      const group = element('fieldset'); group.append(element('legend',prompt));
+      choices.forEach((choice,index) => {
+        const label = element('label'); const input = element('input');
+        input.type = selectedType === 'multi' ? 'checkbox' : 'radio'; input.name = 'preview-answer'; input.value = String(index);
+        label.append(input, document.createTextNode(' ' + choice)); group.append(label);
+      });
+      if (selectedType === 'text') { const input = element('textarea'); input.setAttribute('aria-label','Preview answer'); group.append(input); }
+      const result = element('p'); result.setAttribute('role','status');
+      const close = button('Close preview', () => dialog.close());
+      dialog.append(title,description,group);
+      if (kind.value === 'quiz') dialog.append(button('Preview reveal', () => {
+        const raw = correct.querySelector('input').value.trim();
+        const indices = raw ? raw.split(',').map(value => Number(value.trim())-1) : [];
+        if (!indices.length || (selectedType !== 'multi' && indices.length !== 1) || new Set(indices).size !== indices.length ||
+            indices.some(index => !Number.isInteger(index) || index < 0 || index >= choices.length)) {
+          result.textContent = 'Choose valid correct option numbers in the editor.'; return;
+        }
+        const explanation = box.querySelector('[name=explanation]').value.trim();
+        result.textContent = `Correct answer: ${indices.map(index => choices[index]).join(', ')}${explanation ? ' · ' + explanation : ''}`;
+      }));
+      dialog.append(result,close); root.append(dialog);
+      dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
+    }));
     box.append(button('Remove question', () => { if (box.parentElement.querySelectorAll('fieldset').length > 1) { dirty = true; box.remove(); } }));
     return box;
   }

@@ -89,10 +89,12 @@ class AgentAPI(unittest.TestCase):
         self.save_grant()
         with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
             args = {'action':'save','revision':0,'payload':{'title':'Agent quiz','kind':'quiz','questions':[
-                {'type':'single','prompt':'Choose','options':['A','B'],'correct':[0],'points':3}]}}
+                {'type':'single','prompt':'Choose','options':['A','B'],'correct':[0],'points':3,
+                 'explanation':'Why A is correct.'}]}}
             code, result = self.req('execute', self.prepared('engagement.control', args))
             self.assertEqual(code, 200, result)
             self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['questions'][0]['points'], 3)
+            self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['questions'][0]['explanation'], 'Why A is correct.')
 
     def test_agent_can_preview_and_confirm_copy_of_legacy_draft(self):
         import engagement_catalog

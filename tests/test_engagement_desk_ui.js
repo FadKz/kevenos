@@ -4,6 +4,27 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('organizer can reorder questions without losing their unsaved text', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-desk.js'), 'utf8'));
+  const writes = [], root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => ({revision:0, activities:[], runs:[]}),
+    async (path, body) => { writes.push(body); return {revision:1, activities:[], runs:[]}; });
+  root.querySelector('[name=title]').value = 'Ordered poll';
+  root.querySelector('[name=prompt]').value = 'First';
+  root.querySelector('[name=options]').value = 'A\nB';
+  [...root.querySelectorAll('button')].find(item => item.textContent === 'Add question').click();
+  const boxes = root.querySelectorAll('.engagement-editor-questions fieldset');
+  boxes[1].querySelector('[name=prompt]').value = 'Second';
+  boxes[1].querySelector('[name=options]').value = 'C\nD';
+  [...boxes[1].querySelectorAll('button')].find(item => item.textContent === 'Move earlier').click();
+  root.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles:true, cancelable:true}));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(Array.from(writes[0].payload.questions, q => q.prompt), ['Second', 'First']);
+  assert.deepEqual(Array.from(writes[0].payload.questions[0].options), ['C', 'D']);
+});
+
 test('organizer can save a draft and receives clear validation', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true, url:'https://example.test/organizer'});
   const w = dom.window;

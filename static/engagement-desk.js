@@ -105,6 +105,14 @@
     type.addEventListener('change', update); kind.addEventListener('change', update); update();
     box.append(options, correct);
     if (item.evidence) box.append(field('Source excerpt — verify this supports the question', 'evidence', item.evidence, true));
+    box.append(button('Move earlier', () => {
+      const previous = box.previousElementSibling;
+      if (previous) { box.parentElement.insertBefore(box, previous); dirty = true; }
+    }));
+    box.append(button('Move later', () => {
+      const next = box.nextElementSibling;
+      if (next) { box.parentElement.insertBefore(next, box); dirty = true; }
+    }));
     box.append(button('Remove question', () => { if (box.parentElement.querySelectorAll('fieldset').length > 1) { dirty = true; box.remove(); } }));
     return box;
   }

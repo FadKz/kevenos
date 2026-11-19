@@ -30,7 +30,7 @@ async function port() {
     await fs.writeFile(path.join(secretDir,name), value, {mode:0o600});
   const address = 'http://localhost:' + await port();
   const app = spawn(process.env.KEVENOS_TEST_PYTHON || 'python3', ['server.py','--host','127.0.0.1','--port',address.split(':').at(-1),'--mode','self'],
-    {cwd:root, env:{...process.env, KEVENOS_DATA:data, KEVENOS_HOSTED:'1', KEVENOS_SECRETS_DIR:secretDir,
+    {cwd:root, env:{PATH:process.env.PATH, KEVENOS_DB_BACKEND:'sqlite', KEVENOS_DATA:data, KEVENOS_HOSTED:'1', KEVENOS_SECRETS_DIR:secretDir,
       KEVENOS_ENGAGEMENT_V2:'1', KEVENOS_ENGAGEMENT_AI_ENABLED:'0', KEVENOS_GATEWAY_ENABLED:'0', KEVENOS_SMTP_ENABLED:'0', KEVENOS_ASSISTANT_ENABLED:'0', TZ:'UTC'},
       stdio:['ignore','ignore','pipe']});
   let serverErrors = '';

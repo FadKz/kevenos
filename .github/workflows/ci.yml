@@ -74,6 +74,8 @@ jobs:
         run: |
           KEVENOS_TEST_BROWSER=webkit node tests/test_engagement_rehearsal.cjs
           KEVENOS_TEST_BROWSER=chromium node tests/test_engagement_rehearsal.cjs
+      - name: Exercise 100 attendee HTTP burst
+        run: node tests/benchmark_engagement.cjs
       - name: Audit Node dependencies
         run: npm audit --audit-level=high
       - name: Audit live-display dependencies

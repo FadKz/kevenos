@@ -4,6 +4,24 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('removing a filled question requires confirmation', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close()); w.confirm = () => false;
+  w.eval(readFileSync(join(__dirname,'../static/engagement-desk.js'),'utf8'));
+  const root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => ({revision:0,activities:[],runs:[]}), async () => {});
+  root.querySelector('[name=prompt]').value = 'Keep my work';
+  [...root.querySelectorAll('button')].find(button => button.textContent === 'Add question').click();
+  const questions = () => root.querySelectorAll('.engagement-editor-questions fieldset');
+  [...questions()[0].querySelectorAll('button')].find(button => button.textContent === 'Remove question').click();
+  assert.equal(questions().length,2);
+  w.confirm = () => true;
+  [...questions()[0].querySelectorAll('button')].find(button => button.textContent === 'Remove question').click();
+  assert.equal(questions().length,1);
+  [...questions()[0].querySelectorAll('button')].find(button => button.textContent === 'Remove question').click();
+  assert.match(root.textContent,/Keep at least one question/);
+});
+
 test('Organizer can preview unsaved question and reveal without sending it', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close());

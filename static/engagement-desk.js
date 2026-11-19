@@ -161,7 +161,15 @@
       dialog.append(result,close); root.append(dialog);
       dialog.addEventListener('close', () => dialog.remove(), {once:true}); dialog.showModal();
     }));
-    box.append(button('Remove question', () => { if (box.parentElement.querySelectorAll('fieldset').length > 1) { dirty = true; box.remove(); } }));
+    box.append(button('Remove question', () => {
+      if (box.parentElement.querySelectorAll('fieldset').length <= 1) {
+        root.querySelector('[role=status]').textContent = 'Keep at least one question in the draft.'; return;
+      }
+      const hasContent = box.dataset.questionId || type.value !== 'single' || pointsInput.value !== '1' ||
+        ['prompt','options','correct','explanation','evidence'].some(name => box.querySelector(`[name=${name}]`)?.value.trim());
+      if (hasContent && !confirm('Remove this question from the draft? Unsaved changes to it will be lost.')) return;
+      dirty = true; box.remove();
+    }));
     return box;
   }
   function drawQuestions(list) {

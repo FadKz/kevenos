@@ -25,6 +25,7 @@ import event_assistant
 import event_operations
 import participant_workspace
 import event_quiz
+import engagement_catalog
 import audience_questions
 import event_push
 import registration_desk
@@ -1769,6 +1770,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if event_quiz.handle(sys.modules[__name__], self, path):
                 return
+            if engagement_catalog.handle(sys.modules[__name__], self, path):
+                return
             if audience_questions.handle(sys.modules[__name__], self, path):
                 return
             if event_push.handle(sys.modules[__name__], self, path):
@@ -1995,6 +1998,8 @@ class Handler(BaseHTTPRequestHandler):
             if event_mail.handle_post(sys.modules[__name__], self, path, b):
                 return
             if event_quiz.handle(sys.modules[__name__], self, path, b):
+                return
+            if engagement_catalog.handle(sys.modules[__name__], self, path, b):
                 return
             if audience_questions.handle(sys.modules[__name__], self, path, b):
                 return

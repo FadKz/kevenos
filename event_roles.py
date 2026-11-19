@@ -115,7 +115,7 @@ def guard(s,h,path,body=None):
     if not ident:return False # Domain handlers retain their unauthenticated checks.
     role=ident.get('dashboard',ident['role'])
     if role=='admin':
-        operations={'/api/desk/clock':'scoring','/api/desk/mode':'scoring','/api/desk/sheet':'scoring','/api/desk/calib':'scoring','/api/desk/reveal':'scoring','/api/desk/final':'scoring','/api/desk/public':'scoring','/api/desk/audience':'organizer','/api/desk/program':'organizer','/api/desk/quiz':'organizer','/api/registration':'registration'}
+        operations={'/api/desk/clock':'scoring','/api/desk/mode':'scoring','/api/desk/sheet':'scoring','/api/desk/calib':'scoring','/api/desk/reveal':'scoring','/api/desk/final':'scoring','/api/desk/public':'scoring','/api/desk/audience':'organizer','/api/desk/program':'organizer','/api/desk/quiz':'organizer','/api/desk/engagement':'organizer','/api/registration':'registration'}
         if h.command=='POST' and path in operations:
             if h.headers.get('X-Dashboard') or operations[path] not in {g['role'] for g in ident.get('grants',[])}:
                 h.send(403,{'error':'Open the assigned operational dashboard for this action.'});return True
@@ -137,8 +137,8 @@ def guard(s,h,path,body=None):
     gets={'/api/content','/api/desk/state','/api/event-operations'}
     posts={'/api/event-operations'}
     if role=='organizer':
-        gets|={'/api/desk/audience','/api/desk/audience/responses','/api/desk/quiz','/api/desk/quiz/questions.csv','/api/desk/participant-workspace'}
-        posts|={'/api/desk/audience','/api/desk/program','/api/desk/quiz','/api/desk/participant-workspace'}
+        gets|={'/api/desk/audience','/api/desk/audience/responses','/api/desk/quiz','/api/desk/quiz/questions.csv','/api/desk/participant-workspace','/api/desk/engagement'}
+        posts|={'/api/desk/audience','/api/desk/program','/api/desk/quiz','/api/desk/participant-workspace','/api/desk/engagement'}
     else:
         gets|={'/api/desk/scores','/api/desk/sheets','/api/desk/calib','/api/desk/export.csv','/api/desk/participant-workspace'}
         posts|={'/api/desk/public','/api/desk/clock','/api/desk/mode','/api/desk/reveal','/api/desk/final','/api/desk/calib','/api/desk/sheet','/api/desk/ai-summary','/api/desk/participant-workspace'}

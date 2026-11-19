@@ -103,7 +103,7 @@ def save_draft(state, payload, *, expected_revision):
     seen_ids = set()
     clean = []
     for question in questions:
-        if not isinstance(question, dict) or set(question) - {'id', 'prompt', 'type', 'options', 'correct', 'evidence'}:
+        if not isinstance(question, dict) or set(question) - {'id', 'prompt', 'type', 'options', 'correct', 'evidence', 'points'}:
             raise ValueError('Use the supported question fields.')
         question_id = question.get('id')
         if question_id is not None and (not isinstance(question_id, str) or question_id not in previous_ids or question_id in seen_ids):
@@ -134,6 +134,11 @@ def save_draft(state, payload, *, expected_revision):
                 (not correct or (question_type != 'multi' and len(correct) != 1))) or (kind == 'poll' and correct):
             raise ValueError('Choose the correct answers for a quiz; polls are unscored.')
         item = {'id': question_id, 'type': question_type, 'prompt': prompt, 'options': choices, 'correct': sorted(correct)}
+        points = question.get('points', 1 if kind == 'quiz' else 0)
+        if type(points) is not int or (kind == 'quiz' and not 1 <= points <= 100) or (kind == 'poll' and points != 0):
+            raise ValueError('Choose 1 to 100 points for a quiz question; polls are unscored.')
+        if kind == 'quiz':
+            item['points'] = points
         if question.get('evidence'):
             item['evidence'] = _text(question['evidence'], 500, 'source evidence')
         elif 'evidence' in question and not isinstance(question['evidence'], str):
@@ -529,7 +534,8 @@ def player_view(run, *, principal=None):
         if response:
             question = snapshot['questions'][0]
             selected = response['choice'] if isinstance(response['choice'], list) else [response['choice']]
-            view['result'] = {'earned': int(selected == question['correct']), 'available': 1}
+            points = question.get('points', 1)
+            view['result'] = {'earned': points if selected == question['correct'] else 0, 'available': points}
     return view
 
 
@@ -546,13 +552,14 @@ def player_score(state, principal, audience):
         for question in snapshot['questions']:
             if question['id'] not in released:
                 continue
-            available += 1
+            points = question.get('points', 1)
+            available += points
             response = next((run.get('responses', {}).get(item['id'], {}).get(principal) for item in deliveries
                              if item.get('question_id') == question['id'] and
                              principal in run.get('responses', {}).get(item['id'], {})), None)
             if response:
                 selected = response['choice'] if isinstance(response['choice'], list) else [response['choice']]
-                earned += int(selected == question['correct'])
+                earned += points if selected == question['correct'] else 0
     return {'earned':earned, 'available':available} if available else None
 
 
@@ -785,7 +792,7 @@ def analytics_csv(state, workspace, run_id=None):
         raise ValueError('Export one run at a time for this event.')
     buffer = io.StringIO(newline='')
     writer = csv.writer(buffer)
-    writer.writerow(['generated_utc','workspace','activity','version','run_id','question','respondents',
+    writer.writerow(['generated_utc','workspace','activity','version','run_id','question','points_per_correct_answer','respondents',
                      'denominator','views','option_counts','correct_count','median_seconds','suppressed_below'])
     generated = datetime.now(timezone.utc).isoformat(timespec='seconds')
     for run in runs:
@@ -796,7 +803,8 @@ def analytics_csv(state, workspace, run_id=None):
             counts = metric['distribution']
             breakdown = '; '.join(f'{label}: {count}' for label, count in zip(labels, counts)) if counts is not None else 'suppressed or not applicable'
             writer.writerow([generated, safe(workspace), safe(run['snapshot']['title']), run['version'], run['id'],
-                             safe(question['prompt']), metric['respondents'], metric['denominator'], 'not tracked',
+                             safe(question['prompt']), question.get('points', 1) if run['snapshot']['kind'] == 'quiz' else '',
+                             metric['respondents'], metric['denominator'], 'not tracked',
                              safe(breakdown), '' if metric['correct_count'] is None else metric['correct_count'],
                              '' if metric['median_seconds'] is None else metric['median_seconds'], metric['suppressed_below']])
     return ('\ufeff' + buffer.getvalue()).encode('utf-8')

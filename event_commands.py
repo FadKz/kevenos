@@ -1105,7 +1105,7 @@ ENGAGEMENT_REV = integer(0, 2**31 - 1)
 ENGAGEMENT_DURATION = {'type':['integer','null'], 'minimum':1, 'maximum':3600}
 ENGAGEMENT_QUESTION = obj({'id':ENGAGEMENT_ID, 'type':choices('single','multi','true_false','rating','text'),
                            'prompt':string(500,1), 'options':array(string(150,1),8,2),
-                           'correct':array(integer(0,7),8,0,uniqueItems=True), 'evidence':string(500,1)}, ('type','prompt'))
+                           'correct':array(integer(0,7),8,0,uniqueItems=True), 'points':integer(1,100), 'evidence':string(500,1)}, ('type','prompt'))
 ENGAGEMENT_DRAFT = obj({'id':ENGAGEMENT_ID, 'title':string(120,1), 'kind':choices('quiz','poll'),
                         'description':string(500),
                         'audiences':array(choices('participant','guest'),2,1,uniqueItems=True),

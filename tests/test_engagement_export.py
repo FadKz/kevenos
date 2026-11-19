@@ -20,6 +20,7 @@ class Export(unittest.TestCase):
         rows = list(csv.DictReader(io.StringIO(data)))
         self.assertEqual(rows[0]['respondents'], '1')
         self.assertEqual(rows[0]['option_counts'], 'suppressed or not applicable')
+        self.assertEqual(rows[0]['points_per_correct_answer'], '')
         self.assertEqual(rows[0]['workspace'], "'\u00a0=unsafe")
         self.assertNotIn('Private free text', data)
 

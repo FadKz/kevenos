@@ -4,6 +4,22 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('organizer can set quiz points on a question', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-desk.js'), 'utf8'));
+  const root = w.document.querySelector('#desk'), writes = [];
+  await w.EngagementDesk.mount(root, async () => ({revision:0, activities:[], runs:[]}),
+    async (path, body) => { writes.push(body); return {revision:1, activities:[], runs:[]}; });
+  root.querySelector('[name=title]').value = 'Scored quiz';
+  const kind = root.querySelector('[name=kind]'); kind.value = 'quiz'; kind.dispatchEvent(new w.Event('change', {bubbles:true}));
+  root.querySelector('[name=prompt]').value = 'Question?'; root.querySelector('[name=options]').value = 'A\nB';
+  root.querySelector('[name=correct]').value = '1'; root.querySelector('[name=points]').value = '3';
+  root.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles:true, cancelable:true}));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(writes[0].payload.questions[0].points, 3);
+});
+
 test('completed runs show per-question aggregate history', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close());

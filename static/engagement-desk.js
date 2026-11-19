@@ -101,12 +101,15 @@
     type.value = item.type || 'single'; label.append(type); box.append(label);
     const options = field('Options, one per line', 'options', (item.options || []).join('\n'), true);
     const correct = field('Correct option numbers, separated by commas', 'correct', (item.correct || []).map(i => i + 1).join(', '));
+    const points = field('Points for a correct answer', 'points', String(item.points ?? 1));
+    const pointsInput = points.querySelector('input'); pointsInput.type = 'number'; pointsInput.min = '1'; pointsInput.max = '100'; pointsInput.step = '1';
     const update = () => {
       options.hidden = !['single', 'multi'].includes(type.value);
       correct.hidden = kind.value !== 'quiz';
+      points.hidden = kind.value !== 'quiz';
     };
     type.addEventListener('change', update); kind.addEventListener('change', update); update();
-    box.append(options, correct);
+    box.append(options, correct, points);
     if (item.evidence) box.append(field('Source excerpt — verify this supports the question', 'evidence', item.evidence, true));
     box.append(button('Move earlier', () => {
       const previous = box.previousElementSibling;
@@ -119,7 +122,7 @@
     box.append(button('Duplicate question', () => {
       const evidence = box.querySelector('[name=evidence]')?.value || '';
       const copy = questionEditor({evidence}, kind);
-      for (const name of ['prompt', 'type', 'options', 'correct', 'evidence']) {
+      for (const name of ['prompt', 'type', 'options', 'correct', 'points', 'evidence']) {
         const source = box.querySelector(`[name=${name}]`), target = copy.querySelector(`[name=${name}]`);
         if (source && target) target.value = source.value;
       }
@@ -246,7 +249,10 @@
         const result = {type, prompt:box.querySelector('[name=prompt]').value.trim()};
         if (box.dataset.questionId) result.id = box.dataset.questionId;
         if (['single','multi'].includes(type)) result.options = box.querySelector('[name=options]').value.split('\n').map(v => v.trim()).filter(Boolean);
-        if (kind.value === 'quiz') result.correct = correct ? correct.split(',').map(v => Number(v.trim()) - 1) : [];
+        if (kind.value === 'quiz') {
+          result.correct = correct ? correct.split(',').map(v => Number(v.trim()) - 1) : [];
+          result.points = Number(box.querySelector('[name=points]').value);
+        }
         const evidence = box.querySelector('[name=evidence]')?.value.trim();
         if (evidence) result.evidence = evidence;
         return result;

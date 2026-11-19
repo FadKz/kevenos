@@ -59,6 +59,10 @@ for the model service. Preserve verifiable source excerpts and request human
 review of every question and answer. Saving a draft, publishing it, and sending
 a question are separate actions; none implies approval of the next.
 
+Quiz questions may specify an integer `points` value from 1 to 100; omitted
+values default to one. Polls are unscored. A run retains the point values of
+its published snapshot even when the draft is edited later.
+
 `engagement.legacy_preview` returns counts for the previous quiz and audience
 records and identifies copyable Audience drafts without changing them. Use a
 confirmed `copy_legacy_pack` action with the preview digest to copy a draft;

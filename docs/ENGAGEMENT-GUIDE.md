@@ -9,7 +9,8 @@ Keep the flag off for production until the release checks in
 1. Open **Event Operations → Engagement Hub**. Choose **New activity**, enter a
    title, choose a scored quiz or an unscored poll, and select its audiences.
 2. Add questions, options and, for a quiz, the correct option numbers. A
-   multiple-choice question can have several correct options. Use **Move
+   multiple-choice question can have several correct options. Set 1–100
+   points for each quiz question; the default is one. Polls have no points. Use **Move
    earlier** and **Move later** to arrange the series, then save the draft.
 3. Review the draft and publish a version. Edits after publication do not
    change that version or an already started run.

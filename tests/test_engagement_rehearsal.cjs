@@ -87,6 +87,7 @@ async function port() {
     await page.getByLabel('Question', {exact:true}).fill('Which answer is correct?');
     await page.getByLabel('Options, one per line').fill('Correct answer\nOther answer');
     await page.getByLabel('Correct option numbers, separated by commas').fill('1');
+    await page.getByLabel('Points for a correct answer').fill('3');
     await page.getByRole('button', {name:'Save draft'}).click();
     await page.getByRole('button', {name:'Publish draft'}).click();
     await page.getByRole('button', {name:'Start run'}).click();
@@ -125,11 +126,11 @@ async function port() {
     await page.getByRole('button', {name:'Close question'}).click();
     await page.getByRole('button', {name:'Reveal answer'}).click();
     await until(async () => (await tv.locator('body').innerText()).includes('Correct answer'), 'hall reveal');
-    assert.deepEqual((await phone1.api('/api/engagement/player')).score, {earned:1,available:1});
-    assert.deepEqual((await guest.api('/api/engagement/player')).score, {earned:1,available:1});
+    assert.deepEqual((await phone1.api('/api/engagement/player')).score, {earned:3,available:3});
+    assert.deepEqual((await guest.api('/api/engagement/player')).score, {earned:3,available:3});
     await page.getByRole('button', {name:'Finish run'}).click();
     await page.getByText('Completed runs (1)').waitFor();
-    assert.deepEqual((await phone1.api('/api/engagement/player')).score, {earned:1,available:1});
+    assert.deepEqual((await phone1.api('/api/engagement/player')).score, {earned:3,available:3});
     await page.getByLabel('Allow participants').check(); await page.getByLabel('Allow guests').check();
     await page.getByRole('button', {name:'Save audience settings'}).click();
     await until(async () => await phone1.page.locator('#engagement-questions').isVisible(), 'participant Q&A');

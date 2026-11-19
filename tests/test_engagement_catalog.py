@@ -14,6 +14,25 @@ import test_workspace_routes as workspace
 
 
 class EngagementCatalogTests(unittest.TestCase):
+    def test_configured_quiz_points_are_snapshotted_and_awarded_after_reveal(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[0],'points':3}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        catalog.save_draft(state, {'id':draft['id'],'title':'Quiz','kind':'quiz','questions':[
+            {**draft['questions'][0], 'points':5}]}, expected_revision=4)
+        catalog.submit_answer(state, run['id'], run['delivery']['id'], 'attendee', 0)
+        self.assertIsNone(catalog.player_score(state, 'attendee', 'participant'))
+        catalog.close_question(state, run['id'], expected_revision=5)
+        catalog.reveal_question(state, run['id'], expected_revision=6)
+        self.assertEqual(catalog.player_score(state, 'attendee', 'participant'), {'earned':3,'available':3})
+        self.assertEqual(catalog.player_view(state['runs'][0], principal='attendee')['result'], {'earned':3,'available':3})
+        with self.assertRaises(ValueError):
+            catalog.save_draft(state, {'title':'Invalid','kind':'quiz','questions':[
+                {'type':'single','prompt':'Question?','options':['A','B'],'correct':[0],'points':True}]}, expected_revision=7)
+
     def test_finishing_run_preserves_results_and_requires_question_closed(self):
         state = catalog.empty()
         draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[

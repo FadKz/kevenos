@@ -4,6 +4,21 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('completed runs show per-question aggregate history', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-desk.js'), 'utf8'));
+  const state = {revision:0,activities:[],runs:[{id:'r',version:1,status:'completed',snapshot:{title:'Survey',questions:[
+    {id:'q',prompt:'How useful?',type:'single',options:['Yes','No']}]},
+    question_analytics:[{question_id:'q',respondents:6,denominator:6,distribution:[4,2],suppressed_below:5}]}]};
+  const root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => state, async () => state);
+  const history = [...root.querySelectorAll('details')].find(item => item.textContent.includes('Completed runs'));
+  assert.match(history.textContent, /How useful/);
+  assert.match(history.textContent, /6 responses/);
+  assert.match(history.textContent, /Yes: 4/);
+});
+
 test('organizer can filter the moderation queue without changing its contents', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close());

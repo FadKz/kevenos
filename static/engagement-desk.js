@@ -25,18 +25,21 @@
     dirty = false;
     return true;
   }
-  function updateAnalytics(run) {
-    const target = [...root.querySelectorAll('[data-engagement-run]')].find(item => item.dataset.engagementRun === run.id);
-    if (!target || !run.analytics) return;
-    const {respondents, distribution, denominator, suppressed_below:threshold, correct_count:correct, median_seconds:median} = run.analytics;
-    const question = run.snapshot.questions.find(item => item.id === run.active_question_id);
+  function analyticsText(question, metrics) {
+    const {respondents, distribution, denominator, suppressed_below:threshold, correct_count:correct, median_seconds:median} = metrics;
     const labels = question?.type === 'rating' ? ['1','2','3','4','5'] : question?.options || [];
     const counts = distribution?.map((count,index) => `${labels[index] || `Option ${index + 1}`}: ${count}`).join(' · ');
-    target.textContent = `${respondents} ${respondents === 1 ? 'response' : 'responses'}. ` +
+    return `${respondents} ${respondents === 1 ? 'response' : 'responses'}. ` +
       (distribution ? `Answer counts: ${counts} (out of ${denominator} respondents).` :
         `Answer breakdown is hidden for groups smaller than ${threshold}, or for free text.`) +
       (correct == null ? '' : ` ${correct} of ${denominator} respondents answered correctly.`) +
       (median == null ? '' : ` Median response time: ${median} seconds.`);
+  }
+  function updateAnalytics(run) {
+    const target = [...root.querySelectorAll('[data-engagement-run]')].find(item => item.dataset.engagementRun === run.id);
+    if (!target || !run.analytics) return;
+    const question = run.snapshot.questions.find(item => item.id === run.active_question_id);
+    target.textContent = analyticsText(question, run.analytics);
   }
   async function refresh() {
     if (busy || reading || !root) return;
@@ -361,13 +364,18 @@
     if (completed.length) {
       const history = element('details'); history.append(element('summary', `Completed runs (${completed.length})`));
       completed.forEach(run => {
-        const row = element('p', `${run.snapshot.title} · version ${run.version} `);
+        const row = element('div', null, 'engagement-run');
+        row.append(element('h4', `${run.snapshot.title} · version ${run.version}`));
         row.append(button('Export run analytics', () => {
           if (!window.KEV?.download) { notice.textContent = 'Downloads are unavailable in this session.'; return; }
           window.KEV.download('/api/desk/engagement/analytics.csv?run_id=' + encodeURIComponent(run.id)).catch(error => {
             notice.textContent = error?.message || 'Could not download analytics.';
           });
         }));
+        (run.question_analytics || []).forEach(metrics => {
+          const question = run.snapshot.questions.find(item => item.id === metrics.question_id);
+          if (question) row.append(element('h5', question.prompt), element('p', analyticsText(question, metrics)));
+        });
         history.append(row);
       });
       runs.append(history);

@@ -31,7 +31,8 @@ Keep the flag off for production until the release checks in
    answers and prefixes spreadsheet formula-like text.
 7. When the activity is over, close its active question and choose **Finish
    run**. This stops hall sharing and keeps results and exports under
-   **Completed runs**. Finish only after revealing any results you intend to
+   **Completed runs**, where the per-question aggregate results are also
+   available. Finish only after revealing any results you intend to
    show; a finished run cannot be resumed.
 
 When the new runner is enabled, new sends through the old Quiz and Audience

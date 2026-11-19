@@ -160,7 +160,8 @@ focus traps that interrupt an important event workflow.
 
 Device matrix: iPhone Safari and Chrome on iOS; iPad Safari and Chrome in both
 orientations; macOS Safari and Chrome desktop. Use actual supported OS/browser
-versions recorded at test time. iOS browsers share WebKit, so cover Chrome's
+versions recorded at test time. iOS browsers generally use WebKit (confirm
+the actual engine and supported regional variants), so cover Chrome's
 browser-specific UI as well as Safari; desktop Chrome provides Chromium
 coverage. Test orientation, safe areas, dynamic viewport, keyboard, history,
 reconnect, background/foreground, screen reader and installed iPhone web-app

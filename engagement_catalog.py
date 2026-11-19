@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import io
 import json
 import hashlib
+import math
 import os
 import re
 import statistics
@@ -713,13 +714,29 @@ def _validate_command(action, payload):
 
 def _legacy_delivery_open(db):
     now = time.time()
-    quiz = _read(db, 'event_quiz_v1', {})
-    if any(item.get('status') == 'open' and (item.get('end') is None or item['end'] > now)
-           for item in quiz.get('runs', [])):
-        return True
-    audience = _read(db, 'audience_questions_v1', {})
-    return any(item.get('status') == 'live' and (item.get('closesAt') is None or item['closesAt'] > now * 1000)
-               for item in audience.get('packs', []))
+    try:
+        quiz = _read(db, 'event_quiz_v1', {})
+        audience = _read(db, 'audience_questions_v1', {})
+        if not isinstance(quiz, dict) or not isinstance(audience, dict):
+            raise ValueError
+        runs, packs = quiz.get('runs', []), audience.get('packs', [])
+        if not isinstance(runs, list) or not isinstance(packs, list):
+            raise ValueError
+        for item, active_status, deadline_key, clock in [
+                *((item, 'open', 'end', now) for item in runs),
+                *((item, 'live', 'closesAt', now * 1000) for item in packs)]:
+            if not isinstance(item, dict) or not isinstance(item.get('status'), str):
+                raise ValueError
+            if item['status'] != active_status:
+                continue
+            deadline = item.get(deadline_key)
+            if deadline is not None and (type(deadline) not in (int, float) or not math.isfinite(deadline)):
+                raise ValueError
+            if deadline is None or deadline > clock:
+                return True
+        return False
+    except (ValueError, TypeError, OverflowError) as error:
+        raise Conflict('Legacy delivery state requires inspection before sending a question.') from error
 
 
 def legacy_preview(db):
@@ -727,13 +744,33 @@ def legacy_preview(db):
     quiz = _read(db, 'event_quiz_v1', {})
     audience = _read(db, 'audience_questions_v1', {})
     archive = _read(db, 'event_quiz_reset_archive_v1', [])
+    if not isinstance(quiz, dict) or not isinstance(audience, dict) or not isinstance(archive, list):
+        raise ValueError('Legacy records require inspection before inventory.')
     answers = quiz.get('answers', {})
+    runs = quiz.get('runs', [])
+    if not isinstance(answers, dict) or not isinstance(runs, list) or any(not isinstance(run, dict) for run in runs):
+        raise ValueError('Legacy quiz records require inspection before inventory.')
+    if any(not isinstance(entries, dict) for entries in answers.values()):
+        raise ValueError('Legacy quiz answer records require inspection before inventory.')
+    cases = {'voided':sum(run.get('status') == 'void' for run in runs),
+             'unscored':sum(run.get('points') == 0 for run in runs),
+             'excluded_audiences':sum(bool(run.get('excluded')) for run in runs),
+             'predictions':sum(bool(run.get('prediction')) for run in runs),
+             'warmup_or_post':sum(run.get('kind') in {'warmup', 'post'} for run in runs),
+             'catchup_or_waiting':sum(run.get('kind') == 'waiting' or bool(run.get('catchup')) for run in runs),
+             'open':sum(run.get('status') == 'open' for run in runs)}
     packs = audience.get('packs', [])
+    if not isinstance(packs, list) or any(not isinstance(item, dict) for item in packs):
+        raise ValueError('Legacy audience records require inspection before inventory.')
+    if any(item.get('status') == 'draft' and (not isinstance(item.get('id'), str) or
+           not isinstance(item.get('questions', []), list)) for item in packs):
+        raise ValueError('Legacy audience drafts require inspection before inventory.')
     drafts = [{'id':item['id'], 'title':item.get('title',''), 'question_count':len(item.get('questions', [])),
                'digest':_legacy_digest(item)} for item in packs if item.get('status') == 'draft']
     records = db.execute('SELECT count(*) AS n FROM kv WHERE k LIKE ?', ('audience_answers_v1:%',)).fetchone()['n']
-    return {'quiz':{'revision':quiz.get('rev', 0), 'runs':len(quiz.get('runs', [])),
-                    'answering_accounts':len(answers), 'archives':len(archive)},
+    return {'quiz':{'revision':quiz.get('rev', 0), 'runs':len(runs),
+                    'answering_accounts':len(answers), 'answer_entries':sum(len(entries) for entries in answers.values()),
+                    'archives':len(archive), 'cases':cases},
             'audience':{'revision':audience.get('rev', 0), 'packs':len(packs),
                         'draft_packs':sum(item.get('status') == 'draft' for item in packs),
                         'answer_records':records, 'drafts':drafts},
@@ -1011,8 +1048,12 @@ def handle(service, handler, path, body=None):
         if body is not None:
             handler.send(405, {'error':'Read the compatibility inventory with GET.'})
         else:
-            with service.LOCK:
-                handler.send(200, legacy_preview(service.DB))
+            try:
+                with service.LOCK:
+                    result = legacy_preview(service.DB)
+                handler.send(200, result)
+            except ValueError as error:
+                handler.send(409, {'error':str(error)})
         return True
     if body is not None and (identity.get('impersonation') or {}).get('mode') == 'preview':
         handler.send(403, {'error': 'This profile is a read-only preview.'})

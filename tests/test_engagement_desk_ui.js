@@ -315,13 +315,17 @@ test('legacy inventory is explicitly read-only', async t => {
   const root = w.document.querySelector('#desk'), calls = [];
   await w.EngagementDesk.mount(root, async path => {
     calls.push(path);
-    return path.endsWith('legacy-preview') ? {quiz:{runs:2,answering_accounts:4,archives:1}, audience:{packs:3,draft_packs:1,answer_records:5}} : {revision:0,activities:[],runs:[]};
+    return path.endsWith('legacy-preview') ? {quiz:{runs:2,answering_accounts:4,answer_entries:8,archives:1,
+      cases:{voided:1,unscored:1,excluded_audiences:0,predictions:0,warmup_or_post:1,catchup_or_waiting:0,open:0}},
+      audience:{packs:3,draft_packs:1,answer_records:5}} : {revision:0,activities:[],runs:[]};
   }, async () => { throw new Error('Unexpected write'); });
   [...root.querySelectorAll('button')].find(button => button.textContent === 'Check legacy history').click();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(calls[1], '/api/desk/engagement/legacy-preview');
   assert.match(root.textContent, /2 legacy quiz runs/);
   assert.match(root.textContent, /No changes were made/);
+  assert.match(root.textContent, /8 saved answers/);
+  assert.match(root.textContent, /1 voided/);
 });
 
 test('copying a legacy draft requires confirmation and its preview digest', async t => {

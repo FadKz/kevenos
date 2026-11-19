@@ -46,6 +46,9 @@ qualified.
 **Previous quiz and audience history → Check legacy history** shows a read-only
 inventory. An old Audience draft can be copied into a new, unpublished poll
 after confirmation; its original and historical results are left untouched.
+The inventory also counts saved answers and special cases such as voids,
+exclusions and predictions. These case counts can overlap. Malformed legacy
+records require inspection and prevent a new question from being sent.
 The app checks that the source still matches the preview and prevents the same
 draft from being copied twice. Previous scored runs and responses are not yet
 migrated into the new scoring model.

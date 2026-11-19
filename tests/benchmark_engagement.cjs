@@ -67,8 +67,8 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
     run = state.runs[0];
     const sessions = [];
     for (let i=0; i<100; i++) { const session = {}; await call('/api/access/login', {role:'guest',password:guest}, session); sessions.push(session); }
-    const samples = [], pollSamples = [], started = performance.now();
-    const receipts = await Promise.all(sessions.map(async (session,index) => {
+    const samples = [], pollSamples = [], deskSamples = [], started = performance.now();
+    const attendees = Promise.all(sessions.map(async (session,index) => {
       const pollStart = performance.now();
       const view = await call('/api/engagement/player', undefined, session);
       pollSamples.push(performance.now()-pollStart);
@@ -77,6 +77,11 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
       const response = await call('/api/engagement/player', {run_id:run.id,delivery_id:run.delivery.id,choice:index%2}, session);
       samples.push(performance.now()-begin); return response.receipt.id;
     }));
+    const deskReads = Promise.all(Array.from({length:10}, async () => {
+      const begin = performance.now(); await call('/api/desk/engagement', undefined, organizer);
+      deskSamples.push(performance.now()-begin);
+    }));
+    const [receipts] = await Promise.all([attendees,deskReads]);
     const elapsed = performance.now()-started;
     assert.equal(new Set(receipts).size, 100, 'all attendee receipts must be distinct');
     state = await call('/api/desk/engagement', undefined, organizer);
@@ -84,7 +89,8 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
     assert(!errors.includes('Traceback (most recent call last)'), 'server traceback during synthetic load');
     console.log(JSON.stringify({backend:'sqlite',attendees:100,successful:receipts.length,
       burst_ms:Math.round(elapsed),poll_p95_ms:Math.round(percentile(pollSamples,.95)),
-      answer_p50_ms:Math.round(percentile(samples,.5)),answer_p95_ms:Math.round(percentile(samples,.95))}));
+      answer_p50_ms:Math.round(percentile(samples,.5)),answer_p95_ms:Math.round(percentile(samples,.95)),
+      organizer_p95_ms:Math.round(percentile(deskSamples,.95))}));
   } finally {
     if (app.exitCode === null && app.signalCode === null) { app.kill('SIGTERM'); await new Promise(resolve => app.once('exit',resolve)); }
     await fs.rm(data,{recursive:true,force:true});

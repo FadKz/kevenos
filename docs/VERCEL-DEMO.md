@@ -79,3 +79,16 @@ Supabase backup/recovery controls for database recovery; never point an older
 application at a newer schema without verifying compatibility. If the Git
 source is faulty, revert the offending merge on GitHub and let `main` produce a
 replacement production deployment.
+
+## Preview image capacity
+
+Each distinct container preview can create a registry image. If Vercel's
+build log says the repository has reached its image limit, inspect the
+project's registry images and deployment history before removing anything.
+Identify the active production image and all rollback images; retain those,
+the latest usable preview and any artifacts still needed for review. An
+untagged image is not necessarily unused. Remove only explicitly identified,
+superseded preview artifacts whose source can be rebuilt, then rebuild the
+failed **preview** and verify it. Removing an image can make an older preview
+unavailable. Do not delete a repository, prune blindly, or redeploy production
+to test registry cleanup.

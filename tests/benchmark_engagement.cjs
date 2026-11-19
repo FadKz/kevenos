@@ -22,6 +22,8 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
 (async () => {
   const bursts = Number(process.env.KEVENOS_TEST_BURSTS || '1');
   if (!Number.isInteger(bursts) || bursts < 1 || bursts > 10) throw new Error('Choose one to ten synthetic bursts.');
+  const interval = Number(process.env.KEVENOS_TEST_INTERVAL_MS || '0');
+  if (!Number.isInteger(interval) || interval < 0 || interval > 10000) throw new Error('Choose an interval from 0 to 10000 milliseconds.');
   const data = await fs.mkdtemp(path.join(os.tmpdir(), 'kevenos-engagement-load-'));
   const secrets = path.join(data, 'secrets'); await fs.mkdir(secrets, {mode:0o700});
   const admin = 'Synthetic-Load-Admin9!', guest = 'Synthetic-Load-Guest9!';
@@ -67,7 +69,7 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
     let run = state.runs[0];
     const sessions = [];
     for (let i=0; i<100; i++) { const session = {}; await call('/api/access/login', {role:'guest',password:guest}, session); sessions.push(session); }
-    const samples = [], pollSamples = [], deskSamples = [], receipts = [], rounds = [], started = performance.now();
+    const samples = [], pollSamples = [], deskSamples = [], backgroundSamples = [], receipts = [], rounds = [], started = performance.now();
     for (let round=0; round<bursts; round++) {
       const answerOffset = samples.length;
       state = await command('open_question', {run_id:run.id,question_id:run.snapshot.questions[round].id,duration:null}, state.revision);
@@ -89,6 +91,17 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
       receipts.push(...roundReceipts);
       rounds.push({question:round+1, answer_p95_ms:Math.round(percentile(samples.slice(answerOffset),.95))});
       state = await command('close_question', {run_id:run.id}, state.revision);
+      if (interval && round+1 < bursts) {
+        const until = performance.now()+interval;
+        while (performance.now() < until) {
+          await Promise.all(sessions.map(async session => {
+            const begin = performance.now(); await call('/api/engagement/player', undefined, session);
+            backgroundSamples.push(performance.now()-begin);
+          }));
+          const remaining = until-performance.now();
+          if (remaining > 0) await delay(Math.min(2000, remaining));
+        }
+      }
     }
     const elapsed = performance.now()-started;
     assert.equal(new Set(receipts).size, 100*bursts, 'all attendee receipts must be distinct');
@@ -96,10 +109,11 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
     assert.equal(state.runs[0].question_analytics.length, bursts);
     assert(state.runs[0].question_analytics.every(item => item.respondents === 100), 'all answers must be recorded');
     assert(!errors.includes('Traceback (most recent call last)'), 'server traceback during synthetic load');
-    console.log(JSON.stringify({backend:'sqlite',attendees:100,bursts,successful:receipts.length,
+    console.log(JSON.stringify({backend:'sqlite',attendees:100,bursts,interval_ms:interval,successful:receipts.length,
       burst_ms:Math.round(elapsed),poll_p95_ms:Math.round(percentile(pollSamples,.95)),
       answer_p50_ms:Math.round(percentile(samples,.5)),answer_p95_ms:Math.round(percentile(samples,.95)),
-      organizer_p95_ms:Math.round(percentile(deskSamples,.95)), rounds}));
+      organizer_p95_ms:Math.round(percentile(deskSamples,.95)),
+      background_poll_p95_ms:backgroundSamples.length ? Math.round(percentile(backgroundSamples,.95)) : null, rounds}));
   } finally {
     if (app.exitCode === null && app.signalCode === null) { app.kill('SIGTERM'); await new Promise(resolve => app.once('exit',resolve)); }
     await fs.rm(data,{recursive:true,force:true});

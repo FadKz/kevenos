@@ -11,6 +11,8 @@ no traceback. It reports burst duration and HTTP latency percentiles.
 The script accepts no target URL and removes its temporary database on exit.
 Set `KEVENOS_TEST_BURSTS` to a number from 1 to 10 to exercise consecutive
 questions with the same sessions; the default is one burst.
+Set `KEVENOS_TEST_INTERVAL_MS` from 0 to 10000 to add an interval between
+bursts; attendees continue polling roughly every two seconds in that interval.
 It is a correctness smoke test, not a production capacity rating. Localhost
 does not model mobile networks, TLS, browser rendering, sustained traffic,
 other event views, PostgreSQL, multiple hosts, failover or concurrent backups.

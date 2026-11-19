@@ -13,6 +13,35 @@ import server
 
 @unittest.skipUnless(os.environ.get('KEVENOS_TEST_DATABASE_URL'), 'Disposable PostgreSQL URL required')
 class PostgresConcurrency(unittest.TestCase):
+    def test_one_hundred_attendees_record_distinct_answers(self):
+        environment = {'KEVENOS_DB_BACKEND': 'postgres',
+                       'KEVENOS_DATABASE_URL': os.environ['KEVENOS_TEST_DATABASE_URL'],
+                       'KEVENOS_DB_SCHEMA_PREFIX': 'engtest_' + uuid4().hex[:12]}
+        with patch.dict(os.environ, environment):
+            connections = [server.open_db('/tmp/engagement-test/judging.db') for _ in range(10)]
+        for db in connections:
+            self.addCleanup(db.close)
+        services = [SimpleNamespace(DB=db, LOCK=threading.RLock()) for db in connections]
+        operator = {'role':'organizer', 'credential_id':'operator'}
+        draft = catalog.execute(services[0], 'save', {'title':'Poll', 'kind':'poll', 'questions':[
+            {'type':'single','prompt':'Question?','options':['A','B']}]},
+            expected_revision=0, request_id='1'*32, identity=operator)
+        catalog.execute(services[0], 'publish', {'activity_id':draft['id']},
+                        expected_revision=1, request_id='2'*32, identity=operator)
+        run = catalog.execute(services[0], 'open_run', {'activity_id':draft['id'], 'version':1},
+                              expected_revision=2, request_id='3'*32, identity=operator)
+        run = catalog.execute(services[0], 'open_question', {'run_id':run['id'],
+            'question_id':run['snapshot']['questions'][0]['id'], 'duration':None},
+            expected_revision=3, request_id='4'*32, identity=operator)
+        def respond(index):
+            return catalog.answer(services[index % len(services)], run['id'], run['delivery']['id'], index % 2,
+                                  identity={'role':'participant','credential_id':f'participant-{index}'})
+        with ThreadPoolExecutor(max_workers=30) as pool:
+            receipts = list(pool.map(respond, range(100)))
+        self.assertEqual(len({item['id'] for item in receipts}), 100)
+        saved = catalog._read(connections[0], catalog.KEY, catalog.empty())
+        self.assertEqual(len(saved['runs'][0]['responses'][run['delivery']['id']]), 100)
+
     def test_fifteen_simultaneous_answers_are_all_recorded_once(self):
         environment = {'KEVENOS_DB_BACKEND': 'postgres',
                        'KEVENOS_DATABASE_URL': os.environ['KEVENOS_TEST_DATABASE_URL'],

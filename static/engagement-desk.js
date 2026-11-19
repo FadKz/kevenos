@@ -113,6 +113,16 @@
       const next = box.nextElementSibling;
       if (next) { box.parentElement.insertBefore(next, box); dirty = true; }
     }));
+    box.append(button('Duplicate question', () => {
+      const evidence = box.querySelector('[name=evidence]')?.value || '';
+      const copy = questionEditor({evidence}, kind);
+      for (const name of ['prompt', 'type', 'options', 'correct', 'evidence']) {
+        const source = box.querySelector(`[name=${name}]`), target = copy.querySelector(`[name=${name}]`);
+        if (source && target) target.value = source.value;
+      }
+      copy.querySelector('[name=type]').dispatchEvent(new Event('change', {bubbles:true}));
+      box.after(copy); dirty = true;
+    }));
     box.append(button('Remove question', () => { if (box.parentElement.querySelectorAll('fieldset').length > 1) { dirty = true; box.remove(); } }));
     return box;
   }

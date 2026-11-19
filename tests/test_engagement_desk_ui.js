@@ -25,6 +25,27 @@ test('organizer can reorder questions without losing their unsaved text', async 
   assert.deepEqual(Array.from(writes[0].payload.questions[0].options), ['C', 'D']);
 });
 
+test('duplicating a question copies current edits into an independent question', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-desk.js'), 'utf8'));
+  const writes = [], root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => ({revision:0, activities:[], runs:[]}),
+    async (path, body) => { writes.push(body); return {revision:1, activities:[], runs:[]}; });
+  root.querySelector('[name=title]').value = 'Poll';
+  root.querySelector('[name=prompt]').value = 'Draft question';
+  root.querySelector('[name=options]').value = 'First\nSecond';
+  [...root.querySelectorAll('button')].find(item => item.textContent === 'Duplicate question').click();
+  const boxes = root.querySelectorAll('.engagement-editor-questions fieldset');
+  assert.equal(boxes.length, 2);
+  assert.equal(boxes[1].querySelector('[name=prompt]').value, 'Draft question');
+  boxes[1].querySelector('[name=prompt]').value = 'Independent copy';
+  root.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles:true, cancelable:true}));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(Array.from(writes[0].payload.questions, q => q.prompt), ['Draft question', 'Independent copy']);
+  assert.equal(writes[0].payload.questions[1].id, undefined);
+});
+
 test('organizer can save a draft and receives clear validation', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true, url:'https://example.test/organizer'});
   const w = dom.window;

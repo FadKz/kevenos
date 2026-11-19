@@ -32,6 +32,10 @@
     if (!delivery || !question) { clearInterval(timer); timer = undefined; updateClock = undefined; root.replaceChildren(); currentKey = ''; return; }
     const key = `${delivery.id}:${delivery.status}:${!!data.answered}`;
     if (key === currentKey) { if (updateClock) updateClock(delivery.ends_at, data.now); return; }
+    const sameDelivery = currentKey.startsWith(`${delivery.id}:`) && !data.answered && ['open','paused'].includes(delivery.status);
+    const previousDialogOpen = sameDelivery && !!root.querySelector('dialog[open]');
+    const previousChoices = sameDelivery ? [...root.querySelectorAll('input[name=engagement-answer]:checked')].map(input => input.value) : [];
+    const previousText = sameDelivery ? root.querySelector('.engagement-choices textarea')?.value : undefined;
     currentKey = key;
     clearInterval(timer); timer = undefined; updateClock = undefined;
     root.replaceChildren();
@@ -69,12 +73,13 @@
         const label = node('label', null, 'engagement-choice');
         const input = node('input'); input.type = question.type === 'multi' ? 'checkbox' : 'radio';
         input.name = 'engagement-answer'; input.value = String(question.type === 'rating' ? index + 1 : index);
-        input.checked = data.answered && (Array.isArray(data.selection) ? data.selection.includes(Number(input.value)) : data.selection === Number(input.value));
+        input.checked = data.answered ? (Array.isArray(data.selection) ? data.selection.includes(Number(input.value)) : data.selection === Number(input.value)) : previousChoices.includes(input.value);
         label.append(input, node('span', option)); choices.append(label); inputs.push(input);
       });
     } else if (question.type === 'text') {
       const input = node('textarea'); input.maxLength = 1000; input.rows = 4;
       if (data.answered && typeof data.selection === 'string') input.value = data.selection;
+      else if (previousText !== undefined) input.value = previousText;
       input.setAttribute('aria-label', 'Your answer'); choices.append(input); inputs.push(input);
     }
     form.append(choices);
@@ -108,7 +113,7 @@
     reopen.addEventListener('click', () => { reopen.hidden = true; dialog.showModal(); });
     dialog.addEventListener('cancel', () => { dismissed = delivery.id; reopen.hidden = false; });
     const editing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-    if (dismissed !== delivery.id && ((!closed && !data.answered) || keepOpen) && !editing && !document.querySelector('dialog[open]')) dialog.showModal();
+    if (dismissed !== delivery.id && ((!closed && !data.answered) || keepOpen || previousDialogOpen) && !editing && !document.querySelector('dialog[open]')) dialog.showModal();
     else reopen.hidden = false;
     form.addEventListener('submit', async event => {
       event.preventDefault();

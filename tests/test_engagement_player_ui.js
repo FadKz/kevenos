@@ -22,6 +22,24 @@ test('a time extension updates the visible timer without discarding a selection'
   assert.equal(choice.checked, true);
 });
 
+test('a pause and resume preserve an unsubmitted selection', async t => {
+  const dom = new JSDOM('<div id="engagement-player"></div>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  w.eval(readFileSync(join(__dirname, '../static/engagement-player.js'), 'utf8'));
+  const state = {now:100, answered:false, question:{id:'run',kind:'poll',title:'Poll',
+    delivery:{id:'delivery',status:'open',ends_at:115},questions:[{type:'single',prompt:'Question?',options:['A','B']}]}};
+  const api = async () => state;
+  await w.EngagementPlayer.refresh(api);
+  w.document.querySelectorAll('input[type=radio]')[1].click();
+  state.question.delivery.status = 'paused'; state.question.delivery.ends_at = null;
+  await w.EngagementPlayer.refresh(api);
+  assert.equal(w.document.querySelectorAll('input[type=radio]')[1].checked, true);
+  state.question.delivery.status = 'open'; state.question.delivery.ends_at = 120;
+  await w.EngagementPlayer.refresh(api);
+  assert.equal(w.document.querySelectorAll('input[type=radio]')[1].checked, true);
+});
+
 test('live question appears and sends the selected answer once', async t => {
   const dom = new JSDOM('<main><textarea aria-label="Pitch notes">draft</textarea><div id="engagement-player"></div></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window;

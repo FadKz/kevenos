@@ -8,6 +8,21 @@ import test_workspace_routes as workspace
 
 
 class Export(unittest.TestCase):
+    def test_free_text_question_exports_aggregate_without_response_text(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Feedback','kind':'poll','questions':[
+            {'type':'text','prompt':'What would help?'}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        catalog.submit_answer(state, run['id'], run['delivery']['id'], 'attendee', 'Private free text')
+        data = catalog.analytics_csv(state, '\u00a0=unsafe').decode('utf-8-sig')
+        rows = list(csv.DictReader(io.StringIO(data)))
+        self.assertEqual(rows[0]['respondents'], '1')
+        self.assertEqual(rows[0]['option_counts'], 'suppressed or not applicable')
+        self.assertEqual(rows[0]['workspace'], "'\u00a0=unsafe")
+        self.assertNotIn('Private free text', data)
+
     def test_export_is_scoped_aggregate_and_safe_for_spreadsheets(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp()

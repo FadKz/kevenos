@@ -776,7 +776,7 @@ def analytics_csv(state, workspace, run_id=None):
     """Export aggregate response metrics; never include individual responses."""
     def safe(value):
         text = str(value)
-        return "'" + text if text.lstrip(' \t\r\n').startswith(('=','+','-','@')) or text.startswith(('\t','\r','\n')) else text
+        return "'" + text if text.lstrip().startswith(('=','+','-','@')) or text.startswith(('\t','\r','\n')) else text
     projected = desk_view(state)
     runs = [run for run in projected['runs'] if run_id is None or run['id'] == run_id]
     if run_id is not None and not runs:

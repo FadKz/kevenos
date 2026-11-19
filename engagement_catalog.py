@@ -401,7 +401,8 @@ def ask_question(state, principal, audience, text, request_id):
         raise ValueError('Provide a unique request ID.')
     text = _text(text, 500, 'a question')
     questions = state.get('qa', [])
-    previous = next((item for item in questions if item['request_id'] == request_id), None)
+    alias_id = state.get('qa_request_aliases', {}).get(request_id)
+    previous = next((item for item in questions if item['request_id'] == request_id or item['id'] == alias_id), None)
     if previous:
         if previous['principal'] != principal or previous['text'] != text or previous['audience'] != audience:
             raise Conflict('Request ID was already used for a different question.')
@@ -411,6 +412,14 @@ def ask_question(state, principal, audience, text, request_id):
         raise Conflict('Audience questions are closed.')
     if not settings.get('participants' if audience == 'participant' else 'guests'):
         raise PermissionError('Audience questions are not enabled for this audience.')
+    duplicate = next((item for item in questions if item['principal'] == principal and item['audience'] == audience
+                      and item['text'] == text and item['status'] in {'pending', 'approved', 'answered'}), None)
+    if duplicate:
+        aliases = state.setdefault('qa_request_aliases', {})
+        if len(aliases) >= 5000:
+            raise Conflict('Question retry limit reached. Ask the event team for help.')
+        aliases[request_id] = duplicate['id']
+        return {'id':duplicate['id'], 'received_at':duplicate['created_at']}
     if len(questions) >= 1000 or sum(item['principal'] == principal for item in questions) >= 5:
         raise Conflict('Question limit reached. Ask the event team for help.')
     item = {'id':uuid4().hex, 'request_id':request_id, 'principal':principal, 'audience':audience,
@@ -573,6 +582,7 @@ def player_score(state, principal, audience):
 def desk_view(state):
     """Project aggregate results without returning individual responses."""
     result = deepcopy(state)
+    result.pop('qa_request_aliases', None)
     for run in result['runs']:
         _settle(run)
     result['qa'] = [{**{key:item[key] for key in ('id','text','status','answer','created_at','audience') if key in item},

@@ -25,7 +25,7 @@
       const stamp = generation; sending = true; submit.disabled = true; notice.textContent = 'Sending…';
       try {
         await api(path, {body:pending}); if (stamp !== generation) return;
-        pending = null; input.value = ''; notice.textContent = 'Question sent for review.';
+        pending = null; input.value = ''; notice.textContent = 'Question received. Check its status below.';
       } catch (error) {
         if (stamp !== generation) return;
         if (error?.status >= 400 && error?.status < 500) pending = null;

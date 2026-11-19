@@ -75,6 +75,9 @@ support approved questions once per participant account or guest browser
 session and remove their support. Text may
 be shown to others after approval, so do not submit private information.
 The Organizer can filter the moderation queue by status or search its text.
+If the same attendee sends identical text again, the app returns the original
+receipt while that question is pending, published or answered. Questions
+from different attendees remain separate and private until individually approved.
 
 ## Optional AI suggestions
 

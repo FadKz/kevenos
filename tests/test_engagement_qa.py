@@ -6,6 +6,26 @@ import test_workspace_routes as workspace
 
 
 class ModeratedQuestions(unittest.TestCase):
+    def test_repeated_own_question_is_deduplicated_without_cross_user_disclosure(self):
+        state = catalog.empty()
+        catalog.configure_questions(state, participants=True, guests=True, expected_revision=0)
+        first = catalog.ask_question(state, 'participant:one', 'participant', 'Same question?', 'a'*32)
+        retry = catalog.ask_question(state, 'participant:one', 'participant', 'Same question?', 'b'*32)
+        self.assertEqual(first, retry)
+        self.assertEqual(len(state['qa']), 1)
+        self.assertEqual(catalog.ask_question(state, 'participant:one', 'participant', 'Same question?', 'b'*32), first)
+        with self.assertRaises(catalog.Conflict):
+            catalog.ask_question(state, 'participant:one', 'participant', 'Different question?', 'b'*32)
+        other = catalog.ask_question(state, 'guest:other', 'guest', 'Same question?', 'c'*32)
+        self.assertNotEqual(other['id'], first['id'])
+        self.assertEqual(catalog.public_questions(state), [])
+        catalog.moderate_question(state, first['id'], 'reject', expected_revision=1)
+        again = catalog.ask_question(state, 'participant:one', 'participant', 'Same question?', 'd'*32)
+        self.assertNotEqual(again['id'], first['id'])
+        self.assertNotIn('qa_request_aliases', catalog.desk_view(state))
+        catalog.configure_questions(state, participants=False, guests=False, expected_revision=2)
+        self.assertEqual(catalog.ask_question(state, 'participant:one', 'participant', 'Same question?', 'b'*32), first)
+
     def test_questions_require_enabled_audience_and_are_published_only_after_review(self):
         state = catalog.empty()
         with self.assertRaises(catalog.Conflict):
@@ -71,10 +91,13 @@ class ModeratedQuestions(unittest.TestCase):
             path = '/api/engagement/questions'
             result, _ = fixture.post(path, {'text':'Participant question?', 'request_id':'2'*32}, cookie=participant)
             question_id = result['receipt']['id']
+            repeated, _ = fixture.post(path, {'text':'Participant question?', 'request_id':'5'*32}, cookie=participant)
+            self.assertEqual(repeated['receipt']['id'], question_id)
             result, _ = fixture.get(path, cookie=guest)
             self.assertEqual(result['questions'], [])
             self.assertEqual(result['own'], [])
             result, _ = fixture.get(path, cookie=participant)
+            self.assertEqual(len(result['own']), 1)
             self.assertEqual(result['own'][0]['text'], 'Participant question?')
             self.assertEqual(result['own'][0]['status'], 'pending')
             catalog.execute(service, 'moderate_question', {'id':question_id, 'decision':'approve'}, expected_revision=1,

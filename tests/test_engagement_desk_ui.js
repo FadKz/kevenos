@@ -4,6 +4,26 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('organizer can filter the moderation queue without changing its contents', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-desk.js'), 'utf8'));
+  const state = {revision:0, activities:[], runs:[], qa:[
+    {id:'a',text:'Where is lunch?',status:'pending',audience:'guest',votes:0},
+    {id:'b',text:'When does it start?',status:'approved',audience:'participant',votes:1}]};
+  const root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => state, async () => state);
+  const status = root.querySelector('[name=qa-filter]'); status.value = 'pending';
+  status.dispatchEvent(new w.Event('change', {bubbles:true}));
+  const list = root.querySelector('[data-qa-list]');
+  assert.match(list.textContent, /Where is lunch/);
+  assert.doesNotMatch(list.textContent, /When does it start/);
+  const search = root.querySelector('[name=qa-search]'); search.value = 'start';
+  search.dispatchEvent(new w.Event('input', {bubbles:true}));
+  assert.doesNotMatch(list.textContent, /Where is lunch/);
+  assert.equal(state.qa.length, 2);
+});
+
 test('organizer can reorder questions without losing their unsaved text', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close());

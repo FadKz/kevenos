@@ -68,6 +68,7 @@ approved. The Organizer can approve, remove or answer a question; attendees can
 support approved questions once per participant account or guest browser
 session and remove their support. Text may
 be shown to others after approval, so do not submit private information.
+The Organizer can filter the moderation queue by status or search its text.
 
 ## Optional AI suggestions
 

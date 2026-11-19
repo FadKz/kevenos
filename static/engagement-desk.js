@@ -128,8 +128,11 @@
   }
   function drawQuestions(list) {
     list.replaceChildren();
-    const questions = state.qa || [];
-    if (!questions.length) list.append(element('p', 'No audience questions yet.'));
+    const filter = root.querySelector('[name=qa-filter]')?.value || 'all';
+    const search = (root.querySelector('[name=qa-search]')?.value || '').trim().toLocaleLowerCase();
+    const questions = (state.qa || []).filter(item => (filter === 'all' || item.status === filter) &&
+      (!search || item.text.toLocaleLowerCase().includes(search)));
+    if (!questions.length) list.append(element('p', state.qa?.length ? 'No questions match these filters.' : 'No audience questions yet.'));
     questions.slice().sort((a, b) => (b.votes || 0) - (a.votes || 0)).forEach(question => {
       const card = element('article', null, 'engagement-run');
       card.append(element('p', question.text), element('p', `${question.status} · ${question.audience} · ${question.votes || 0} supports`));
@@ -384,7 +387,16 @@
     const apply = element('button', 'Save audience settings', 'btn'); apply.type = 'submit'; config.append(apply);
     config.addEventListener('submit', event => { event.preventDefault(); command('configure_questions', {participants:participants.checked, guests:guests.checked}); });
     qa.append(config);
+    const filterLabel = element('label', 'Question status', 'engagement-field');
+    const filter = element('select'); filter.name = 'qa-filter';
+    for (const [value, title] of [['all','All questions'],['pending','Awaiting review'],['approved','Approved'],['answered','Answered'],['rejected','Removed']]) {
+      const option = element('option', title); option.value = value; filter.append(option);
+    }
+    filterLabel.append(filter); qa.append(filterLabel);
+    const searchLabel = field('Search audience questions', 'qa-search', ''); qa.append(searchLabel);
     const list = element('div'); list.dataset.qaList = ''; qa.append(list); root.append(qa); drawQuestions(list);
+    filter.addEventListener('change', () => drawQuestions(list));
+    searchLabel.querySelector('input').addEventListener('input', () => drawQuestions(list));
     state.runs.forEach(updateAnalytics);
   }
   async function mount(target, reader, writer, options = {}) {

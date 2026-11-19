@@ -186,6 +186,7 @@
     root.replaceChildren();
     const intro = element('section', null, 'engagement-desk-intro');
     intro.append(element('h2', 'Engagement Hub'), element('p', 'Prepare an activity, publish its version, then choose when each question goes live.'));
+    if (state.quiz_enabled === false) intro.append(element('p', 'Quizzes are disabled by the event Admin. Polls and audience questions remain available.'));
     const notice = element('p'); notice.setAttribute('role', 'status'); intro.append(notice); root.append(intro);
     const legacy = element('details', null, 'engagement-desk-card');
     legacy.append(element('summary', 'Previous quiz and audience history'),
@@ -230,7 +231,8 @@
         if (confirm(`${archive ? 'Archive' : 'Restore'} “${activity.draft.title}”? The draft is retained.`))
           command('archive_draft', {activity_id:activity.id, archive});
       }));
-      if (activity.versions.length) item.append(button('Start run', () => { if (confirm(`Start the latest published version of “${activity.draft.title}”?`)) command('open_run', {activity_id:activity.id, version:activity.versions.length}); }));
+      if (activity.versions.length) item.append(button('Start run', () => { if (confirm(`Start the latest published version of “${activity.draft.title}”?`)) command('open_run', {activity_id:activity.id, version:activity.versions.length}); },
+        state.quiz_enabled === false && activity.versions[activity.versions.length-1].snapshot?.kind === 'quiz'));
       library.append(item);
     });
     const activity = state.activities.find(item => item.id === selected);
@@ -370,7 +372,7 @@
           if (seconds === null && autoReveal.checked) { notice.textContent = 'Automatic reveal requires a timer.'; duration.focus(); return; }
           if (confirm('Resend this question to people who have not answered? Existing answers will be kept.'))
             command('resend_question', {run_id:run.id, duration:seconds, auto_reveal:autoReveal.checked});
-        }));
+        }, state.quiz_enabled === false && run.snapshot.kind === 'quiz'));
       }
       run.snapshot.questions.forEach(question => {
         const used = (run.delivered_question_ids || []).includes(question.id);
@@ -384,7 +386,7 @@
           const timing = seconds === null ? 'until closed' : `for ${seconds} seconds`;
           const reveal = autoReveal.checked ? ' Answers will be revealed when the timer ends.' : ' Answers stay hidden until you reveal them.';
           if (confirm(`Send “${question.prompt}” to the selected audience ${timing}?${reveal}`)) command('open_question', {run_id:run.id, question_id:question.id, duration:seconds, auto_reveal:autoReveal.checked});
-        }, used || ['open','paused'].includes(delivery?.status)));
+        }, used || ['open','paused'].includes(delivery?.status) || (state.quiz_enabled === false && run.snapshot.kind === 'quiz')));
         card.append(row);
       });
       runs.append(card);

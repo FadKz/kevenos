@@ -62,6 +62,11 @@ a question are separate actions; none implies approval of the next.
 Quiz questions may specify an integer `points` value from 1 to 100; omitted
 values default to one. Polls are unscored. A run retains the point values of
 its published snapshot even when the draft is edited later.
+Read `quiz_enabled` from `engagement.state`. An agent with the separate
+`engagement:admin` and `engagement:read` grants can prepare and confirm
+`engagement.settings` to enable or disable new quiz launches in the current
+workspace. An active quiz question must be closed first; polls and Q&A are
+unaffected. The ordinary `engagement:write` grant cannot change this setting.
 An optional question `explanation` is withheld from attendee projections
 until the question is revealed.
 For audience Q&A, `merge_question` links a pending question to an approved or

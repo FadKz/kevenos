@@ -201,6 +201,8 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(tools["engagement_state"].annotations.read_only_hint)
         self.assertTrue(tools["engagement_control"].annotations.destructive_hint)
         self.assertTrue(tools["engagement_control"].annotations.open_world_hint)
+        self.assertTrue(tools["engagement_settings"].annotations.destructive_hint)
+        self.assertTrue(tools["engagement_settings"].annotations.open_world_hint)
         self.assertIn("operate_quiz", {p.name for p in (await session.list_prompts()).prompts})
         prompt = (await session.get_prompt("operate_quiz")).messages[0].content.text
         self.assertIn("quiz_analytics", prompt)
@@ -217,6 +219,13 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
             "confirmation_id":prepared_draft.structured_content["data"]["confirmation_id"],
             "idempotency_key":prepared_draft.structured_content["data"]["idempotency_key"]})
         self.assertFalse(sent.is_error)
+        settings = {"arguments":{"revision":0,"enabled":False},"context":"practice","revision":"current"}
+        prepared_settings = await session.call_tool("agent_prepare", {"command":"engagement.settings", **settings})
+        self.assertFalse(prepared_settings.is_error)
+        changed = await session.call_tool("engagement_settings", {**settings, "confirm":"EXECUTE",
+            "confirmation_id":prepared_settings.structured_content["data"]["confirmation_id"],
+            "idempotency_key":prepared_settings.structured_content["data"]["idempotency_key"]})
+        self.assertFalse(changed.is_error)
 
         state = await session.call_tool("quiz_state")
         self.assertFalse(state.is_error)

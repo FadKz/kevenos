@@ -8,6 +8,23 @@ import test_workspace_routes as workspace
 
 
 class LegacyInventory(unittest.TestCase):
+    def test_disabling_quizzes_waits_for_legacy_quiz_but_not_legacy_poll(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        admin = {'role':'admin','credential_id':'admin'}
+        with service.DB:
+            catalog._write(service.DB, 'event_quiz_v1', {'runs':[{'status':'open','end':None}]})
+            catalog._write(service.DB, 'audience_questions_v1', {'packs':[{'status':'live','closesAt':None}]})
+        with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            with self.assertRaises(catalog.Conflict):
+                catalog.execute(service, 'set_quiz_enabled', {'enabled':False}, expected_revision=0,
+                                request_id='1'*32, identity=admin)
+            with service.DB: catalog._write(service.DB, 'event_quiz_v1', {'runs':[]})
+            result = catalog.execute(service, 'set_quiz_enabled', {'enabled':False}, expected_revision=0,
+                                     request_id='2'*32, identity=admin)
+        self.assertFalse(result['enabled'])
+
     def test_legacy_delivery_guard_distinguishes_open_expired_and_bad_deadlines(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp(); self.addCleanup(fixture.doCleanups)

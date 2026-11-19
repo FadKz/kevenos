@@ -141,7 +141,7 @@ def tools_for(catalog: dict[str, Any]) -> dict[str, tuple[types.Tool, str, str |
                     if needs_confirmation else ""), object_schema(fields, *fields),
                 read_only=False, destructive=needs_confirmation,
                 open_world=command["name"].startswith(("notifications.", "credentials.issue", "credentials.reset"))
-                or command["name"] in {"quiz.control","audience.control","engagement.control"},
+                or command["name"] in {"quiz.control","audience.control","engagement.control","engagement.settings"},
             ),
             "execute", command["name"],
         )

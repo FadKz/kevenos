@@ -4,6 +4,34 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('Organizer sees that quiz launches are disabled but can still start polls', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname,'../static/engagement-desk.js'),'utf8'));
+  const state = {revision:1,quiz_enabled:false,runs:[],activities:[
+    {id:'q',draft:{title:'Quiz'},versions:[{snapshot:{kind:'quiz'}}]},
+    {id:'p',draft:{title:'Poll'},versions:[{snapshot:{kind:'poll'}}]}]};
+  const root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => state, async () => state);
+  assert.match(root.textContent,/Quizzes are disabled/);
+  const buttons = [...root.querySelectorAll('button')].filter(button => button.textContent === 'Start run');
+  assert.equal(buttons[0].disabled,true); assert.equal(buttons[1].disabled,false);
+});
+
+test('a disabled quiz cannot reopen or resend its existing questions', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname,'../static/engagement-desk.js'),'utf8'));
+  const state = {revision:3,quiz_enabled:false,activities:[],runs:[{id:'r',status:'open',version:1,
+    snapshot:{title:'Quiz',kind:'quiz',questions:[{id:'q1',prompt:'First?'},{id:'q2',prompt:'Second?'}]},
+    delivery:{id:'d',status:'closed'},delivered_question_ids:['q1']}]};
+  const root = w.document.querySelector('#desk');
+  await w.EngagementDesk.mount(root, async () => state, async () => state);
+  assert.equal([...root.querySelectorAll('button')].find(button => button.textContent === 'Resend question').disabled,true);
+  assert.equal([...root.querySelectorAll('button')].find(button => button.textContent === 'Open question').disabled,true);
+  assert.equal([...root.querySelectorAll('button')].find(button => button.textContent === 'Reveal answer').disabled,false);
+});
+
 test('organizer can link a pending duplicate to a published question', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close()); w.confirm = () => true;

@@ -61,6 +61,15 @@ async function port() {
     const admin = await session('admin', adminPassword);
     await admin.api('/api/admin/credentials', {action:'create',role:'desk',label:'Synthetic organizer',password:deskPassword});
     await admin.api('/api/admin/workspace', {mode:'rehearsal',confirm:'REHEARSAL'});
+    await admin.page.goto(address+'/admin#system');
+    const settings = admin.page.locator('#engagement-settings');
+    await settings.getByRole('button', {name:'Disable quizzes'}).click();
+    try { await settings.getByText('Quizzes are disabled for this event.').waitFor({timeout:10000}); }
+    catch (error) { throw new Error('Admin setting did not update: ' + await settings.innerText(), {cause:error}); }
+    assert.equal((await admin.api('/api/desk/engagement')).quiz_enabled, false);
+    await settings.getByRole('button', {name:'Enable quizzes'}).click();
+    await settings.getByText('Quizzes are enabled for this event.').waitFor();
+    assert.equal((await admin.api('/api/desk/engagement')).quiz_enabled, true);
     const roster = (await admin.api('/api/desk/roster')).roster;
     roster[0].members[0].name = 'Alex Example'; roster[1].members[0].name = 'Sam Example';
     await admin.api('/api/desk/roster', {rows:roster});

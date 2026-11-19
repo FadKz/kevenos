@@ -6,6 +6,11 @@ Keep the flag off for production until the release checks in
 
 ## Organizer
 
+An Admin can enable or disable quiz launches in **Event settings → Quiz
+availability** without rebuilding. Close an active quiz question before
+disabling. Existing quiz results remain; polls and audience questions are
+unaffected. This event setting is separate from the deployment feature flag.
+
 1. Open **Event Operations → Engagement Hub**. Choose **New activity**, enter a
    title, choose a scored quiz or an unscored poll, and select its audiences.
 2. Add questions, options and, for a quiz, the correct option numbers. A

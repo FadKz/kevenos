@@ -13,6 +13,38 @@ import server
 
 @unittest.skipUnless(os.environ.get('KEVENOS_TEST_DATABASE_URL'), 'Disposable PostgreSQL URL required')
 class PostgresConcurrency(unittest.TestCase):
+    def test_disabling_quiz_and_opening_question_are_serialized(self):
+        environment = {'KEVENOS_DB_BACKEND':'postgres', 'KEVENOS_DATABASE_URL':os.environ['KEVENOS_TEST_DATABASE_URL'],
+                       'KEVENOS_DB_SCHEMA_PREFIX':'engtest_' + uuid4().hex[:12]}
+        with patch.dict(os.environ, environment):
+            connections = [server.open_db('/tmp/engagement-test/judging.db') for _ in range(2)]
+        for db in connections: self.addCleanup(db.close)
+        services = [SimpleNamespace(DB=db, LOCK=threading.RLock()) for db in connections]
+        organizer, admin = {'role':'organizer','credential_id':'operator'}, {'role':'admin','credential_id':'admin'}
+        draft = catalog.execute(services[0], 'save', {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[0]}]},
+            expected_revision=0, request_id='1'*32, identity=organizer)
+        catalog.execute(services[0], 'publish', {'activity_id':draft['id']}, expected_revision=1,
+                        request_id='2'*32, identity=organizer)
+        run = catalog.execute(services[0], 'open_run', {'activity_id':draft['id'],'version':1}, expected_revision=2,
+                              request_id='3'*32, identity=organizer)
+        barrier = threading.Barrier(2)
+        def attempt(index, action, payload, actor):
+            barrier.wait(timeout=10)
+            try:
+                catalog.execute(services[index], action, payload, expected_revision=3,
+                                request_id=str(index+4)*32, identity=actor)
+                return 'accepted'
+            except catalog.Conflict:
+                return 'conflict'
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}), ThreadPoolExecutor(max_workers=2) as pool:
+            opening = pool.submit(attempt, 0, 'open_question', {'run_id':run['id'],
+                'question_id':run['snapshot']['questions'][0]['id'], 'duration':None}, organizer)
+            disabling = pool.submit(attempt, 1, 'set_quiz_enabled', {'enabled':False}, admin)
+            self.assertCountEqual([opening.result(), disabling.result()], ['accepted','conflict'])
+        state = catalog._read(connections[0], catalog.KEY, catalog.empty())
+        self.assertEqual(bool(state['runs'][0].get('delivery')), state.get('quiz_enabled',True))
+
     def test_one_hundred_attendees_record_distinct_answers(self):
         environment = {'KEVENOS_DB_BACKEND': 'postgres',
                        'KEVENOS_DATABASE_URL': os.environ['KEVENOS_TEST_DATABASE_URL'],

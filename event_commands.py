@@ -1146,7 +1146,7 @@ def _engagement_state(s, args):
     state = engagement_catalog.desk_view(s.kv_get(engagement_catalog.KEY) or engagement_catalog.empty())
     collection = args.get('collection','activities')
     values = state.get('qa', []) if collection == 'questions' else state[collection]
-    return {'revision':state['revision'], 'collection':collection, 'question_settings':state.get('qa_settings', {}),
+    return {'revision':state['revision'], 'collection':collection, 'quiz_enabled':state.get('quiz_enabled', True), 'question_settings':state.get('qa_settings', {}),
             **_page(values, {'limit':20, **args}, collection)}
 
 
@@ -1155,6 +1155,19 @@ def _engagement_state(s, args):
 def _engagement_legacy_preview(s, args):
     _engagement_enabled()
     return engagement_catalog.legacy_preview(s.DB)
+
+
+@command('engagement.settings', 'Enable or disable new quiz launches for this event. Confirm the exact workspace and setting.',
+         ['engagement:read','engagement:admin'], obj({'revision':ENGAGEMENT_REV,'enabled':BOOL}, ('revision','enabled')))
+def _engagement_settings(s, args, actor, principal):
+    _engagement_enabled()
+    identity = {'role':'admin', 'credential_id':'agent:' + principal['id'], 'label':principal['label']}
+    try:
+        engagement_catalog.execute(s, 'set_quiz_enabled', {'enabled':args['enabled']}, expected_revision=args['revision'],
+                                   request_id=uuid.UUID(principal['idempotency_key']).hex, identity=identity)
+    except engagement_catalog.Conflict as error:
+        _conflict(str(error))
+    return {'enabled':args['enabled'], 'revision':s.kv_get(engagement_catalog.KEY)['revision']}
 
 
 @command('engagement.control', 'Create and publish activities or control a run. Confirm the exact action, workspace, version and audience before execution.',

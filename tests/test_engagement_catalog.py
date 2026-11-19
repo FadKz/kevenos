@@ -14,6 +14,50 @@ import test_workspace_routes as workspace
 
 
 class EngagementCatalogTests(unittest.TestCase):
+    def test_quiz_availability_requires_admin_and_keeps_workspace_isolation(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        body = {'action':'set_quiz_enabled','payload':{'enabled':False},'revision':0,'request_id':'1'*32}
+        staff = fixture.login(fixture.issue('desk'))
+        with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            fixture.post('/api/admin/engagement-settings', body, cookie=staff, status=403)
+            fixture.post('/api/desk/engagement', body, cookie=fixture.admin, status=403)
+            _, dashboard_headers = fixture.get('/api/access/me', cookie=fixture.admin, headers={'X-Dashboard':'admin'})
+            admin_headers = {'X-Dashboard':'admin','X-Access-Context':dashboard_headers['x-access-context'][0]}
+            result, _ = fixture.post('/api/admin/engagement-settings', body, cookie=fixture.admin, headers=admin_headers)
+            self.assertFalse(result['quiz_enabled'])
+            fixture.post('/api/desk/engagement', {'action':'save','payload':{},'revision':1,'request_id':'2'*32},
+                         cookie=fixture.admin, headers=admin_headers, status=403)
+            fixture.switch('rehearsal')
+            rehearsal, _ = fixture.get('/api/desk/engagement', cookie=fixture.admin)
+            self.assertTrue(rehearsal.get('quiz_enabled', True))
+            fixture.switch('live')
+            live, _ = fixture.get('/api/desk/engagement', cookie=fixture.admin)
+            self.assertFalse(live['quiz_enabled'])
+
+    def test_event_quiz_switch_blocks_new_quiz_activity_but_not_polls(self):
+        state = catalog.empty()
+        quiz = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[0]}]}, expected_revision=0)
+        catalog.publish(state, quiz['id'], expected_revision=1)
+        run = catalog.open_run(state, quiz['id'], 1, expected_revision=2)
+        catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3, duration=None)
+        with self.assertRaises(catalog.Conflict):
+            catalog.set_quiz_enabled(state, False, expected_revision=4)
+        catalog.close_question(state, run['id'], expected_revision=4)
+        catalog.set_quiz_enabled(state, False, expected_revision=5)
+        with self.assertRaises(catalog.Conflict):
+            catalog.open_run(state, quiz['id'], 1, expected_revision=6)
+        with self.assertRaises(catalog.Conflict):
+            catalog.resend_question(state, run['id'], expected_revision=6)
+        poll = catalog.save_draft(state, {'title':'Poll','kind':'poll','questions':[
+            {'type':'single','prompt':'Poll?','options':['A','B']}]}, expected_revision=6)
+        catalog.publish(state, poll['id'], expected_revision=7)
+        pollrun = catalog.open_run(state, poll['id'], 1, expected_revision=8)
+        catalog.open_question(state, pollrun['id'], pollrun['snapshot']['questions'][0]['id'], expected_revision=9)
+        catalog.set_quiz_enabled(state, True, expected_revision=10)
+        self.assertTrue(state['quiz_enabled'])
+
     def test_desk_projection_does_not_copy_or_expose_private_responses(self):
         class PrivateResponse(dict):
             def __deepcopy__(self, memo):

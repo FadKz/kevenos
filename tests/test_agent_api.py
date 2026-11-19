@@ -13,6 +13,20 @@ import event_workspace
 S = access.S
 
 class AgentAPI(unittest.TestCase):
+    def test_quiz_availability_requires_separate_agent_admin_scope(self):
+        self.principal['scopes'] += ['engagement:read','engagement:write']; self.save_grant()
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            code, capabilities = self.req('capabilities')
+            self.assertNotIn('engagement.settings', [item['name'] for item in capabilities['data']['commands']])
+            self.principal['scopes'].append('engagement:admin'); self.save_grant()
+            body = self.prepared('engagement.settings', {'revision':0,'enabled':False})
+            code, result = self.req('execute', body)
+            self.assertEqual(code, 200, result)
+            self.assertFalse(S.kv_get('engagement_catalog_v1')['quiz_enabled'])
+            code, result = self.req('read', {'resource':'engagement.state','arguments':{}})
+            self.assertEqual(code, 200, result)
+            self.assertFalse(result['data']['quiz_enabled'])
+
     def test_agent_can_confirm_combining_questions(self):
         import engagement_catalog as catalog
         self.principal['scopes'] += ['engagement:read', 'engagement:write']; self.save_grant()

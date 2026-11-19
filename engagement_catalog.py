@@ -22,6 +22,7 @@ import database
 KEY = 'engagement_catalog_v1'
 RECEIPTS_KEY = 'engagement_receipts_v1'
 DESK = '/api/desk/engagement'
+ADMIN_SETTINGS = '/api/admin/engagement-settings'
 LEGACY_PREVIEW = '/api/desk/engagement/legacy-preview'
 ANALYTICS_CSV = '/api/desk/engagement/analytics.csv'
 PLAYER = '/api/participant/engagement'
@@ -31,6 +32,7 @@ PAYLOAD_FIELDS = {
     'save': ({'id','title','kind','questions','audiences','description'}, {'title','kind','questions'}),
     'publish': ({'activity_id'}, {'activity_id'}),
     'archive_draft': ({'activity_id','archive'}, {'activity_id','archive'}),
+    'set_quiz_enabled': ({'enabled'}, {'enabled'}),
     'open_run': ({'activity_id','version'}, {'activity_id','version'}),
     'finish_run': ({'run_id'}, {'run_id'}),
     'open_question': ({'run_id','question_id','duration','auto_reveal'}, {'run_id','question_id'}),
@@ -53,7 +55,7 @@ class Conflict(ValueError):
 
 
 def empty():
-    return {'revision': 0, 'activities': [], 'runs': [], 'qa_settings': {'participants': False, 'guests': False}, 'qa': []}
+    return {'revision': 0, 'activities': [], 'runs': [], 'quiz_enabled':True, 'qa_settings': {'participants': False, 'guests': False}, 'qa': []}
 
 
 def _revision(state, expected):
@@ -192,6 +194,7 @@ def open_run(state, activity_id, version_number, *, expected_revision):
     version = next((v for v in activity['versions'] if type(version_number) is int and v['version'] == version_number), None)
     if version is None:
         raise Conflict('Choose a published activity version.')
+    _require_quiz_enabled(state, version['snapshot'])
     run = {'id': uuid4().hex, 'activity_id': activity_id, 'version': version_number,
            'status': 'open', 'snapshot': deepcopy(version['snapshot'])}
     state['runs'].append(run)
@@ -233,6 +236,25 @@ def _delivery_status(delivery, now=None):
     return delivery.get('status')
 
 
+def _require_quiz_enabled(state, snapshot):
+    if snapshot.get('kind') == 'quiz' and state.get('quiz_enabled', True) is not True:
+        raise Conflict('The event Admin has disabled quiz launches.')
+
+
+def set_quiz_enabled(state, enabled, *, expected_revision):
+    _revision(state, expected_revision)
+    if type(enabled) is not bool:
+        raise ValueError('Choose whether quizzes are enabled.')
+    if state.get('quiz_enabled', True) is enabled:
+        raise Conflict('Quizzes are already in that state.')
+    if not enabled and any(run.get('status') == 'open' and run['snapshot'].get('kind') == 'quiz'
+                           and _delivery_status(run.get('delivery') or {}) in {'open','paused'} for run in state['runs']):
+        raise Conflict('Close the active quiz question before disabling quizzes.')
+    state['quiz_enabled'] = enabled
+    state['revision'] += 1
+    return {'enabled':enabled}
+
+
 def _settle(run, now=None):
     delivery = run.get('delivery') or {}
     status = _delivery_status(delivery, now)
@@ -253,6 +275,7 @@ def _timing(duration, auto_reveal):
 def open_question(state, run_id, question_id, *, expected_revision, duration=15, auto_reveal=False):
     _revision(state, expected_revision)
     run = _run(state, run_id)
+    _require_quiz_enabled(state, run['snapshot'])
     _timing(duration, auto_reveal)
     if not any(item['id'] == question_id for item in run['snapshot']['questions']):
         raise Conflict('Choose a question from this activity version.')
@@ -277,6 +300,7 @@ def open_question(state, run_id, question_id, *, expected_revision, duration=15,
 def resend_question(state, run_id, *, expected_revision, duration=15, auto_reveal=False):
     _revision(state, expected_revision)
     run = _run(state, run_id)
+    _require_quiz_enabled(state, run['snapshot'])
     _timing(duration, auto_reveal)
     for item in state['runs']:
         _settle(item)
@@ -694,6 +718,8 @@ def _apply(state, action, payload, expected_revision, db=None):
         return publish(state, payload.get('activity_id'), expected_revision=expected_revision)
     if action == 'archive_draft':
         return archive_draft(state, payload.get('activity_id'), payload.get('archive'), expected_revision=expected_revision)
+    if action == 'set_quiz_enabled':
+        return set_quiz_enabled(state, payload.get('enabled'), expected_revision=expected_revision)
     if action == 'open_run':
         return open_run(state, payload.get('activity_id'), payload.get('version'), expected_revision=expected_revision)
     if action == 'finish_run':
@@ -743,11 +769,11 @@ def _validate_command(action, payload):
         raise ValueError('Use the supported fields for this operation.')
 
 
-def _legacy_delivery_open(db):
+def _legacy_delivery_open(db, *, include_audience=True):
     now = time.time()
     try:
         quiz = _read(db, 'event_quiz_v1', {})
-        audience = _read(db, 'audience_questions_v1', {})
+        audience = _read(db, 'audience_questions_v1', {}) if include_audience else {}
         if not isinstance(quiz, dict) or not isinstance(audience, dict):
             raise ValueError
         runs, packs = quiz.get('runs', []), audience.get('packs', [])
@@ -907,6 +933,8 @@ def execute(service, action, payload, *, expected_revision, request_id, identity
     """
     if not isinstance(identity, dict) or identity.get('dashboard', identity.get('role')) not in {'admin', 'organizer', 'desk'} or not identity.get('credential_id') or (identity.get('impersonation') or {}).get('mode') == 'preview':
         raise PermissionError('Organizer access is required.')
+    if action == 'set_quiz_enabled' and identity.get('dashboard', identity.get('role')) != 'admin':
+        raise PermissionError('Admin access is required to change quiz availability.')
     _validate_command(action, payload)
     if not isinstance(request_id, str) or not re.fullmatch(r'[0-9a-f]{32}', request_id):
         raise ValueError('Provide a unique request ID.')
@@ -925,6 +953,10 @@ def execute(service, action, payload, *, expected_revision, request_id, identity
                 raise Conflict('Request ID was already used for a different operation.')
             return deepcopy(receipt['result'])
         state = _read(db, KEY, empty())
+        if (action == 'set_quiz_enabled' and payload.get('enabled') is False
+                and os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1'
+                and _legacy_delivery_open(db, include_audience=False)):
+            raise Conflict('Close the existing legacy quiz question before disabling quizzes.')
         if action in {'open_question','resend_question'} and os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1' and _legacy_delivery_open(db):
             raise Conflict('Close the existing quiz or audience question before starting an Engagement Hub question.')
         result = _apply(state, action, payload, expected_revision, db)
@@ -962,13 +994,33 @@ def answer(service, run_id, delivery_id, choice, *, identity):
 
 def handle(service, handler, path, body=None):
     """Experimental, explicitly enabled Organizer and participant adapters."""
-    if path not in {DESK, LEGACY_PREVIEW, ANALYTICS_CSV, PLAYER, SHARED_PLAYER, QUESTIONS} or os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+    if path not in {DESK, ADMIN_SETTINGS, LEGACY_PREVIEW, ANALYTICS_CSV, PLAYER, SHARED_PLAYER, QUESTIONS} or os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
         return False
     identity = service.event_access.session(service, handler.headers)
     if not identity:
         handler.send(401, {'error': 'Sign in to continue.'})
         return True
     role = identity.get('dashboard', identity.get('role'))
+    if path == ADMIN_SETTINGS:
+        if role != 'admin' or identity.get('impersonation'):
+            handler.send(403, {'error':'Admin access is required to change quiz availability.'})
+            return True
+        try:
+            if body is not None:
+                if not isinstance(body, dict) or set(body) != {'action','revision','request_id','payload'} or body.get('action') != 'set_quiz_enabled':
+                    raise ValueError('Use the supported setting fields.')
+                execute(service, body['action'], body['payload'], expected_revision=body['revision'],
+                        request_id=body['request_id'], identity=identity)
+            with service.LOCK:
+                state = _read(service.DB, KEY, empty())
+            handler.send(200, {'revision':state['revision'], 'quiz_enabled':state.get('quiz_enabled', True)})
+        except PermissionError as error:
+            handler.send(403, {'error':str(error)})
+        except Conflict as error:
+            handler.send(409, {'error':str(error)})
+        except ValueError as error:
+            handler.send(400, {'error':str(error)})
+        return True
     if path == QUESTIONS:
         audience = identity.get('role')
         if audience not in {'participant', 'guest'}:
@@ -1056,6 +1108,9 @@ def handle(service, handler, path, body=None):
         return True
     if role not in {'admin', 'organizer', 'desk'}:
         handler.send(403, {'error': 'Organizer access is required.'})
+        return True
+    if path == DESK and isinstance(body, dict) and body.get('action') == 'set_quiz_enabled':
+        handler.send(403, {'error':'Use Admin event settings to change quiz availability.'})
         return True
     if path == ANALYTICS_CSV:
         if body is not None:

@@ -61,6 +61,7 @@
 <script src="/static/assistant.js"></script>
 <script src="/static/accounts.js"></script>
 <script src="/static/agenda.js"></script>
+<script src="/static/engagement-settings.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const get = path => KEV.api(path, null, KEV.staff.token);
@@ -1174,6 +1175,10 @@ async function vSystem() {
   if (workspace.mode === 'rehearsal') {
     $('main').insertAdjacentHTML('beforeend','<section class="card" id="prepare-live"></section>');
     window.PitchLiveTransition?.mount($('prepare-live'),(path,body)=>post(path,body));
+  }
+  if (status.engagement_v2 && window.EngagementSettings) {
+    $('main').insertAdjacentHTML('beforeend','<section class="card" id="engagement-settings"></section>');
+    window.EngagementSettings.mount($('engagement-settings'),get,post).catch(error => fail(error,generation));
   }
   bindConfiguration(setup, workspace, generation);
   $('main').querySelectorAll('[data-workspace]').forEach(button => {

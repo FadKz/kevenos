@@ -47,6 +47,7 @@
     close.addEventListener('click', () => { dismissed = delivery.id; dialog.close(); reopen.hidden = false; reopen.focus(); });
     header.append(eyebrow, title, close); panel.append(header);
     if (run.description) panel.append(node('p', run.description, 'engagement-description'));
+    if (run.progress?.total > 1) panel.append(node('p', `Question ${run.progress.position} of ${run.progress.total}`, 'engagement-progress'));
     const status = node('p', '', 'engagement-status'); status.setAttribute('role', 'status');
     if (data.answered) status.textContent = 'Answer saved.';
     else if (delivery.status === 'paused') status.textContent = 'The event team paused this question. Please wait.';

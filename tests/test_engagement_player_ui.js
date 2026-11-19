@@ -29,7 +29,7 @@ test('live question appears and sends the selected answer once', async t => {
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   const calls = [];
-  const question = {id:'run', kind:'quiz', title:'Knowledge check', delivery:{id:'delivery', status:'open', ends_at:115},
+  const question = {id:'run', kind:'quiz', title:'Knowledge check', progress:{position:1,total:3}, delivery:{id:'delivery', status:'open', ends_at:115},
     questions:[{id:'q1', type:'single', prompt:'Choose one', options:['First', 'Second']}]};
   let state = {question, answered:false, now:100};
   const api = async (path, options) => {
@@ -42,6 +42,7 @@ test('live question appears and sends the selected answer once', async t => {
   const root = w.document.querySelector('#engagement-player');
   assert.ok(root.querySelector('dialog[open]'));
   assert.match(root.textContent, /Choose one/);
+  assert.match(root.textContent, /Question 1 of 3/);
   root.querySelectorAll('input[type=radio]')[1].click();
   root.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles:true, cancelable:true}));
   await new Promise(resolve => setTimeout(resolve, 0));

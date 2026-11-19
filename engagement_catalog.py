@@ -516,6 +516,11 @@ def player_view(run, *, principal=None):
             question.pop('correct', None)
     view = {**snapshot, 'id': run['id'], 'activity_id': run['activity_id'], 'status': run['status'],
             'delivery': delivery}
+    if snapshot['questions']:
+        ordered = run['snapshot']['questions']
+        position = next(index + 1 for index, question in enumerate(ordered)
+                        if question['id'] == run['active_question_id'])
+        view['progress'] = {'position':position, 'total':len(ordered)}
     delivery = delivery or {}
     if principal and delivery.get('status') == 'revealed' and snapshot['kind'] == 'quiz' and snapshot['questions']:
         ids = [item['id'] for item in [*run.get('deliveries', []), delivery] if item.get('question_id') == run['active_question_id']]

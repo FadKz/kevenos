@@ -110,6 +110,7 @@ class EngagementCatalogTests(unittest.TestCase):
         question_id = run['snapshot']['questions'][0]['id']
         self.assertEqual(catalog.player_view(run)['questions'], [])
         run = catalog.open_question(state, run['id'], question_id, expected_revision=3)
+        self.assertEqual(catalog.player_view(run)['progress'], {'position':1, 'total':2})
         changed = catalog.save_draft(state, {'id': draft['id'], 'title': 'Revised', 'kind': 'quiz', 'questions': [
             {'prompt': 'What is three plus three?', 'type': 'single', 'options': ['5', '6'], 'correct': [1]}
         ]}, expected_revision=4)

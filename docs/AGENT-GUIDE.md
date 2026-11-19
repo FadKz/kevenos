@@ -7,9 +7,10 @@ deployment addresses.
 ## Connect
 
 - Local MCP: run `python agent_mcp.py --transport stdio` from this directory.
-- Remote MCP: configure the application with `KEVENOS_AGENT_TOKENS` and connect to
-  `${KEVENOS_PUBLIC_URL}/mcp` using the corresponding bearer token.
-- HTTP API: use `${KEVENOS_PUBLIC_URL}/api/agent/v1` with the same scoped token.
+- Remote MCP: configure the agent gateway and application grant file, route its
+  authenticated endpoint, then connect to `${KEVENOS_PUBLIC_URL}/mcp` with the
+  corresponding bearer token.
+- HTTP API: use `${KEVENOS_PUBLIC_URL}/api/v1/agent` with the same scoped token.
 
 Set the public URL, token grants, database path, mail, push and AI settings with
 environment variables documented in the package deployment guide. Never put
@@ -35,3 +36,18 @@ The reusable package provides schemas and controls, not a configured agent.
 The deployer must supply a public origin, TLS termination, token grants and any
 optional AI gateway. Model calls are disabled unless an AI base URL and key are
 configured explicitly.
+
+## Experimental Engagement Hub
+
+When `KEVENOS_ENGAGEMENT_V2=1`, the `engagement.state` resource reads a page of
+activities or runs; choose `collection`, `limit`, and `offset`. The separate
+`engagement:read` grant is required. The response contains drafts and correct
+answers, but excludes individual responses. Treat it as Organizer-only data.
+
+`engagement.control` requires both `engagement:read` and `engagement:write`.
+Read current state and the command schema, prepare the exact action and obtain
+explicit operator confirmation. Reuse the returned idempotency key when checking
+a receipt; do not invent another key for an uncertain result. Opening, resending,
+closing, revealing and sharing on the hall are distinct actions. The hub is still
+experimental; keep it disabled until the implementation and release gates in
+`ENGAGEMENT-IMPLEMENTATION-PLAN.md` have passed.

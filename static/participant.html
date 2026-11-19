@@ -14,6 +14,7 @@
 <link href="/static/event.css" rel="stylesheet"/>
 <link href="/static/participant-workspace.css" rel="stylesheet"/>
 <link href="/static/event-quiz.css" rel="stylesheet"/>
+<link href="/static/engagement-player.css" rel="stylesheet"/>
 <link href="/static/audience-questions.css" rel="stylesheet"/>
 <link href="/static/event-operations.css" rel="stylesheet"/></head>
 <body class="participant-page">
@@ -83,6 +84,7 @@
 <p role="status" id="notification-invitation-status"></p>
 </section>
 <div id="participant-operations-help"></div>
+<div id="engagement-questions" hidden></div>
 <section aria-labelledby="pitch-prep-title" class="card event-section pitch-prep-card" hidden="" id="pitch-prep-card">
 <div>
 <p class="event-kicker">Pitch Prep</p>
@@ -242,6 +244,7 @@
 </details>
 </dialog>
 <p aria-atomic="true" aria-live="polite" class="participant-sr-only" id="live-changes" role="status"></p>
+<div id="engagement-player"></div>
 </main>
 <script src="/static/common.js"></script>
 <script src="/static/event-operations.js"></script>
@@ -250,6 +253,8 @@
 <script src="/static/participant-workspace.js"></script>
 <script src="/static/participant-prep.js"></script>
 <script src="/static/event-quiz.js"></script>
+<script src="/static/engagement-player.js"></script>
+<script src="/static/engagement-questions.js"></script>
 <script src="/static/audience-questions.js"></script>
 <script>
     const $ = id => document.getElementById(id), esc = KEV.esc;
@@ -460,6 +465,8 @@
       timelineKey = '';
       KEV.messages?.clear();
       window.EventQuiz?.clear();
+      window.EngagementPlayer?.clear();
+      window.EngagementQuestions?.clear();
       window.AudienceQuestions?.clear();
       window.ParticipantPrep?.clear();
       for (const id of ['agenda-current', 'team-members']) $(id).replaceChildren();
@@ -497,6 +504,8 @@
             KEV.messages?.clear();
             window.ParticipantWorkspace?.clear();
             window.EventQuiz?.clear();
+            window.EngagementPlayer?.clear();
+            window.EngagementQuestions?.clear();
             window.AudienceQuestions?.clear();
             window.ParticipantPrep?.clear();
             // Remove old assignment and protected links before fetching a changed assignment.
@@ -513,6 +522,10 @@
         renderLive(state);
         KEV.messages?.receive(state);
         window.EventQuiz?.participant(state);
+        if (state.engagement_v2) {
+          window.EngagementPlayer?.refresh(KEV.api);
+          window.EngagementQuestions?.mount($('engagement-questions'), KEV.api);
+        } else { window.EngagementPlayer?.clear(); window.EngagementQuestions?.clear(); }
         window.AudienceQuestions?.participant($('audience-questions-player'), KEV.api);
         lastSuccess = Number.isFinite(state.now) ? state.now : Date.now()/1000; lastReceived = Date.now();
         connection(true);

@@ -1,7 +1,16 @@
 # Engagement Hub implementation plan
 
-Status: proposed for review; no implementation or production deployment is authorized by this document alone.
+Status: product direction approved; implementation in progress behind the disabled-by-default `KEVENOS_ENGAGEMENT_V2` flag. Production promotion remains subject to the qualification gates below.
 Tracking: tmwhead/kelzia-brain#26. Baseline: KevenOS 1.2.0, commit 0532f02.
+
+Current foundation: organizer drafts and immutable versions, timed single-question
+deliveries and resends, participant and opt-in guest session receipts, explicit
+answer reveal, a shared hall question projection, limited aggregate counts,
+basic Q&A moderation, and SQLite/PostgreSQL serialization. The flag is experimental:
+guest reconnect and retention policies, hall qualification, complete analytics,
+Q&A voting and duplicate handling, migration,
+AI/API/MCP parity and full browser/recovery qualification remain incomplete.
+Existing quiz and event data continue to use the legacy implementation.
 
 ## Product outcome
 

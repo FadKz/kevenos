@@ -1,0 +1,11 @@
+.engagement-desk-intro, .engagement-desk-card { border:1px solid #284b6f; border-radius:1rem; padding:1.1rem; background:#0b1b30; margin-bottom:1rem; }
+.engagement-desk-layout { display:grid; grid-template-columns:minmax(15rem, .8fr) minmax(0, 1.2fr); gap:1rem; }
+.engagement-field { display:flex; flex-direction:column; gap:.4rem; margin:1rem 0; color:#d4e5f3; }
+.engagement-field[hidden] { display:none; }
+.engagement-field input, .engagement-field textarea, .engagement-field select { box-sizing:border-box; width:100%; min-height:44px; padding:.7rem; border:1px solid #52718d; border-radius:.5rem; background:#07111f; color:#f8fafc; }
+.engagement-field textarea { min-height:6rem; }
+.engagement-editor-question, .engagement-run { margin:1rem 0; padding:1rem; border:1px solid #284b6f; border-radius:.75rem; }
+.engagement-library-item, .engagement-run-question { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.75rem 0; border-bottom:1px solid #284b6f; }
+.engagement-run-question span { flex:1 1 12rem; }
+.engagement-desk-card button { min-height:44px; margin:.2rem; }
+@media (max-width:700px) { .engagement-desk-layout { grid-template-columns:1fr; } }

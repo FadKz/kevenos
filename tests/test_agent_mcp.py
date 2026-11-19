@@ -42,7 +42,7 @@ STATUS = {"name": "event.status", "description": "Read status", "input_schema": 
 def topic_catalog():
     catalog = event_catalog()
     return {
-        group: [item for item in catalog[group] if item["name"].startswith(("quiz.", "audience.", "schedule."))]
+        group: [item for item in catalog[group] if item["name"].startswith(("quiz.", "audience.", "schedule.", "engagement."))]
         for group in ("resources", "commands")
     }
 
@@ -198,10 +198,25 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(tools["quiz_analytics"].annotations.read_only_hint)
         self.assertTrue(tools["quiz_control"].annotations.destructive_hint)
         self.assertTrue(tools["quiz_control"].annotations.open_world_hint)
+        self.assertTrue(tools["engagement_state"].annotations.read_only_hint)
+        self.assertTrue(tools["engagement_control"].annotations.destructive_hint)
+        self.assertTrue(tools["engagement_control"].annotations.open_world_hint)
         self.assertIn("operate_quiz", {p.name for p in (await session.list_prompts()).prompts})
         prompt = (await session.get_prompt("operate_quiz")).messages[0].content.text
         self.assertIn("quiz_analytics", prompt)
         self.assertIn("agent_prepare", prompt)
+
+        engagement = await session.call_tool("engagement_state")
+        self.assertFalse(engagement.is_error)
+        self.assertEqual(engagement.structured_content["data"]["received"]["resource"], "engagement.state")
+        draft = {"arguments":{"action":"save", "revision":0, "payload":{"title":"Poll", "kind":"poll", "questions":[
+            {"type":"single", "prompt":"Choose", "options":["A","B"]}]}}, "context":"practice", "revision":"current"}
+        prepared_draft = await session.call_tool("agent_prepare", {"command":"engagement.control", **draft})
+        self.assertFalse(prepared_draft.is_error)
+        sent = await session.call_tool("engagement_control", {**draft, "confirm":"EXECUTE",
+            "confirmation_id":prepared_draft.structured_content["data"]["confirmation_id"],
+            "idempotency_key":prepared_draft.structured_content["data"]["idempotency_key"]})
+        self.assertFalse(sent.is_error)
 
         state = await session.call_tool("quiz_state")
         self.assertFalse(state.is_error)

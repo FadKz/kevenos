@@ -568,6 +568,7 @@ def handle_get(s,h,path,q):
             result['message_scope'] = event_operations.subject(s, ident)[0]
             import participant_workspace
             result['workspace'] = participant_workspace.participant_data(s, s.roster_row(participant['pair']))
+            result['engagement_v2'] = os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1'
         h.send(200,result); return True
     if path=='/api/help':
         context=q.get('context',[ident['role']])[0]

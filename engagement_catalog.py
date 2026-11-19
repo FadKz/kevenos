@@ -17,6 +17,20 @@ KEY = 'engagement_catalog_v1'
 RECEIPTS_KEY = 'engagement_receipts_v1'
 DESK = '/api/desk/engagement'
 PLAYER = '/api/participant/engagement'
+SHARED_PLAYER = '/api/engagement/player'
+QUESTIONS = '/api/engagement/questions'
+PAYLOAD_FIELDS = {
+    'save': ({'id','title','kind','questions','audiences'}, {'title','kind','questions'}),
+    'publish': ({'activity_id'}, {'activity_id'}),
+    'open_run': ({'activity_id','version'}, {'activity_id','version'}),
+    'open_question': ({'run_id','question_id','duration'}, {'run_id','question_id'}),
+    'close_question': ({'run_id'}, {'run_id'}),
+    'reveal_question': ({'run_id'}, {'run_id'}),
+    'resend_question': ({'run_id','duration'}, {'run_id'}),
+    'share_hall': ({'run_id','share'}, {'run_id','share'}),
+    'configure_questions': ({'participants','guests'}, {'participants','guests'}),
+    'moderate_question': ({'id','decision','answer'}, {'id','decision'}),
+}
 
 
 class Conflict(ValueError):
@@ -24,7 +38,7 @@ class Conflict(ValueError):
 
 
 def empty():
-    return {'revision': 0, 'activities': [], 'runs': []}
+    return {'revision': 0, 'activities': [], 'runs': [], 'qa_settings': {'participants': False, 'guests': False}, 'qa': []}
 
 
 def _revision(state, expected):
@@ -51,16 +65,21 @@ def _activity(state, activity_id):
 
 def save_draft(state, payload, *, expected_revision):
     _revision(state, expected_revision)
-    if not isinstance(payload, dict) or set(payload) - {'id', 'title', 'kind', 'questions'}:
+    if not isinstance(payload, dict) or set(payload) - {'id', 'title', 'kind', 'questions', 'audiences'}:
         raise ValueError('Use the supported activity fields.')
     title = _text(payload.get('title'), 120, 'an activity title')
     kind = payload.get('kind')
     if not isinstance(kind, str) or kind not in {'quiz', 'poll'}:
         raise ValueError('Choose a quiz or poll.')
+    prior = _activity(state, payload['id']) if 'id' in payload else None
+    audiences = payload.get('audiences', prior['draft'].get('audiences', ['participant']) if prior else ['participant'])
+    if (not isinstance(audiences, list) or not audiences or
+            any(not isinstance(audience, str) or audience not in ('participant', 'guest') for audience in audiences) or
+            len(set(audiences)) != len(audiences)):
+        raise ValueError('Choose the allowed audiences for this activity.')
     questions = payload.get('questions')
     if not isinstance(questions, list) or not 1 <= len(questions) <= 100:
         raise ValueError('Include between 1 and 100 questions.')
-    prior = _activity(state, payload['id']) if 'id' in payload else None
     previous_ids = {q['id'] for q in prior['draft']['questions']} if prior else set()
     seen_ids = set()
     clean = []
@@ -96,7 +115,8 @@ def save_draft(state, payload, *, expected_revision):
                 (not correct or (question_type != 'multi' and len(correct) != 1))) or (kind == 'poll' and correct):
             raise ValueError('Choose the correct answers for a quiz; polls are unscored.')
         clean.append({'id': question_id, 'type': question_type, 'prompt': prompt, 'options': choices, 'correct': sorted(correct)})
-    draft = {'id': prior['id'] if prior else uuid4().hex, 'title': title, 'kind': kind, 'questions': clean}
+    draft = {'id': prior['id'] if prior else uuid4().hex, 'title': title, 'kind': kind,
+             'audiences': list(audiences), 'questions': clean}
     if prior:
         prior['draft'] = draft
     else:
@@ -147,10 +167,30 @@ def open_question(state, run_id, question_id, *, expected_revision, duration=15)
     if question_id in run.get('delivered_question_ids', []):
         raise Conflict('This question has already been delivered.')
     now = time.time()
-    run['delivery'] = {'id': uuid4().hex, 'status': 'open', 'opened_at': now,
+    if run.get('delivery'):
+        run.setdefault('deliveries', []).append(run['delivery'])
+    run['delivery'] = {'id': uuid4().hex, 'question_id': question_id, 'status': 'open', 'opened_at': now,
                        'ends_at': None if duration is None else now + duration}
     run.setdefault('delivered_question_ids', []).append(question_id)
     run['active_question_id'] = question_id
+    state['revision'] += 1
+    return deepcopy(run)
+
+
+def resend_question(state, run_id, *, expected_revision, duration=15):
+    _revision(state, expected_revision)
+    run = _run(state, run_id)
+    if duration is not None and (type(duration) is not int or not 1 <= duration <= 3600):
+        raise ValueError('Choose a duration from 1 to 3600 seconds, or no time limit.')
+    delivery = run.get('delivery') or {}
+    if delivery.get('status') != 'closed':
+        raise Conflict('Close the question before resending it; revealed answers cannot be resent.')
+    if any(item.get('status') == 'open' and item.get('delivery', {}).get('status') == 'open' for item in state['runs']):
+        raise Conflict('Close the current question first.')
+    now = time.time()
+    run.setdefault('deliveries', []).append(delivery)
+    run['delivery'] = {'id': uuid4().hex, 'question_id': run['active_question_id'], 'status': 'open',
+                       'opened_at': now, 'ends_at': None if duration is None else now + duration}
     state['revision'] += 1
     return deepcopy(run)
 
@@ -179,6 +219,79 @@ def reveal_question(state, run_id, *, expected_revision):
     return deepcopy(run)
 
 
+def share_hall(state, run_id, share, *, expected_revision):
+    _revision(state, expected_revision)
+    if type(share) is not bool:
+        raise ValueError('Choose whether to share the question.')
+    run = _run(state, run_id)
+    if share and not run.get('delivery'):
+        raise Conflict('Open a question before sharing it on the hall display.')
+    if share:
+        for item in state['runs']:
+            item['hall_shared'] = False
+    run['hall_shared'] = share
+    state['revision'] += 1
+    return deepcopy(run)
+
+
+def configure_questions(state, *, participants, guests, expected_revision):
+    _revision(state, expected_revision)
+    if type(participants) is not bool or type(guests) is not bool:
+        raise ValueError('Choose who can submit audience questions.')
+    state['qa_settings'] = {'participants': participants, 'guests': guests}
+    state['revision'] += 1
+    return deepcopy(state['qa_settings'])
+
+
+def ask_question(state, principal, audience, text, request_id):
+    if not isinstance(principal, str) or not principal or audience not in ('participant', 'guest'):
+        raise PermissionError('An individual event session is required.')
+    if not isinstance(request_id, str) or not re.fullmatch(r'[0-9a-f]{32}', request_id):
+        raise ValueError('Provide a unique request ID.')
+    text = _text(text, 500, 'a question')
+    questions = state.get('qa', [])
+    previous = next((item for item in questions if item['request_id'] == request_id), None)
+    if previous:
+        if previous['principal'] != principal or previous['text'] != text or previous['audience'] != audience:
+            raise Conflict('Request ID was already used for a different question.')
+        return {'id': previous['id'], 'received_at': previous['created_at']}
+    settings = state.get('qa_settings', {})
+    if not settings.get('participants') and not settings.get('guests'):
+        raise Conflict('Audience questions are closed.')
+    if not settings.get('participants' if audience == 'participant' else 'guests'):
+        raise PermissionError('Audience questions are not enabled for this audience.')
+    if len(questions) >= 1000 or sum(item['principal'] == principal for item in questions) >= 5:
+        raise Conflict('Question limit reached. Ask the event team for help.')
+    item = {'id':uuid4().hex, 'request_id':request_id, 'principal':principal, 'audience':audience,
+            'text':text, 'status':'pending', 'created_at':time.time()}
+    state.setdefault('qa', []).append(item)
+    return {'id':item['id'], 'received_at':item['created_at']}
+
+
+def moderate_question(state, question_id, action, *, expected_revision, answer=None):
+    _revision(state, expected_revision)
+    question = next((item for item in state.get('qa', []) if item['id'] == question_id), None)
+    if not question:
+        raise Conflict('This question is no longer available.')
+    if action == 'approve' and question['status'] == 'pending':
+        question['status'] = 'approved'
+    elif action == 'reject' and question['status'] in {'pending', 'approved', 'answered'}:
+        question['status'] = 'rejected'
+        question.pop('answer', None)
+    elif action == 'answer' and question['status'] == 'approved':
+        question['answer'] = _text(answer, 1000, 'an answer')
+        question['status'] = 'answered'
+    else:
+        raise Conflict('This moderation action is unavailable for the question.')
+    state['revision'] += 1
+    return {'id':question['id'], 'status':question['status']}
+
+
+def public_questions(state):
+    return [{key:item[key] for key in ('id','text','status','answer','created_at') if key in item}
+            for item in state.get('qa', []) if item['status'] in {'approved','answered'}]
+
+
 def submit_answer(state, run_id, delivery_id, principal, choice):
     """Record one answer per authenticated principal and delivery.
 
@@ -189,9 +302,11 @@ def submit_answer(state, run_id, delivery_id, principal, choice):
         raise PermissionError('An individual session is required.')
     run = _run(state, run_id)
     delivery = run.get('delivery') or {}
-    if delivery.get('id') != delivery_id:
+    deliveries = [*run.get('deliveries', []), delivery]
+    requested = next((item for item in deliveries if item.get('id') == delivery_id), None)
+    if not requested:
         raise Conflict('This question is no longer active.')
-    question = next(q for q in run['snapshot']['questions'] if q['id'] == run['active_question_id'])
+    question = next(q for q in run['snapshot']['questions'] if q['id'] == requested['question_id'])
     question_type = question['type']
     if question_type in {'single', 'true_false'}:
         if type(choice) is not int or not 0 <= choice < len(question['options']):
@@ -209,12 +324,15 @@ def submit_answer(state, run_id, delivery_id, principal, choice):
         choice = _text(choice, 1000, 'an answer')
     else:
         raise ValueError('Unsupported question type.')
-    answers = run.get('responses', {}).get(delivery_id, {})
-    previous = answers.get(principal)
+    prior_ids = [item['id'] for item in deliveries if item.get('question_id') == requested['question_id']]
+    previous = next((run.get('responses', {}).get(item_id, {}).get(principal) for item_id in prior_ids
+                     if principal in run.get('responses', {}).get(item_id, {})), None)
     if previous:
         if previous['choice'] != choice:
             raise Conflict('Your answer has already been submitted.')
         return deepcopy(previous['receipt'])
+    if delivery.get('id') != delivery_id:
+        raise Conflict('This question is no longer active.')
     now = time.time()
     if delivery.get('status') != 'open' or (delivery['ends_at'] is not None and now >= delivery['ends_at']):
         raise Conflict('This question is closed.')
@@ -234,12 +352,82 @@ def player_view(run, *, principal=None):
             'delivery': deepcopy(run.get('delivery'))}
     delivery = run.get('delivery') or {}
     if principal and delivery.get('status') == 'revealed' and snapshot['kind'] == 'quiz' and snapshot['questions']:
-        response = run.get('responses', {}).get(delivery['id'], {}).get(principal)
+        ids = [item['id'] for item in [*run.get('deliveries', []), delivery] if item.get('question_id') == run['active_question_id']]
+        response = next((run.get('responses', {}).get(item_id, {}).get(principal) for item_id in ids
+                         if principal in run.get('responses', {}).get(item_id, {})), None)
         if response:
             question = snapshot['questions'][0]
             selected = response['choice'] if isinstance(response['choice'], list) else [response['choice']]
             view['result'] = {'earned': int(selected == question['correct']), 'available': 1}
     return view
+
+
+def desk_view(state):
+    """Project aggregate results without returning individual responses."""
+    result = deepcopy(state)
+    result['qa'] = [{key:item[key] for key in ('id','text','status','answer','created_at','audience') if key in item}
+                    for item in result.get('qa', [])]
+    for run in result['runs']:
+        responses = run.pop('responses', {})
+        delivery = run.get('delivery') or {}
+        question = next((q for q in run['snapshot']['questions'] if q['id'] == run.get('active_question_id')), None)
+        ids = [item['id'] for item in [*run.get('deliveries', []), delivery]
+               if item.get('id') and item.get('question_id') == run.get('active_question_id')]
+        people = {}
+        for item_id in ids:
+            people.update(responses.get(item_id, {}))
+        distribution = None
+        if question and len(people) >= 5 and question['type'] in {'single', 'multi', 'true_false', 'rating'}:
+            count = 5 if question['type'] == 'rating' else len(question['options'])
+            distribution = [0] * count
+            for answer in people.values():
+                selected = answer['choice'] if isinstance(answer['choice'], list) else [answer['choice']]
+                for choice in selected:
+                    distribution[choice - 1 if question['type'] == 'rating' else choice] += 1
+        run['analytics'] = {'respondents': len(people), 'denominator': len(people), 'distribution': distribution,
+                            'suppressed_below': 5}
+    return result
+
+
+def hall_view(state):
+    """Return only explicitly shared, currently released information."""
+    run = next((item for item in state['runs'] if item.get('hall_shared') and item.get('status') == 'open'), None)
+    if not run or not run.get('delivery'):
+        return None
+    player = player_view(run)
+    if not player['questions']:
+        return None
+    question = player['questions'][0]
+    view = {'title': player['title'], 'kind': player['kind'], 'prompt': question['prompt'],
+            'status': player['delivery']['status'], 'ends_at': player['delivery']['ends_at']}
+    if player['delivery']['status'] == 'revealed':
+        if question.get('correct'):
+            view['options'] = question['options']
+            view['correct'] = question['correct']
+        stats = next(item for item in desk_view(state)['runs'] if item['id'] == run['id'])['analytics']
+        if stats['distribution'] is not None:
+            view['distribution'] = stats['distribution']
+            view['respondents'] = stats['respondents']
+            view['options'] = question['options'] if question['type'] != 'rating' else ['1', '2', '3', '4', '5']
+    return view
+
+
+def hall_quiz(service):
+    """Adapt the privacy-filtered hall projection to the existing room renderer."""
+    if os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+        return None
+    view = hall_view(_read(service.DB, KEY, empty()))
+    if not view:
+        return None
+    options = [{'key': chr(ord('A') + index), 'text': text} for index, text in enumerate(view.get('options', []))]
+    result = {'kind': 'question', 'prompt': view['prompt'], 'status': view['status'],
+              'end': view['ends_at'], 'options': options,
+              'results_pending': view['status'] == 'closed'}
+    if 'correct' in view:
+        result['correct'] = [options[index]['key'] for index in view['correct']]
+    if 'distribution' in view:
+        result['bars'] = [{**option, 'count': view['distribution'][index]} for index, option in enumerate(options)]
+    return result
 
 
 def _apply(state, action, payload, expected_revision):
@@ -254,6 +442,14 @@ def _apply(state, action, payload, expected_revision):
                              duration=payload.get('duration', 15))
     if action == 'close_question':
         return close_question(state, payload.get('run_id'), expected_revision=expected_revision)
+    if action == 'resend_question':
+        return resend_question(state, payload.get('run_id'), expected_revision=expected_revision, duration=payload.get('duration', 15))
+    if action == 'share_hall':
+        return share_hall(state, payload.get('run_id'), payload.get('share'), expected_revision=expected_revision)
+    if action == 'configure_questions':
+        return configure_questions(state, participants=payload.get('participants'), guests=payload.get('guests'), expected_revision=expected_revision)
+    if action == 'moderate_question':
+        return moderate_question(state, payload.get('id'), payload.get('decision'), answer=payload.get('answer'), expected_revision=expected_revision)
     return reveal_question(state, payload.get('run_id'), expected_revision=expected_revision)
 
 
@@ -267,14 +463,21 @@ def _write(db, key, value):
                (key, json.dumps(value)))
 
 
+def _validate_command(action, payload):
+    if not isinstance(action, str) or action not in PAYLOAD_FIELDS or not isinstance(payload, dict):
+        raise ValueError('Choose a supported catalog operation.')
+    allowed, required = PAYLOAD_FIELDS[action]
+    if set(payload) - allowed or required - set(payload):
+        raise ValueError('Use the supported fields for this operation.')
+
+
 def persist(service, action, payload, *, expected_revision):
     """Apply one catalog operation atomically in the selected event workspace.
 
     Authorization, audit and idempotency remain the responsibility of the
     future command adapter. SQLite is supported for a single app instance.
     """
-    if not isinstance(action, str) or action not in {'save', 'publish', 'open_run', 'open_question', 'close_question', 'reveal_question'} or not isinstance(payload, dict):
-        raise ValueError('Choose a supported catalog operation.')
+    _validate_command(action, payload)
     db = service.DB
     with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
         state = _read(db, KEY, empty())
@@ -291,8 +494,7 @@ def execute(service, action, payload, *, expected_revision, request_id, identity
     """
     if not isinstance(identity, dict) or identity.get('dashboard', identity.get('role')) not in {'admin', 'organizer', 'desk'} or not identity.get('credential_id') or (identity.get('impersonation') or {}).get('mode') == 'preview':
         raise PermissionError('Organizer access is required.')
-    if not isinstance(action, str) or action not in {'save', 'publish', 'open_run', 'open_question', 'close_question', 'reveal_question'} or not isinstance(payload, dict):
-        raise ValueError('Choose a supported catalog operation.')
+    _validate_command(action, payload)
     if not isinstance(request_id, str) or not re.fullmatch(r'[0-9a-f]{32}', request_id):
         raise ValueError('Provide a unique request ID.')
     actor = identity.get('actor') or identity
@@ -325,35 +527,90 @@ def execute(service, action, payload, *, expected_revision, request_id, identity
 
 
 def answer(service, run_id, delivery_id, choice, *, identity):
-    """Submit against the selected workspace using a server-authenticated participant."""
-    if (not isinstance(identity, dict) or identity.get('role') != 'participant'
-            or not identity.get('credential_id') or (identity.get('impersonation') or {}).get('mode') == 'preview'):
-        raise PermissionError('An individual participant session is required.')
+    """Submit using a server-authenticated participant or individual guest session."""
+    if (not isinstance(identity, dict) or identity.get('role') not in {'participant','guest'}
+            or (identity.get('impersonation') or {}).get('mode') == 'preview'):
+        raise PermissionError('An individual attendee session is required.')
+    audience = identity['role']
+    principal = identity.get('credential_id') if audience == 'participant' else ('guest:' + identity['digest'] if identity.get('digest') else None)
+    if not principal:
+        raise PermissionError('An individual attendee session is required.')
     db = service.DB
     with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
         state = _read(db, KEY, empty())
-        receipt = submit_answer(state, run_id, delivery_id, identity['credential_id'], choice)
+        run = _run(state, run_id)
+        if audience not in run['snapshot'].get('audiences', ['participant']):
+            raise PermissionError('This activity is not open to your audience.')
+        receipt = submit_answer(state, run_id, delivery_id, principal, choice)
         _write(db, KEY, state)
         return receipt
 
 
 def handle(service, handler, path, body=None):
     """Experimental, explicitly enabled Organizer and participant adapters."""
-    if path not in {DESK, PLAYER} or os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+    if path not in {DESK, PLAYER, SHARED_PLAYER, QUESTIONS} or os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
         return False
     identity = service.event_access.session(service, handler.headers)
     if not identity:
         handler.send(401, {'error': 'Sign in to continue.'})
         return True
     role = identity.get('dashboard', identity.get('role'))
-    if path == PLAYER:
-        if identity.get('role') != 'participant':
-            handler.send(403, {'error': 'Participant access is required.'})
+    if path == QUESTIONS:
+        audience = identity.get('role')
+        if audience not in {'participant', 'guest'}:
+            handler.send(403, {'error':'Participant or guest access is required.'})
             return True
         try:
-            assignment = service.event_access.participant_assignment(service, identity)
-            if not assignment or not assignment['name'].strip():
-                raise Conflict('Your participant assignment is unavailable.')
+            if audience == 'participant':
+                assignment = service.event_access.participant_assignment(service, identity)
+                if not assignment or not assignment['name'].strip():
+                    raise Conflict('Your participant assignment is unavailable.')
+                principal = 'participant:' + identity['credential_id']
+            else:
+                digest = identity.get('digest')
+                if not digest:
+                    raise PermissionError('An individual guest session is required.')
+                principal = 'guest:' + digest
+            if body is not None:
+                if (identity.get('impersonation') or {}).get('mode') == 'preview':
+                    raise PermissionError('This profile is a read-only preview.')
+                if not isinstance(body, dict) or set(body) != {'text','request_id'}:
+                    raise ValueError('Use the supported question fields.')
+                db = service.DB
+                with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
+                    state = _read(db, KEY, empty())
+                    receipt = ask_question(state, principal, audience, body['text'], body['request_id'])
+                    _write(db, KEY, state)
+                handler.send(200, {'receipt':receipt})
+                return True
+            with service.LOCK:
+                state = _read(service.DB, KEY, empty())
+            own = [{key:item[key] for key in ('id','text','status','answer','created_at') if key in item}
+                   for item in state.get('qa', []) if item['principal'] == principal]
+            enabled = state.get('qa_settings', {}).get('participants' if audience == 'participant' else 'guests', False)
+            handler.send(200, {'enabled':enabled, 'questions':public_questions(state), 'own':own})
+        except PermissionError as error:
+            handler.send(403, {'error':str(error)})
+        except Conflict as error:
+            handler.send(409, {'error':str(error)})
+        except ValueError as error:
+            handler.send(400, {'error':str(error)})
+        return True
+    if path in {PLAYER, SHARED_PLAYER}:
+        audience = identity.get('role')
+        if audience not in ({'participant'} if path == PLAYER else {'participant','guest'}):
+            handler.send(403, {'error': 'Attendee access is required.'})
+            return True
+        try:
+            if audience == 'participant':
+                assignment = service.event_access.participant_assignment(service, identity)
+                if not assignment or not assignment['name'].strip():
+                    raise Conflict('Your participant assignment is unavailable.')
+                principal = identity['credential_id']
+            else:
+                if not identity.get('digest'):
+                    raise PermissionError('An individual guest session is required.')
+                principal = 'guest:' + identity['digest']
             if body is not None:
                 if not isinstance(body, dict) or set(body) != {'run_id', 'delivery_id', 'choice'}:
                     raise ValueError('Use the supported answer fields.')
@@ -364,9 +621,14 @@ def handle(service, handler, path, body=None):
                 state = _read(service.DB, KEY, empty())
             candidates = [run for run in state['runs'] if run['status'] == 'open' and run.get('delivery')]
             run = max(candidates, key=lambda item: item['delivery']['opened_at']) if candidates else None
-            answered = bool(run and identity['credential_id'] in run.get('responses', {}).get(run['delivery']['id'], {}))
-            handler.send(200, {'question': player_view(run, principal=identity['credential_id']) if run else None,
-                               'answered': answered, 'now': time.time()})
+            if run and audience not in run['snapshot'].get('audiences', ['participant']):
+                run = None
+            own = next((run.get('responses', {}).get(item['id'], {}).get(principal)
+                for item in [*run.get('deliveries', []), run['delivery']]
+                if item.get('question_id') == run['active_question_id'] and
+                principal in run.get('responses', {}).get(item['id'], {})), None) if run else None
+            handler.send(200, {'question': player_view(run, principal=principal) if run else None,
+                               'answered': bool(own), 'selection': own['choice'] if own else None, 'now': time.time()})
         except PermissionError as error:
             handler.send(403, {'error': str(error)})
         except Conflict as error:
@@ -388,7 +650,7 @@ def handle(service, handler, path, body=None):
                     request_id=body['request_id'], identity=identity)
         with service.LOCK:
             state = _read(service.DB, KEY, empty())
-        handler.send(200, state)
+        handler.send(200, desk_view(state))
     except PermissionError as error:
         handler.send(403, {'error': str(error)})
     except Conflict as error:

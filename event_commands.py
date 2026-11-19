@@ -6,6 +6,7 @@ Call these operations with the active workspace pinned and the domain lock held.
 from copy import deepcopy
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import time
 import uuid
@@ -15,6 +16,7 @@ import event_access
 import event_config
 import event_mail
 import event_quiz
+import engagement_catalog
 import final_event
 
 
@@ -184,6 +186,7 @@ def snapshot(s):
     return {
         'content': s.CONTENT,
         'quiz_revision': event_quiz.load(s)['rev'],
+        'engagement_revision': (s.kv_get(engagement_catalog.KEY) or engagement_catalog.empty())['revision'],
         'audience_revision': audience_questions.load(s)['rev'],
         'state': rows(s.DB, """
             SELECT k,v FROM kv WHERE k IN (
@@ -1095,6 +1098,59 @@ def _quiz_control(s, args, actor, principal):
     if archive_id:
         result['archive_id'] = archive_id
     return result
+
+
+ENGAGEMENT_ID = string(32, 32, pattern='^[0-9a-f]{32}$')
+ENGAGEMENT_REV = integer(0, 2**31 - 1)
+ENGAGEMENT_DURATION = {'type':['integer','null'], 'minimum':1, 'maximum':3600}
+ENGAGEMENT_QUESTION = obj({'id':ENGAGEMENT_ID, 'type':choices('single','multi','true_false','rating','text'),
+                           'prompt':string(500,1), 'options':array(string(150,1),8,2),
+                           'correct':array(integer(0,7),8,0,uniqueItems=True)}, ('type','prompt'))
+ENGAGEMENT_DRAFT = obj({'id':ENGAGEMENT_ID, 'title':string(120,1), 'kind':choices('quiz','poll'),
+                        'audiences':array(choices('participant','guest'),2,1,uniqueItems=True),
+                        'questions':array(ENGAGEMENT_QUESTION,100,1)}, ('title','kind','questions'))
+ENGAGEMENT_CONTROL = actions(
+    save=({'revision':ENGAGEMENT_REV,'payload':ENGAGEMENT_DRAFT}, ('revision','payload')),
+    publish=({'revision':ENGAGEMENT_REV,'payload':obj({'activity_id':ENGAGEMENT_ID},('activity_id',))}, ('revision','payload')),
+    open_run=({'revision':ENGAGEMENT_REV,'payload':obj({'activity_id':ENGAGEMENT_ID,'version':VERSION},('activity_id','version'))}, ('revision','payload')),
+    open_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'question_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION},('run_id','question_id'))}, ('revision','payload')),
+    close_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
+    reveal_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
+    resend_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION},('run_id',))}, ('revision','payload')),
+    share_hall=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'share':BOOL},('run_id','share'))}, ('revision','payload')),
+    configure_questions=({'revision':ENGAGEMENT_REV,'payload':obj({'participants':BOOL,'guests':BOOL},('participants','guests'))}, ('revision','payload')),
+    moderate_question=({'revision':ENGAGEMENT_REV,'payload':obj({'id':ENGAGEMENT_ID,'decision':choices('approve','reject','answer'),
+                           'answer':string(1000,1)},('id','decision'))}, ('revision','payload')),
+)
+
+
+def _engagement_enabled():
+    if os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+        raise CommandError('feature_disabled','Engagement Hub is not enabled in this deployment.',409)
+
+
+@resource('engagement.state', 'Read a page of engagement activities, runs, or moderated audience questions. Individual poll answers are excluded.',
+          'engagement:read', obj({'collection':choices('activities','runs','questions'), **PAGE}))
+def _engagement_state(s, args):
+    _engagement_enabled()
+    state = engagement_catalog.desk_view(s.kv_get(engagement_catalog.KEY) or engagement_catalog.empty())
+    collection = args.get('collection','activities')
+    values = state.get('qa', []) if collection == 'questions' else state[collection]
+    return {'revision':state['revision'], 'collection':collection, 'question_settings':state.get('qa_settings', {}),
+            **_page(values, {'limit':20, **args}, collection)}
+
+
+@command('engagement.control', 'Create and publish activities or control a run. Confirm the exact action, workspace, version and audience before execution.',
+         'engagement:write', ENGAGEMENT_CONTROL)
+def _engagement_control(s, args, actor, principal):
+    _engagement_enabled()
+    identity = {'role':'organizer', 'credential_id':'agent:' + principal['id'], 'label':principal['label']}
+    try:
+        engagement_catalog.execute(s, args['action'], args['payload'], expected_revision=args['revision'],
+                                   request_id=uuid.UUID(principal['idempotency_key']).hex, identity=identity)
+    except engagement_catalog.Conflict as error:
+        _conflict(str(error))
+    return {'action':args['action'], 'revision':s.kv_get(engagement_catalog.KEY)['revision']}
 
 
 AUDIENCE_ID = string(32,32,pattern=audience_questions.ID_PATTERN)

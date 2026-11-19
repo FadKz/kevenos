@@ -152,7 +152,7 @@ def guard(s,h,path,body=None):
 def desk_projection(s,ident,data):
     role=(ident or {}).get('dashboard')
     if role!='organizer':return data
-    safe={k:data[k] for k in ('now','program','room','agenda','versions','public','configuration','config','rounds','judge_count','pairs','rehearsal','port','anonymous_view_key','clock','mode') if k in data}
+    safe={k:data[k] for k in ('now','program','room','agenda','versions','public','configuration','config','rounds','judge_count','pairs','rehearsal','port','anonymous_view_key','clock','mode','engagement_v2') if k in data}
     safe['stations']=[{k:r[k] for k in ('station','submitted','seen','pair','clock') if k in r} for r in data['stations']]
     safe['final']=s.public_state(names=False).get('final',{})
     return safe

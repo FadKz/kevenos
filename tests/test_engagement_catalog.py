@@ -44,6 +44,14 @@ class EngagementCatalogTests(unittest.TestCase):
             ]}, expected_revision=2)
         self.assertEqual(state['revision'], 2)
 
+    def test_omitted_audience_on_edit_keeps_existing_selection(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Poll','kind':'poll','audiences':['guest'], 'questions':[
+            {'type':'single','prompt':'Question?','options':['A','B']}]}, expected_revision=0)
+        edited = catalog.save_draft(state, {'id':draft['id'], 'title':'Revised','kind':'poll',
+            'questions':draft['questions']}, expected_revision=1)
+        self.assertEqual(edited['audiences'], ['guest'])
+
     def test_published_version_and_run_are_immutable_when_draft_changes(self):
         state = catalog.empty()
         draft = catalog.save_draft(state, {'title': 'Session quiz', 'kind': 'quiz', 'questions': [
@@ -77,6 +85,17 @@ class EngagementCatalogTests(unittest.TestCase):
                 {'type': 'single', 'prompt': 'Question?', 'options': ['A', 'B'], 'correct': [7]}
             ]}, expected_revision=0)
         self.assertEqual(state, catalog.empty())
+
+    def test_command_rejects_unrecognized_payload_fields(self):
+        db = sqlite3.connect(':memory:')
+        self.addCleanup(db.close)
+        db.row_factory = sqlite3.Row
+        db.execute('CREATE TABLE kv(k TEXT PRIMARY KEY, v TEXT NOT NULL)')
+        service = SimpleNamespace(DB=db, LOCK=threading.RLock())
+        with self.assertRaises(ValueError) as error:
+            catalog.persist(service, 'open_run', {'activity_id':'x', 'version':1, 'unexpected':True}, expected_revision=0)
+        self.assertIs(type(error.exception), ValueError)
+        self.assertIsNone(db.execute('SELECT * FROM kv').fetchone())
 
     def test_timed_question_lifecycle_hides_answer_until_explicit_reveal(self):
         state = catalog.empty()
@@ -206,8 +225,137 @@ class EngagementCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.player_view(state['runs'][0], principal='p2')['result'], {'earned': 0, 'available': 1})
         self.assertNotIn('result', catalog.player_view(state['runs'][0], principal='p3'))
 
+    def test_resend_keeps_first_answer_and_late_retry_does_not_double_score(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title': 'Quiz', 'kind': 'quiz', 'questions': [
+            {'type': 'single', 'prompt': 'Question?', 'options': ['A', 'B'], 'correct': [1]},
+        ]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        original = run['delivery']['id']
+        receipt = catalog.submit_answer(state, run['id'], original, 'p1', 1)
+        catalog.close_question(state, run['id'], expected_revision=4)
+        run = catalog.resend_question(state, run['id'], expected_revision=5, duration=30)
+        self.assertNotEqual(run['delivery']['id'], original)
+        self.assertEqual(receipt, catalog.submit_answer(state, run['id'], original, 'p1', 1))
+        with self.assertRaises(catalog.Conflict):
+            catalog.submit_answer(state, run['id'], run['delivery']['id'], 'p1', 0)
+        catalog.submit_answer(state, run['id'], run['delivery']['id'], 'p2', 0)
+        catalog.close_question(state, run['id'], expected_revision=6)
+        catalog.reveal_question(state, run['id'], expected_revision=7)
+        self.assertEqual(catalog.player_view(state['runs'][0], principal='p1')['result'], {'earned':1, 'available':1})
+        self.assertEqual(catalog.player_view(state['runs'][0], principal='p2')['result'], {'earned':0, 'available':1})
+
+    def test_organizer_analytics_suppresses_small_breakdowns_and_individual_answers(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title': 'Poll', 'kind': 'poll', 'questions': [
+            {'type': 'single', 'prompt': 'Question?', 'options': ['A', 'B']},
+        ]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        for i in range(4):
+            catalog.submit_answer(state, run['id'], run['delivery']['id'], f'private-person-{i}', i % 2)
+        projection = catalog.desk_view(state)
+        self.assertNotIn('private-person', str(projection))
+        self.assertNotIn('responses', projection['runs'][0])
+        self.assertEqual(projection['runs'][0]['analytics']['respondents'], 4)
+        self.assertIsNone(projection['runs'][0]['analytics']['distribution'])
+        catalog.submit_answer(state, run['id'], run['delivery']['id'], 'private-person-4', 0)
+        analytics = catalog.desk_view(state)['runs'][0]['analytics']
+        self.assertEqual(analytics['distribution'], [3, 2])
+        self.assertEqual(analytics['denominator'], 5)
+
+    def test_hall_requires_explicit_sharing_and_hides_answer_until_reveal(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title': 'Quiz', 'kind': 'quiz', 'questions': [
+            {'type': 'single', 'prompt': 'Current question', 'options': ['A', 'B'], 'correct': [1]},
+            {'type': 'single', 'prompt': 'Future secret', 'options': ['C', 'D'], 'correct': [0]},
+        ]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        self.assertIsNone(catalog.hall_view(state))
+        catalog.share_hall(state, run['id'], True, expected_revision=4)
+        visible = catalog.hall_view(state)
+        self.assertEqual(visible['prompt'], 'Current question')
+        self.assertNotIn('correct', str(visible))
+        self.assertNotIn('Future secret', str(visible))
+        self.assertNotIn('options', visible)
+        catalog.close_question(state, run['id'], expected_revision=5)
+        self.assertNotIn('correct', str(catalog.hall_view(state)))
+        catalog.reveal_question(state, run['id'], expected_revision=6)
+        self.assertEqual(catalog.hall_view(state)['correct'], [1])
+        catalog.share_hall(state, run['id'], False, expected_revision=7)
+        self.assertIsNone(catalog.hall_view(state))
+
 
 class WorkspaceIsolationTests(unittest.TestCase):
+    def test_guest_cannot_read_or_answer_participant_only_activity(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        guest = fixture.login(workspace.S.CFG['guest_password'])
+        service = workspace.S
+        operator = {'role':'organizer','credential_id':'operator'}
+        draft = catalog.execute(service, 'save', {'title':'Private audience','kind':'poll','questions':[
+            {'type':'single','prompt':'Participants only','options':['A','B']}]}, expected_revision=0, request_id='1'*32, identity=operator)
+        catalog.execute(service, 'publish', {'activity_id':draft['id']}, expected_revision=1, request_id='2'*32, identity=operator)
+        run = catalog.execute(service, 'open_run', {'activity_id':draft['id'],'version':1}, expected_revision=2, request_id='3'*32, identity=operator)
+        run = catalog.execute(service, 'open_question', {'run_id':run['id'],'question_id':run['snapshot']['questions'][0]['id']},
+                              expected_revision=3, request_id='4'*32, identity=operator)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            path = '/api/engagement/player'
+            self.assertIsNone(fixture.get(path, cookie=guest)[0]['question'])
+            fixture.post(path, {'run_id':run['id'], 'delivery_id':run['delivery']['id'], 'choice':0}, cookie=guest, status=403)
+
+    def test_guest_can_only_join_an_explicitly_guest_enabled_activity(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        guest = fixture.login(workspace.S.CFG['guest_password'])
+        service = workspace.S
+        operator = {'role':'organizer', 'credential_id':'operator'}
+        draft = catalog.execute(service, 'save', {'title':'Guest poll', 'kind':'poll', 'audiences':['participant','guest'],
+            'questions':[{'type':'single','prompt':'Choose','options':['A','B']}]}, expected_revision=0, request_id='1'*32, identity=operator)
+        catalog.execute(service, 'publish', {'activity_id':draft['id']}, expected_revision=1, request_id='2'*32, identity=operator)
+        run = catalog.execute(service, 'open_run', {'activity_id':draft['id'], 'version':1}, expected_revision=2, request_id='3'*32, identity=operator)
+        run = catalog.execute(service, 'open_question', {'run_id':run['id'], 'question_id':run['snapshot']['questions'][0]['id']},
+                              expected_revision=3, request_id='4'*32, identity=operator)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            path = '/api/engagement/player'
+            view, _ = fixture.get(path, cookie=guest)
+            self.assertEqual(view['question']['questions'][0]['prompt'], 'Choose')
+            fixture.post(path, {'run_id':run['id'], 'delivery_id':run['delivery']['id'], 'choice':0}, cookie=guest)
+            self.assertTrue(fixture.get(path, cookie=guest)[0]['answered'])
+            guest2 = fixture.login(service.CFG['guest_password'])
+            self.assertFalse(fixture.get(path, cookie=guest2)[0]['answered'])
+            self.assertNotIn('guest:', str(fixture.get(path, cookie=guest)[0]))
+
+    def test_hall_http_projection_follows_explicit_sharing_without_early_answer(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        identity = {'role': 'organizer', 'credential_id': 'operator'}
+        draft = catalog.execute(service, 'save', {'title': 'Quiz', 'kind': 'quiz', 'questions': [
+            {'type': 'single', 'prompt': 'Visible prompt?', 'options': ['A', 'B'], 'correct': [1]},
+        ]}, expected_revision=0, request_id='1'*32, identity=identity)
+        catalog.execute(service, 'publish', {'activity_id':draft['id']}, expected_revision=1, request_id='2'*32, identity=identity)
+        run = catalog.execute(service, 'open_run', {'activity_id':draft['id'], 'version':1}, expected_revision=2, request_id='3'*32, identity=identity)
+        catalog.execute(service, 'open_question', {'run_id':run['id'], 'question_id':run['snapshot']['questions'][0]['id']},
+                        expected_revision=3, request_id='4'*32, identity=identity)
+        catalog.execute(service, 'share_hall', {'run_id':run['id'], 'share':True}, expected_revision=4, request_id='5'*32, identity=identity)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            result = service.public_state(names=False, presenter=True)
+            self.assertEqual(result['quiz']['prompt'], 'Visible prompt?')
+            self.assertEqual(result['quiz']['options'], [])
+            self.assertNotIn('correct', result['quiz'])
+            catalog.execute(service, 'close_question', {'run_id':run['id']}, expected_revision=5, request_id='6'*32, identity=identity)
+            catalog.execute(service, 'reveal_question', {'run_id':run['id']}, expected_revision=6, request_id='7'*32, identity=identity)
+            self.assertEqual(service.public_state(names=False, presenter=True)['quiz']['correct'], ['B'])
+
     def test_participant_http_receives_only_active_question_and_own_receipt(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp()
@@ -237,6 +385,7 @@ class WorkspaceIsolationTests(unittest.TestCase):
             self.assertTrue(receipt['receipt']['id'])
             view, _ = fixture.get(path, cookie=participant)
             self.assertTrue(view['answered'])
+            self.assertEqual(view['selection'], 1)
 
     def test_answer_command_requires_a_participant_and_commits_a_receipt(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
@@ -288,6 +437,11 @@ class WorkspaceIsolationTests(unittest.TestCase):
             guest = fixture.login(workspace.S.CFG['guest_password'])
             fixture.get(path, cookie=guest, status=403)
             fixture.get(path, status=401)
+            staff = fixture.login(fixture.issue('desk'))
+            fixture.get(path, cookie=staff, headers={'X-Dashboard': 'organizer'})
+            fixture.get(path, cookie=staff, headers={'X-Dashboard': 'scoring'}, status=403)
+            fixture.post(path, {**body, 'revision': 1, 'request_id': 'a' * 32}, cookie=staff,
+                         headers={'X-Dashboard': 'scoring'}, status=403)
 
     def test_authorized_command_is_audited_and_replay_safe(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')

@@ -50,7 +50,6 @@ process.on('SIGTERM',()=>app.kill());
   await issue('participant','Review-Quiz-Alex9!',{pair:1,member:1});
   await issue('participant','Review-Quiz-Sam9!',{pair:2,member:1});
   await issue('judge','Review-Quiz-Judge9!',{station:1});
-  await call('/api/desk/clock',{action:'goto',station:1,round:1});
   await call('/api/access/logout',{});
   console.log('Quiz review ready at '+origin+'/. Open independent browser profiles to use multiple roles.');
 })().catch(error=>{console.error(error.message);app.kill();process.exitCode=1;});

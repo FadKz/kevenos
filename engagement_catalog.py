@@ -1,10 +1,15 @@
 """Event-owned activity drafts and immutable published versions.
 
-This is a domain primitive only: callers must persist changes atomically and
-authorize the actor before invoking it. It is not a public API or live runner.
+This is an internal domain primitive and persistence adapter. Callers must
+authorize and audit actors before exposing it; it is not a public API or live
+runner.
 """
 from copy import deepcopy
+import json
 from uuid import uuid4
+import database
+
+KEY = 'engagement_catalog_v1'
 
 
 class Conflict(ValueError):
@@ -100,8 +105,47 @@ def open_run(state, activity_id, version_number, *, expected_revision):
     return deepcopy(run)
 
 
+def open_question(state, run_id, question_id, *, expected_revision):
+    _revision(state, expected_revision)
+    run = next((item for item in state['runs'] if item['id'] == run_id), None)
+    if not run or run['status'] != 'open':
+        raise Conflict('Choose an open activity run.')
+    if not any(item['id'] == question_id for item in run['snapshot']['questions']):
+        raise Conflict('Choose a question from this activity version.')
+    run['active_question_id'] = question_id
+    state['revision'] += 1
+    return deepcopy(run)
+
+
 def player_view(run):
     snapshot = deepcopy(run['snapshot'])
+    snapshot['questions'] = [question for question in snapshot['questions']
+                             if run['status'] == 'open' and question['id'] == run.get('active_question_id')]
     for question in snapshot['questions']:
         question.pop('correct', None)
     return {**snapshot, 'id': run['id'], 'activity_id': run['activity_id'], 'status': run['status']}
+
+
+def persist(service, action, payload, *, expected_revision):
+    """Apply one catalog operation atomically in the selected event workspace.
+
+    Authorization, audit and idempotency remain the responsibility of the
+    future command adapter. SQLite is supported for a single app instance.
+    """
+    if action not in {'save', 'publish', 'open_run', 'open_question'} or not isinstance(payload, dict):
+        raise ValueError('Choose a supported catalog operation.')
+    db = service.DB
+    with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
+        row = db.execute('SELECT v FROM kv WHERE k=?', (KEY,)).fetchone()
+        state = json.loads(row['v']) if row else empty()
+        if action == 'save':
+            result = save_draft(state, payload, expected_revision=expected_revision)
+        elif action == 'publish':
+            result = publish(state, payload.get('activity_id'), expected_revision=expected_revision)
+        elif action == 'open_run':
+            result = open_run(state, payload.get('activity_id'), payload.get('version'), expected_revision=expected_revision)
+        else:
+            result = open_question(state, payload.get('run_id'), payload.get('question_id'), expected_revision=expected_revision)
+        db.execute('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v',
+                   (KEY, json.dumps(state)))
+        return result

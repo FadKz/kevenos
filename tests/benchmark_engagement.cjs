@@ -20,6 +20,8 @@ async function port() {
 function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.ceil(values.length*p)-1]; }
 
 (async () => {
+  const bursts = Number(process.env.KEVENOS_TEST_BURSTS || '1');
+  if (!Number.isInteger(bursts) || bursts < 1 || bursts > 10) throw new Error('Choose one to ten synthetic bursts.');
   const data = await fs.mkdtemp(path.join(os.tmpdir(), 'kevenos-engagement-load-'));
   const secrets = path.join(data, 'secrets'); await fs.mkdir(secrets, {mode:0o700});
   const admin = 'Synthetic-Load-Admin9!', guest = 'Synthetic-Load-Guest9!';
@@ -57,40 +59,47 @@ function percentile(values, p) { return values.slice().sort((a,b) => a-b)[Math.c
     assert(ready, 'synthetic app did not start');
     const organizer = {}; await call('/api/access/login', {role:'admin',password:admin}, organizer);
     const command = async (action, payload, revision) => call('/api/desk/engagement', {action,payload,revision,request_id:id()}, organizer);
-    let state = await command('save', {title:'Synthetic load poll',kind:'poll',audiences:['guest'],questions:[
-      {type:'single',prompt:'Synthetic load question?',options:['A','B']}]}, 0);
+    let state = await command('save', {title:'Synthetic load poll',kind:'poll',audiences:['guest'],questions:
+      Array.from({length:bursts}, (_,index) => ({type:'single',prompt:`Synthetic load question ${index+1}?`,options:['A','B']}))}, 0);
     const activity = state.activities[0];
     state = await command('publish', {activity_id:activity.id}, state.revision);
     state = await command('open_run', {activity_id:activity.id,version:1}, state.revision);
     let run = state.runs[0];
-    state = await command('open_question', {run_id:run.id,question_id:run.snapshot.questions[0].id,duration:null}, state.revision);
-    run = state.runs[0];
     const sessions = [];
     for (let i=0; i<100; i++) { const session = {}; await call('/api/access/login', {role:'guest',password:guest}, session); sessions.push(session); }
-    const samples = [], pollSamples = [], deskSamples = [], started = performance.now();
-    const attendees = Promise.all(sessions.map(async (session,index) => {
-      const pollStart = performance.now();
-      const view = await call('/api/engagement/player', undefined, session);
-      pollSamples.push(performance.now()-pollStart);
-      assert.equal(view.question.delivery.id, run.delivery.id, 'attendee sees the active delivery');
-      const begin = performance.now();
-      const response = await call('/api/engagement/player', {run_id:run.id,delivery_id:run.delivery.id,choice:index%2}, session);
-      samples.push(performance.now()-begin); return response.receipt.id;
-    }));
-    const deskReads = Promise.all(Array.from({length:10}, async () => {
-      const begin = performance.now(); await call('/api/desk/engagement', undefined, organizer);
-      deskSamples.push(performance.now()-begin);
-    }));
-    const [receipts] = await Promise.all([attendees,deskReads]);
+    const samples = [], pollSamples = [], deskSamples = [], receipts = [], rounds = [], started = performance.now();
+    for (let round=0; round<bursts; round++) {
+      const answerOffset = samples.length;
+      state = await command('open_question', {run_id:run.id,question_id:run.snapshot.questions[round].id,duration:null}, state.revision);
+      run = state.runs[0];
+      const attendees = Promise.all(sessions.map(async (session,index) => {
+        const pollStart = performance.now();
+        const view = await call('/api/engagement/player', undefined, session);
+        pollSamples.push(performance.now()-pollStart);
+        assert.equal(view.question.delivery.id, run.delivery.id, 'attendee sees the active delivery');
+        const begin = performance.now();
+        const response = await call('/api/engagement/player', {run_id:run.id,delivery_id:run.delivery.id,choice:index%2}, session);
+        samples.push(performance.now()-begin); return response.receipt.id;
+      }));
+      const deskReads = Promise.all(Array.from({length:10}, async () => {
+        const begin = performance.now(); await call('/api/desk/engagement', undefined, organizer);
+        deskSamples.push(performance.now()-begin);
+      }));
+      const [roundReceipts] = await Promise.all([attendees,deskReads]);
+      receipts.push(...roundReceipts);
+      rounds.push({question:round+1, answer_p95_ms:Math.round(percentile(samples.slice(answerOffset),.95))});
+      state = await command('close_question', {run_id:run.id}, state.revision);
+    }
     const elapsed = performance.now()-started;
-    assert.equal(new Set(receipts).size, 100, 'all attendee receipts must be distinct');
+    assert.equal(new Set(receipts).size, 100*bursts, 'all attendee receipts must be distinct');
     state = await call('/api/desk/engagement', undefined, organizer);
-    assert.equal(state.runs[0].analytics.respondents, 100, 'all answers must be recorded');
+    assert.equal(state.runs[0].question_analytics.length, bursts);
+    assert(state.runs[0].question_analytics.every(item => item.respondents === 100), 'all answers must be recorded');
     assert(!errors.includes('Traceback (most recent call last)'), 'server traceback during synthetic load');
-    console.log(JSON.stringify({backend:'sqlite',attendees:100,successful:receipts.length,
+    console.log(JSON.stringify({backend:'sqlite',attendees:100,bursts,successful:receipts.length,
       burst_ms:Math.round(elapsed),poll_p95_ms:Math.round(percentile(pollSamples,.95)),
       answer_p50_ms:Math.round(percentile(samples,.5)),answer_p95_ms:Math.round(percentile(samples,.95)),
-      organizer_p95_ms:Math.round(percentile(deskSamples,.95))}));
+      organizer_p95_ms:Math.round(percentile(deskSamples,.95)), rounds}));
   } finally {
     if (app.exitCode === null && app.signalCode === null) { app.kill('SIGTERM'); await new Promise(resolve => app.once('exit',resolve)); }
     await fs.rm(data,{recursive:true,force:true});

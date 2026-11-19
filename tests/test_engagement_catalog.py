@@ -14,6 +14,26 @@ import test_workspace_routes as workspace
 
 
 class EngagementCatalogTests(unittest.TestCase):
+    def test_desk_projection_does_not_copy_or_expose_private_responses(self):
+        class PrivateResponse(dict):
+            def __deepcopy__(self, memo):
+                raise AssertionError('private responses should not be copied into the projection')
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Poll','kind':'poll','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B']}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        catalog.submit_answer(state, run['id'], run['delivery']['id'], 'private-person', 0)
+        response_map = state['runs'][0]['responses'][run['delivery']['id']]
+        response_map['private-person'] = PrivateResponse(response_map['private-person'])
+        projected = catalog.desk_view(state)
+        self.assertNotIn('responses', projected['runs'][0])
+        self.assertNotIn('private-person', str(projected))
+        self.assertEqual(projected['runs'][0]['analytics']['respondents'], 1)
+        projected['runs'][0]['snapshot']['questions'][0]['prompt'] = 'Changed'
+        self.assertEqual(state['runs'][0]['snapshot']['questions'][0]['prompt'], 'Question?')
+
     def test_explanations_stay_private_until_the_answer_is_revealed(self):
         state = catalog.empty()
         draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[

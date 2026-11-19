@@ -599,15 +599,16 @@ def player_score(state, principal, audience):
 
 def desk_view(state):
     """Project aggregate results without returning individual responses."""
-    result = deepcopy(state)
-    result.pop('qa_request_aliases', None)
+    result = deepcopy({key:value for key,value in state.items() if key not in {'runs','qa','qa_request_aliases'}})
+    result['runs'] = [deepcopy({key:value for key,value in run.items() if key != 'responses'})
+                      for run in state.get('runs', [])]
     for run in result['runs']:
         _settle(run)
     result['qa'] = [{**{key:item[key] for key in ('id','text','status','answer','created_at','audience','merged_into') if key in item},
                      'votes':len(item.get('votes', []))}
-                    for item in result.get('qa', [])]
-    for run in result['runs']:
-        responses = run.pop('responses', {})
+                    for item in state.get('qa', [])]
+    for source, run in zip(state.get('runs', []), result['runs']):
+        responses = source.get('responses', {})
         delivery = run.get('delivery') or {}
         deliveries = [*run.get('deliveries', []), *([delivery] if delivery else [])]
         question_analytics = []

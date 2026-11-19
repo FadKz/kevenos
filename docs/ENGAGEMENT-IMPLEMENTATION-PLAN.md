@@ -11,6 +11,8 @@ guest reconnect and retention policies, hall qualification, complete analytics,
 Q&A duplicate handling, migration, live gateway qualification, complete API/MCP
 parity and full browser/recovery qualification remain incomplete. Experimental
 AI drafting is separately disabled and requires an approved gateway consumer.
+Historical migration constraints and qualification are described in
+[the migration design](ENGAGEMENT-MIGRATION.md).
 Existing quiz and event data continue to use the legacy implementation.
 The experimental flag blocks new legacy sends, and the new runner waits for
 existing legacy prompts to close. Every serving instance must run this version
@@ -55,10 +57,11 @@ instead of maintaining a separate demo product.
 | Hall/display | Show lobby, prompt, countdown, closed state, permitted reveal and leaderboard, then restore the event scene. No private answers or unreleased keys. | 16:9 65-inch hall/remote screen; high-contrast, readable at distance, safe margins and no required audio. |
 | Agent/API/MCP | Discover scoped capabilities and read authorized state; propose exact drafts/actions, confirm consequential actions, execute common commands, and read receipts. | No role bypass; AI availability or client choice does not change server-side authorization. |
 
-Guest participation is **not currently implemented** simply because a Guest
-role exists: current player paths are participant-specific. Avoid promising
-anonymous results if account identifiers, join tokens or telemetry can
-re-identify a response; specify the visibility and retention model first.
+The experimental player supports explicitly enabled guest activities using a
+browser-session identity. It does not yet guarantee reconnecting to the same
+response after a session expires. Avoid promising anonymous results if account
+identifiers, join tokens or telemetry can re-identify a response; specify the
+visibility and retention model before release.
 
 ## User journey and screen inventory
 

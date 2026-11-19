@@ -6,6 +6,53 @@ import test_workspace_routes as workspace
 
 
 class ModeratedQuestions(unittest.TestCase):
+    def test_combined_question_stays_private_and_can_be_restored_through_http(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        participant = fixture.login(fixture.issue('participant', pair=1, member=1))
+        guest = fixture.login(workspace.S.CFG['guest_password'])
+        service = workspace.S
+        operator = {'role':'organizer','credential_id':'operator'}
+        catalog.execute(service, 'configure_questions', {'participants':True,'guests':True}, expected_revision=0,
+                        request_id='1'*32, identity=operator)
+        with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            path = '/api/engagement/questions'
+            target = fixture.post(path, {'text':'Public question?', 'request_id':'2'*32}, cookie=participant)[0]['receipt']['id']
+            source = fixture.post(path, {'text':'Private similar question?', 'request_id':'3'*32}, cookie=guest)[0]['receipt']['id']
+            catalog.execute(service, 'moderate_question', {'id':target,'decision':'approve'}, expected_revision=1,
+                            request_id='4'*32, identity=operator)
+            catalog.execute(service, 'merge_question', {'id':source,'target_id':target}, expected_revision=2,
+                            request_id='5'*32, identity=operator)
+            guest_view = fixture.get(path, cookie=guest)[0]
+            self.assertEqual(guest_view['own'][0]['status'], 'merged')
+            self.assertEqual(guest_view['own'][0]['merged_into'], target)
+            self.assertNotIn('Private similar question?', str(fixture.get(path, cookie=participant)[0]))
+            catalog.execute(service, 'moderate_question', {'id':target,'decision':'reject'}, expected_revision=3,
+                            request_id='6'*32, identity=operator)
+            self.assertNotIn('merged_into', fixture.get(path, cookie=guest)[0]['own'][0])
+            catalog.execute(service, 'moderate_question', {'id':source,'decision':'restore'}, expected_revision=4,
+                            request_id='7'*32, identity=operator)
+            self.assertEqual(fixture.get(path, cookie=guest)[0]['own'][0]['status'], 'pending')
+
+    def test_organizer_can_combine_and_restore_pending_duplicate(self):
+        state = catalog.empty()
+        catalog.configure_questions(state, participants=True, guests=True, expected_revision=0)
+        target = catalog.ask_question(state, 'participant:one', 'participant', 'Where is lunch?', 'a'*32)
+        source = catalog.ask_question(state, 'guest:two', 'guest', 'Where do we eat?', 'b'*32)
+        with self.assertRaises(catalog.Conflict):
+            catalog.merge_question(state, source['id'], target['id'], expected_revision=1)
+        catalog.moderate_question(state, target['id'], 'approve', expected_revision=1)
+        catalog.merge_question(state, source['id'], target['id'], expected_revision=2)
+        self.assertEqual(state['qa'][1]['status'], 'merged')
+        self.assertEqual(state['qa'][1]['merged_into'], target['id'])
+        self.assertEqual(catalog.ask_question(state, 'guest:two', 'guest', 'Where do we eat?', 'c'*32), source)
+        self.assertEqual(len(state['qa']), 2)
+        self.assertEqual([q['id'] for q in catalog.public_questions(state)], [target['id']])
+        self.assertEqual(catalog.public_questions(state)[0]['votes'], 0)
+        catalog.moderate_question(state, source['id'], 'restore', expected_revision=3)
+        self.assertEqual(state['qa'][1]['status'], 'pending')
+        self.assertNotIn('merged_into', state['qa'][1])
+
     def test_repeated_own_question_is_deduplicated_without_cross_user_disclosure(self):
         state = catalog.empty()
         catalog.configure_questions(state, participants=True, guests=True, expected_revision=0)

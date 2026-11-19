@@ -64,6 +64,9 @@ values default to one. Polls are unscored. A run retains the point values of
 its published snapshot even when the draft is edited later.
 An optional question `explanation` is withheld from attendee projections
 until the question is revealed.
+For audience Q&A, `merge_question` links a pending question to an approved or
+answered question after confirmation. It does not transfer votes; use the
+`restore` moderation decision to return it to the private review queue.
 
 `engagement.legacy_preview` returns counts for the previous quiz and audience
 records and identifies copyable Audience drafts without changing them. Use a

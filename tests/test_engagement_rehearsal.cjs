@@ -147,6 +147,16 @@ async function port() {
     await until(async () => (await guest.page.locator('#engagement-questions').innerText()).includes('Synthetic question for the host?'), 'guest approved question');
     await guest.page.locator('#engagement-questions').getByRole('button', {name:/^Support/}).click();
     await until(async () => (await guest.page.locator('#engagement-questions').innerText()).includes('1 support'), 'guest vote saved');
+    await guest.page.locator('#engagement-questions textarea').fill('A related synthetic question?');
+    await guest.page.locator('#engagement-questions').getByRole('button', {name:'Send question'}).click();
+    await until(async () => (await page.locator('body').innerText()).includes('A related synthetic question?'), 'duplicate moderation queue');
+    const choice = page.getByLabel('Combine with a published question');
+    await choice.selectOption({label:'Synthetic question for the host?'});
+    await page.getByRole('button', {name:'Combine questions'}).click();
+    await until(async () => (await guest.page.locator('#engagement-questions').innerText()).includes('Combined with another question'), 'combined status reaches author');
+    assert.equal(await guest.page.locator('#engagement-questions').getByRole('link', {name:'View related question'}).count(), 1);
+    assert(!(await phone1.page.locator('#engagement-questions').innerText()).includes('A related synthetic question?'), 'pending source remains private');
+    assert((await guest.page.locator('#engagement-questions').innerText()).includes('1 support'), 'combine does not transfer votes');
     assert.deepEqual(errors, []);
     assert(!serverErrors.includes('Traceback (most recent call last)'), 'server traceback during rehearsal: ' + serverErrors);
     console.log(`Engagement rehearsal passed: ${process.env.KEVENOS_TEST_BROWSER || 'chrome'}, two phone profiles, guest tablet, judge and hall.`);

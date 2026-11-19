@@ -13,6 +13,23 @@ import event_workspace
 S = access.S
 
 class AgentAPI(unittest.TestCase):
+    def test_agent_can_confirm_combining_questions(self):
+        import engagement_catalog as catalog
+        self.principal['scopes'] += ['engagement:read', 'engagement:write']; self.save_grant()
+        state = catalog.empty()
+        catalog.configure_questions(state, participants=True, guests=True, expected_revision=0)
+        target = catalog.ask_question(state, 'participant:a', 'participant', 'Public question?', 'a'*32)
+        source = catalog.ask_question(state, 'guest:b', 'guest', 'Similar question?', 'b'*32)
+        catalog.moderate_question(state, target['id'], 'approve', expected_revision=1)
+        with S.DB: catalog._write(S.DB, catalog.KEY, state)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            body = self.prepared('engagement.control', {'action':'merge_question','revision':2,
+                'payload':{'id':source['id'],'target_id':target['id']}})
+            code, result = self.req('execute', body)
+            self.assertEqual(code, 200, result)
+        stored = S.kv_get(catalog.KEY)
+        self.assertEqual(stored['qa'][1]['merged_into'], target['id'])
+
     def setUp(self):
         self.before={k:getattr(S,k) for k in ('CFG','DB','DATA','CONTENT','AUTH_DB','WORKSPACE')}
         self.tmp=TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)

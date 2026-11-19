@@ -42,7 +42,12 @@
     if (data.own.length) {
       own.append(node('h3', 'Your questions'));
       const list = node('ul');
-      data.own.forEach(item => { const li = node('li', `${item.text} — ${item.status === 'pending' ? 'Awaiting review' : item.status === 'rejected' ? 'Not published' : item.status === 'answered' ? 'Answered' : 'Published'}`); if (item.answer) li.append(node('p', item.answer)); list.append(li); });
+      data.own.forEach(item => {
+        const li = node('li', `${item.text} — ${item.status === 'pending' ? 'Awaiting review' : item.status === 'rejected' ? 'Not published' : item.status === 'merged' ? 'Combined with another question' : item.status === 'answered' ? 'Answered' : 'Published'}`);
+        if (item.answer) li.append(node('p', item.answer));
+        if (item.merged_into) { const link = node('a', 'View related question'); link.href = '#engagement-question-' + item.merged_into; li.append(' ', link); }
+        list.append(li);
+      });
       own.append(list);
     }
     const approved = root.querySelector('[data-approved]'); approved.replaceChildren();
@@ -50,7 +55,7 @@
       approved.append(node('h3', 'Questions shared by the event team'));
       const list = node('ul');
       data.questions.forEach(item => {
-        const li = node('li', item.text); if (item.answer) li.append(node('p', item.answer));
+        const li = node('li', item.text); li.id = 'engagement-question-' + item.id; if (item.answer) li.append(node('p', item.answer));
         const vote = node('button', `${item.upvoted ? 'Remove support' : 'Support'} · ${item.votes || 0} ${(item.votes || 0) === 1 ? 'support' : 'supports'}`);
         vote.type = 'button'; vote.className = 'btn ghost'; vote.disabled = !data.enabled;
         vote.setAttribute('aria-pressed', String(!!item.upvoted));

@@ -4,6 +4,25 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('organizer can link a pending duplicate to a published question', async t => {
+  const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close()); w.confirm = () => true;
+  w.eval(readFileSync(join(__dirname, '../static/engagement-desk.js'), 'utf8'));
+  const root = w.document.querySelector('#desk'), writes = [];
+  const state = {revision:1,activities:[],runs:[],qa:[
+    {id:'pending',text:'Where do we eat?',status:'pending',audience:'guest'},
+    {id:'public',text:'Where is lunch?',status:'approved',audience:'participant'}]};
+  await w.EngagementDesk.mount(root, async () => state, async (path,body) => { writes.push(body); return state; });
+  root.querySelector('[name=qa-filter]').value = 'pending';
+  root.querySelector('[name=qa-filter]').dispatchEvent(new w.Event('change', {bubbles:true}));
+  root.querySelector('[name=merge-target]').value = 'public';
+  [...root.querySelectorAll('button')].find(button => button.textContent === 'Combine questions').click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(writes[0].action, 'merge_question');
+  assert.equal(writes[0].payload.id, 'pending');
+  assert.equal(writes[0].payload.target_id, 'public');
+});
+
 test('organizer can set quiz points on a question', async t => {
   const dom = new JSDOM('<main id="desk"></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window; t.after(() => w.close());
@@ -50,7 +69,8 @@ test('organizer can filter the moderation queue without changing its contents', 
   status.dispatchEvent(new w.Event('change', {bubbles:true}));
   const list = root.querySelector('[data-qa-list]');
   assert.match(list.textContent, /Where is lunch/);
-  assert.doesNotMatch(list.textContent, /When does it start/);
+  assert.equal(list.querySelectorAll('article').length, 1);
+  assert.match(list.querySelector('article > p').textContent, /Where is lunch/);
   const search = root.querySelector('[name=qa-search]'); search.value = 'start';
   search.dispatchEvent(new w.Event('input', {bubbles:true}));
   assert.doesNotMatch(list.textContent, /Where is lunch/);

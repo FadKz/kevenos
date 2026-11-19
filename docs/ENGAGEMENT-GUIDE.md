@@ -76,8 +76,12 @@ session and remove their support. Text may
 be shown to others after approval, so do not submit private information.
 The Organizer can filter the moderation queue by status or search its text.
 If the same attendee sends identical text again, the app returns the original
-receipt while that question is pending, published or answered. Questions
-from different attendees remain separate and private until individually approved.
+receipt while that question is pending, published, answered or combined. Questions
+from different attendees remain separate and private unless individually approved.
+The Organizer may combine a pending duplicate with a published question and
+restore it for review later. Combining does not transfer or invent support
+votes. The original author can follow a link while the related question is
+published; their original wording remains private.
 
 ## Optional AI suggestions
 

@@ -4,6 +4,17 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('an attendee sees when their question was combined', async t => {
+  const dom = new JSDOM('<div id="questions"></div>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-questions.js'), 'utf8'));
+  const root = w.document.querySelector('#questions');
+  await w.EngagementQuestions.mount(root, async () => ({enabled:true,questions:[{id:'q1',text:'Where is lunch?',votes:0}],
+    own:[{text:'Where do we eat?',status:'merged',merged_into:'q1'}]}));
+  assert.match(root.textContent, /Combined with another question/);
+  assert.equal(root.querySelector('a').getAttribute('href'), '#engagement-question-q1');
+});
+
 test('an attendee submits a question and sees that it awaits review', async t => {
   const dom = new JSDOM('<div id="questions"></div>', {runScripts:'outside-only', pretendToBeVisual:true, url:'https://example.test/'});
   const w = dom.window; t.after(() => w.close());

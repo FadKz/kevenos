@@ -1126,8 +1126,9 @@ ENGAGEMENT_CONTROL = actions(
     resend_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION,'auto_reveal':BOOL},('run_id',))}, ('revision','payload')),
     share_hall=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'share':BOOL},('run_id','share'))}, ('revision','payload')),
     configure_questions=({'revision':ENGAGEMENT_REV,'payload':obj({'participants':BOOL,'guests':BOOL},('participants','guests'))}, ('revision','payload')),
-    moderate_question=({'revision':ENGAGEMENT_REV,'payload':obj({'id':ENGAGEMENT_ID,'decision':choices('approve','reject','answer'),
+    moderate_question=({'revision':ENGAGEMENT_REV,'payload':obj({'id':ENGAGEMENT_ID,'decision':choices('approve','reject','answer','restore'),
                            'answer':string(1000,1)},('id','decision'))}, ('revision','payload')),
+    merge_question=({'revision':ENGAGEMENT_REV,'payload':obj({'id':ENGAGEMENT_ID,'target_id':ENGAGEMENT_ID},('id','target_id'))}, ('revision','payload')),
     copy_legacy_pack=({'revision':ENGAGEMENT_REV,'payload':obj({'pack_id':ENGAGEMENT_ID,
                            'source_digest':string(64,64,pattern='^[0-9a-f]{64}$')},('pack_id','source_digest'))}, ('revision','payload')),
 )

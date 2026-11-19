@@ -146,6 +146,23 @@
       if (question.status === 'pending') card.append(button('Approve question', () => {
         if (confirm('Publish this question to the audience?')) command('moderate_question', {id:question.id, decision:'approve'});
       }));
+      if (question.status === 'pending') {
+        const targets = (state.qa || []).filter(item => item.id !== question.id && ['approved','answered'].includes(item.status));
+        if (targets.length) {
+          const label = element('label', 'Combine with a published question', 'engagement-field');
+          const select = element('select'); select.name = 'merge-target';
+          const placeholder = element('option', 'Choose a published question'); placeholder.value = ''; select.append(placeholder);
+          targets.forEach(item => { const option = element('option', item.text); option.value = item.id; select.append(option); });
+          label.append(select); card.append(label, button('Combine questions', () => {
+            if (!select.value) { root.querySelector('[role=status]').textContent = 'Choose a published question first.'; return; }
+            if (confirm('Combine this pending question with the selected published question? No votes will be transferred.'))
+              command('merge_question', {id:question.id, target_id:select.value});
+          }));
+        }
+      }
+      if (question.status === 'merged') card.append(button('Restore for review', () => {
+        if (confirm('Restore this question to the review queue?')) command('moderate_question', {id:question.id, decision:'restore'});
+      }));
       if (['pending','approved','answered'].includes(question.status)) card.append(button('Remove question from audience', () => {
         if (confirm('Remove this question from the audience?')) command('moderate_question', {id:question.id, decision:'reject'});
       }));
@@ -409,7 +426,7 @@
     qa.append(config);
     const filterLabel = element('label', 'Question status', 'engagement-field');
     const filter = element('select'); filter.name = 'qa-filter';
-    for (const [value, title] of [['all','All questions'],['pending','Awaiting review'],['approved','Approved'],['answered','Answered'],['rejected','Removed']]) {
+    for (const [value, title] of [['all','All questions'],['pending','Awaiting review'],['approved','Approved'],['answered','Answered'],['merged','Combined'],['rejected','Removed']]) {
       const option = element('option', title); option.value = value; filter.append(option);
     }
     filterLabel.append(filter); qa.append(filterLabel);

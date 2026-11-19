@@ -43,6 +43,7 @@ PAYLOAD_FIELDS = {
     'share_hall': ({'run_id','share'}, {'run_id','share'}),
     'configure_questions': ({'participants','guests'}, {'participants','guests'}),
     'moderate_question': ({'id','decision','answer'}, {'id','decision'}),
+    'merge_question': ({'id','target_id'}, {'id','target_id'}),
     'copy_legacy_pack': ({'pack_id','source_digest'}, {'pack_id','source_digest'}),
 }
 
@@ -413,7 +414,7 @@ def ask_question(state, principal, audience, text, request_id):
     if not settings.get('participants' if audience == 'participant' else 'guests'):
         raise PermissionError('Audience questions are not enabled for this audience.')
     duplicate = next((item for item in questions if item['principal'] == principal and item['audience'] == audience
-                      and item['text'] == text and item['status'] in {'pending', 'approved', 'answered'}), None)
+                      and item['text'] == text and item['status'] in {'pending', 'approved', 'answered', 'merged'}), None)
     if duplicate:
         aliases = state.setdefault('qa_request_aliases', {})
         if len(aliases) >= 5000:
@@ -441,10 +442,27 @@ def moderate_question(state, question_id, action, *, expected_revision, answer=N
     elif action == 'answer' and question['status'] == 'approved':
         question['answer'] = _text(answer, 1000, 'an answer')
         question['status'] = 'answered'
+    elif action == 'restore' and question['status'] == 'merged':
+        question['status'] = 'pending'
+        question.pop('merged_into', None)
     else:
         raise Conflict('This moderation action is unavailable for the question.')
     state['revision'] += 1
     return {'id':question['id'], 'status':question['status']}
+
+
+def merge_question(state, question_id, target_id, *, expected_revision):
+    """Link a private pending question to an already public one without transferring votes."""
+    _revision(state, expected_revision)
+    questions = state.get('qa', [])
+    source = next((item for item in questions if item['id'] == question_id), None)
+    target = next((item for item in questions if item['id'] == target_id), None)
+    if (not source or not target or source is target or source['status'] != 'pending'
+            or target['status'] not in {'approved', 'answered'}):
+        raise Conflict('Combine a pending question with a published question.')
+    source['status'], source['merged_into'] = 'merged', target['id']
+    state['revision'] += 1
+    return {'id':source['id'], 'status':'merged', 'target_id':target['id']}
 
 
 def vote_question(state, question_id, principal, audience, active):
@@ -585,7 +603,7 @@ def desk_view(state):
     result.pop('qa_request_aliases', None)
     for run in result['runs']:
         _settle(run)
-    result['qa'] = [{**{key:item[key] for key in ('id','text','status','answer','created_at','audience') if key in item},
+    result['qa'] = [{**{key:item[key] for key in ('id','text','status','answer','created_at','audience','merged_into') if key in item},
                      'votes':len(item.get('votes', []))}
                     for item in result.get('qa', [])]
     for run in result['runs']:
@@ -699,6 +717,8 @@ def _apply(state, action, payload, expected_revision, db=None):
         return configure_questions(state, participants=payload.get('participants'), guests=payload.get('guests'), expected_revision=expected_revision)
     if action == 'moderate_question':
         return moderate_question(state, payload.get('id'), payload.get('decision'), answer=payload.get('answer'), expected_revision=expected_revision)
+    if action == 'merge_question':
+        return merge_question(state, payload.get('id'), payload.get('target_id'), expected_revision=expected_revision)
     if action == 'copy_legacy_pack':
         return copy_legacy_pack(state, db, payload, expected_revision=expected_revision)
     return reveal_question(state, payload.get('run_id'), expected_revision=expected_revision)
@@ -979,7 +999,9 @@ def handle(service, handler, path, body=None):
                 return True
             with service.LOCK:
                 state = _read(service.DB, KEY, empty())
-            own = [{key:item[key] for key in ('id','text','status','answer','created_at') if key in item}
+            visible_ids = {item['id'] for item in state.get('qa', []) if item['status'] in {'approved','answered'}}
+            own = [{**{key:item[key] for key in ('id','text','status','answer','created_at') if key in item},
+                    **({'merged_into':item['merged_into']} if item.get('merged_into') in visible_ids else {})}
                    for item in state.get('qa', []) if item['principal'] == principal]
             enabled = state.get('qa_settings', {}).get('participants' if audience == 'participant' else 'guests', False)
             handler.send(200, {'enabled':enabled, 'questions':public_questions(state, principal=principal), 'own':own})

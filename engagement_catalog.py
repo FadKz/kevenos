@@ -5,31 +5,44 @@ authorize and audit actors before exposing it; it is not a public API or live
 runner.
 """
 from copy import deepcopy
+import csv
+from datetime import datetime, timezone
+import io
 import json
 import hashlib
 import os
 import re
+import statistics
 import time
 from uuid import uuid4
+from urllib.parse import parse_qs, urlparse
 import database
 
 KEY = 'engagement_catalog_v1'
 RECEIPTS_KEY = 'engagement_receipts_v1'
 DESK = '/api/desk/engagement'
+LEGACY_PREVIEW = '/api/desk/engagement/legacy-preview'
+ANALYTICS_CSV = '/api/desk/engagement/analytics.csv'
 PLAYER = '/api/participant/engagement'
 SHARED_PLAYER = '/api/engagement/player'
 QUESTIONS = '/api/engagement/questions'
 PAYLOAD_FIELDS = {
-    'save': ({'id','title','kind','questions','audiences'}, {'title','kind','questions'}),
+    'save': ({'id','title','kind','questions','audiences','description'}, {'title','kind','questions'}),
     'publish': ({'activity_id'}, {'activity_id'}),
+    'archive_draft': ({'activity_id','archive'}, {'activity_id','archive'}),
     'open_run': ({'activity_id','version'}, {'activity_id','version'}),
-    'open_question': ({'run_id','question_id','duration'}, {'run_id','question_id'}),
+    'finish_run': ({'run_id'}, {'run_id'}),
+    'open_question': ({'run_id','question_id','duration','auto_reveal'}, {'run_id','question_id'}),
     'close_question': ({'run_id'}, {'run_id'}),
+    'pause_question': ({'run_id'}, {'run_id'}),
+    'resume_question': ({'run_id'}, {'run_id'}),
+    'extend_question': ({'run_id','seconds'}, {'run_id','seconds'}),
     'reveal_question': ({'run_id'}, {'run_id'}),
-    'resend_question': ({'run_id','duration'}, {'run_id'}),
+    'resend_question': ({'run_id','duration','auto_reveal'}, {'run_id'}),
     'share_hall': ({'run_id','share'}, {'run_id','share'}),
     'configure_questions': ({'participants','guests'}, {'participants','guests'}),
     'moderate_question': ({'id','decision','answer'}, {'id','decision'}),
+    'copy_legacy_pack': ({'pack_id','source_digest'}, {'pack_id','source_digest'}),
 }
 
 
@@ -65,13 +78,19 @@ def _activity(state, activity_id):
 
 def save_draft(state, payload, *, expected_revision):
     _revision(state, expected_revision)
-    if not isinstance(payload, dict) or set(payload) - {'id', 'title', 'kind', 'questions', 'audiences'}:
+    if not isinstance(payload, dict) or set(payload) - {'id', 'title', 'kind', 'questions', 'audiences', 'description'}:
         raise ValueError('Use the supported activity fields.')
     title = _text(payload.get('title'), 120, 'an activity title')
     kind = payload.get('kind')
     if not isinstance(kind, str) or kind not in {'quiz', 'poll'}:
         raise ValueError('Choose a quiz or poll.')
     prior = _activity(state, payload['id']) if 'id' in payload else None
+    if prior and prior.get('archived'):
+        raise Conflict('Restore this draft before editing it.')
+    description = payload.get('description', prior['draft'].get('description', '') if prior else '')
+    if not isinstance(description, str) or len(description) > 500:
+        raise ValueError('Enter a valid activity description.')
+    description = _text(description, 500, 'an activity description') if description.strip() else ''
     audiences = payload.get('audiences', prior['draft'].get('audiences', ['participant']) if prior else ['participant'])
     if (not isinstance(audiences, list) or not audiences or
             any(not isinstance(audience, str) or audience not in ('participant', 'guest') for audience in audiences) or
@@ -84,7 +103,7 @@ def save_draft(state, payload, *, expected_revision):
     seen_ids = set()
     clean = []
     for question in questions:
-        if not isinstance(question, dict) or set(question) - {'id', 'prompt', 'type', 'options', 'correct'}:
+        if not isinstance(question, dict) or set(question) - {'id', 'prompt', 'type', 'options', 'correct', 'evidence'}:
             raise ValueError('Use the supported question fields.')
         question_id = question.get('id')
         if question_id is not None and (not isinstance(question_id, str) or question_id not in previous_ids or question_id in seen_ids):
@@ -114,8 +133,13 @@ def save_draft(state, payload, *, expected_revision):
         if len(set(correct)) != len(correct) or (kind == 'quiz' and
                 (not correct or (question_type != 'multi' and len(correct) != 1))) or (kind == 'poll' and correct):
             raise ValueError('Choose the correct answers for a quiz; polls are unscored.')
-        clean.append({'id': question_id, 'type': question_type, 'prompt': prompt, 'options': choices, 'correct': sorted(correct)})
-    draft = {'id': prior['id'] if prior else uuid4().hex, 'title': title, 'kind': kind,
+        item = {'id': question_id, 'type': question_type, 'prompt': prompt, 'options': choices, 'correct': sorted(correct)}
+        if question.get('evidence'):
+            item['evidence'] = _text(question['evidence'], 500, 'source evidence')
+        elif 'evidence' in question and not isinstance(question['evidence'], str):
+            raise ValueError('Enter valid source evidence.')
+        clean.append(item)
+    draft = {'id': prior['id'] if prior else uuid4().hex, 'title': title, 'kind': kind, 'description':description,
              'audiences': list(audiences), 'questions': clean}
     if prior:
         prior['draft'] = draft
@@ -128,10 +152,26 @@ def save_draft(state, payload, *, expected_revision):
 def publish(state, activity_id, *, expected_revision):
     _revision(state, expected_revision)
     activity = _activity(state, activity_id)
+    if activity.get('archived'):
+        raise Conflict('Restore this draft before publishing it.')
     version = {'version': len(activity['versions']) + 1, 'snapshot': deepcopy(activity['draft'])}
     activity['versions'].append(version)
     state['revision'] += 1
     return deepcopy(version)
+
+
+def archive_draft(state, activity_id, archive, *, expected_revision):
+    _revision(state, expected_revision)
+    if type(archive) is not bool:
+        raise ValueError('Choose whether to archive the draft.')
+    activity = _activity(state, activity_id)
+    if activity['versions']:
+        raise Conflict('Published history cannot be archived as a draft.')
+    if bool(activity.get('archived')) == archive:
+        raise Conflict('The draft is already in that state.')
+    activity['archived'] = archive
+    state['revision'] += 1
+    return {'id':activity_id, 'archived':archive}
 
 
 def open_run(state, activity_id, version_number, *, expected_revision):
@@ -147,21 +187,66 @@ def open_run(state, activity_id, version_number, *, expected_revision):
     return deepcopy(run)
 
 
-def _run(state, run_id):
+def _find_run(state, run_id):
     run = next((item for item in state['runs'] if item['id'] == run_id), None)
-    if not run or run['status'] != 'open':
+    if not run:
+        raise Conflict('Choose an activity run.')
+    return run
+
+
+def _run(state, run_id):
+    run = _find_run(state, run_id)
+    if run['status'] != 'open':
         raise Conflict('Choose an open activity run.')
     return run
 
 
-def open_question(state, run_id, question_id, *, expected_revision, duration=15):
+def finish_run(state, run_id, *, expected_revision):
     _revision(state, expected_revision)
     run = _run(state, run_id)
+    _settle(run)
+    if (run.get('delivery') or {}).get('status') in {'open', 'paused'}:
+        raise Conflict('Close the current question before finishing this run.')
+    run['status'] = 'completed'
+    run['hall_shared'] = False
+    run['completed_at'] = time.time()
+    state['revision'] += 1
+    return deepcopy(run)
+
+
+def _delivery_status(delivery, now=None):
+    now = time.time() if now is None else now
+    if delivery.get('status') == 'open' and delivery.get('ends_at') is not None and now >= delivery['ends_at']:
+        return 'revealed' if delivery.get('auto_reveal') else 'closed'
+    return delivery.get('status')
+
+
+def _settle(run, now=None):
+    delivery = run.get('delivery') or {}
+    status = _delivery_status(delivery, now)
+    if delivery.get('status') == 'open' and status != 'open':
+        delivery['status'] = status
+        delivery['closed_at'] = delivery['ends_at']
+        if delivery['status'] == 'revealed':
+            delivery['revealed_at'] = delivery['ends_at']
+
+
+def _timing(duration, auto_reveal):
     if duration is not None and (type(duration) is not int or not 1 <= duration <= 3600):
         raise ValueError('Choose a duration from 1 to 3600 seconds, or no time limit.')
+    if type(auto_reveal) is not bool or (auto_reveal and duration is None):
+        raise ValueError('Automatic reveal requires a timed question.')
+
+
+def open_question(state, run_id, question_id, *, expected_revision, duration=15, auto_reveal=False):
+    _revision(state, expected_revision)
+    run = _run(state, run_id)
+    _timing(duration, auto_reveal)
     if not any(item['id'] == question_id for item in run['snapshot']['questions']):
         raise Conflict('Choose a question from this activity version.')
-    if any(item.get('status') == 'open' and item.get('delivery', {}).get('status') == 'open'
+    for item in state['runs']:
+        _settle(item)
+    if any(item.get('status') == 'open' and item.get('delivery', {}).get('status') in {'open','paused'}
            for item in state['runs']):
         raise Conflict('Close the current question first.')
     if question_id in run.get('delivered_question_ids', []):
@@ -169,7 +254,7 @@ def open_question(state, run_id, question_id, *, expected_revision, duration=15)
     now = time.time()
     if run.get('delivery'):
         run.setdefault('deliveries', []).append(run['delivery'])
-    run['delivery'] = {'id': uuid4().hex, 'question_id': question_id, 'status': 'open', 'opened_at': now,
+    run['delivery'] = {'id': uuid4().hex, 'question_id': question_id, 'status': 'open', 'opened_at': now, 'auto_reveal':auto_reveal,
                        'ends_at': None if duration is None else now + duration}
     run.setdefault('delivered_question_ids', []).append(question_id)
     run['active_question_id'] = question_id
@@ -177,19 +262,20 @@ def open_question(state, run_id, question_id, *, expected_revision, duration=15)
     return deepcopy(run)
 
 
-def resend_question(state, run_id, *, expected_revision, duration=15):
+def resend_question(state, run_id, *, expected_revision, duration=15, auto_reveal=False):
     _revision(state, expected_revision)
     run = _run(state, run_id)
-    if duration is not None and (type(duration) is not int or not 1 <= duration <= 3600):
-        raise ValueError('Choose a duration from 1 to 3600 seconds, or no time limit.')
+    _timing(duration, auto_reveal)
+    for item in state['runs']:
+        _settle(item)
     delivery = run.get('delivery') or {}
     if delivery.get('status') != 'closed':
         raise Conflict('Close the question before resending it; revealed answers cannot be resent.')
-    if any(item.get('status') == 'open' and item.get('delivery', {}).get('status') == 'open' for item in state['runs']):
+    if any(item.get('status') == 'open' and item.get('delivery', {}).get('status') in {'open','paused'} for item in state['runs']):
         raise Conflict('Close the current question first.')
     now = time.time()
     run.setdefault('deliveries', []).append(delivery)
-    run['delivery'] = {'id': uuid4().hex, 'question_id': run['active_question_id'], 'status': 'open',
+    run['delivery'] = {'id': uuid4().hex, 'question_id': run['active_question_id'], 'status': 'open', 'auto_reveal':auto_reveal,
                        'opened_at': now, 'ends_at': None if duration is None else now + duration}
     state['revision'] += 1
     return deepcopy(run)
@@ -198,11 +284,64 @@ def resend_question(state, run_id, *, expected_revision, duration=15):
 def close_question(state, run_id, *, expected_revision):
     _revision(state, expected_revision)
     run = _run(state, run_id)
+    _settle(run)
     delivery = run.get('delivery') or {}
-    if delivery.get('status') != 'open':
+    if delivery.get('status') not in {'open','paused'}:
         raise Conflict('There is no open question to close.')
     delivery['status'] = 'closed'
+    delivery.pop('remaining_seconds', None)
     delivery['closed_at'] = time.time()
+    state['revision'] += 1
+    return deepcopy(run)
+
+
+def pause_question(state, run_id, *, expected_revision):
+    _revision(state, expected_revision)
+    run = _run(state, run_id)
+    now = time.time()
+    _settle(run, now)
+    delivery = run.get('delivery') or {}
+    if delivery.get('status') != 'open':
+        raise Conflict('Only an open question can be paused.')
+    delivery['remaining_seconds'] = None if delivery['ends_at'] is None else max(0, delivery['ends_at'] - now)
+    delivery['paused_at'] = now
+    delivery['ends_at'] = None
+    delivery['status'] = 'paused'
+    state['revision'] += 1
+    return deepcopy(run)
+
+
+def resume_question(state, run_id, *, expected_revision):
+    _revision(state, expected_revision)
+    run = _run(state, run_id)
+    delivery = run.get('delivery') or {}
+    if delivery.get('status') != 'paused':
+        raise Conflict('Only a paused question can resume.')
+    if any(item['id'] != run_id and item.get('status') == 'open' and
+           _delivery_status(item.get('delivery') or {}) in {'open','paused'} for item in state['runs']):
+        raise Conflict('Close the other active question first.')
+    remaining = delivery.pop('remaining_seconds')
+    now = time.time()
+    delivery['paused_seconds_total'] = delivery.get('paused_seconds_total', 0) + max(0, now - delivery['paused_at'])
+    delivery['ends_at'] = None if remaining is None else now + remaining
+    delivery['status'] = 'open'
+    state['revision'] += 1
+    return deepcopy(run)
+
+
+def extend_question(state, run_id, seconds, *, expected_revision):
+    _revision(state, expected_revision)
+    if type(seconds) is not int or not 1 <= seconds <= 3600:
+        raise ValueError('Choose an extension from 1 to 3600 seconds.')
+    run = _run(state, run_id)
+    now = time.time()
+    _settle(run, now)
+    delivery = run.get('delivery') or {}
+    if delivery.get('status') != 'open' or delivery.get('ends_at') is None:
+        raise Conflict('Only an open timed question can be extended.')
+    if delivery['ends_at'] + seconds - now > 3600:
+        raise ValueError('The remaining time cannot exceed 3600 seconds.')
+    delivery['ends_at'] += seconds
     state['revision'] += 1
     return deepcopy(run)
 
@@ -210,6 +349,7 @@ def close_question(state, run_id, *, expected_revision):
 def reveal_question(state, run_id, *, expected_revision):
     _revision(state, expected_revision)
     run = _run(state, run_id)
+    _settle(run)
     delivery = run.get('delivery') or {}
     if delivery.get('status') != 'closed':
         raise Conflict('Close the question before revealing its answer.')
@@ -287,8 +427,27 @@ def moderate_question(state, question_id, action, *, expected_revision, answer=N
     return {'id':question['id'], 'status':question['status']}
 
 
-def public_questions(state):
-    return [{key:item[key] for key in ('id','text','status','answer','created_at') if key in item}
+def vote_question(state, question_id, principal, audience, active):
+    if not isinstance(principal, str) or not principal or audience not in ('participant','guest'):
+        raise PermissionError('An individual event session is required.')
+    if type(active) is not bool:
+        raise ValueError('Choose whether to support this question.')
+    if not state.get('qa_settings', {}).get('participants' if audience == 'participant' else 'guests'):
+        raise PermissionError('Audience questions are not enabled for this audience.')
+    item = next((item for item in state.get('qa', []) if item['id'] == question_id), None)
+    if not item or item['status'] not in {'approved','answered'}:
+        raise Conflict('This question is not open for votes.')
+    votes = item.setdefault('votes', [])
+    if active and principal not in votes:
+        votes.append(principal)
+    elif not active and principal in votes:
+        votes.remove(principal)
+    return {'id':item['id'], 'votes':len(votes), 'upvoted':active}
+
+
+def public_questions(state, *, principal=None):
+    return [{**{key:item[key] for key in ('id','text','status','answer','created_at') if key in item},
+             'votes':len(item.get('votes', [])), 'upvoted':bool(principal and principal in item.get('votes', []))}
             for item in state.get('qa', []) if item['status'] in {'approved','answered'}]
 
 
@@ -300,7 +459,7 @@ def submit_answer(state, run_id, delivery_id, principal, choice):
     """
     if not isinstance(principal, str) or not principal:
         raise PermissionError('An individual session is required.')
-    run = _run(state, run_id)
+    run = _find_run(state, run_id)
     delivery = run.get('delivery') or {}
     deliveries = [*run.get('deliveries', []), delivery]
     requested = next((item for item in deliveries if item.get('id') == delivery_id), None)
@@ -331,26 +490,33 @@ def submit_answer(state, run_id, delivery_id, principal, choice):
         if previous['choice'] != choice:
             raise Conflict('Your answer has already been submitted.')
         return deepcopy(previous['receipt'])
+    if run['status'] != 'open':
+        raise Conflict('This activity has finished.')
     if delivery.get('id') != delivery_id:
         raise Conflict('This question is no longer active.')
     now = time.time()
     if delivery.get('status') != 'open' or (delivery['ends_at'] is not None and now >= delivery['ends_at']):
         raise Conflict('This question is closed.')
     receipt = {'id': uuid4().hex, 'delivery_id': delivery_id, 'received_at': now}
-    run.setdefault('responses', {}).setdefault(delivery_id, {})[principal] = {'choice': choice, 'receipt': receipt}
+    elapsed = max(0, now - delivery['opened_at'] - delivery.get('paused_seconds_total', 0))
+    run.setdefault('responses', {}).setdefault(delivery_id, {})[principal] = {'choice': choice, 'receipt': receipt, 'elapsed_seconds':elapsed}
     return deepcopy(receipt)
 
 
 def player_view(run, *, principal=None):
+    delivery = deepcopy(run.get('delivery'))
+    if delivery:
+        _settle({'delivery':delivery})
     snapshot = deepcopy(run['snapshot'])
     snapshot['questions'] = [question for question in snapshot['questions']
                              if run['status'] == 'open' and question['id'] == run.get('active_question_id')]
     for question in snapshot['questions']:
-        if run.get('delivery', {}).get('status') != 'revealed':
+        question.pop('evidence', None)
+        if (delivery or {}).get('status') != 'revealed':
             question.pop('correct', None)
     view = {**snapshot, 'id': run['id'], 'activity_id': run['activity_id'], 'status': run['status'],
-            'delivery': deepcopy(run.get('delivery'))}
-    delivery = run.get('delivery') or {}
+            'delivery': delivery}
+    delivery = delivery or {}
     if principal and delivery.get('status') == 'revealed' and snapshot['kind'] == 'quiz' and snapshot['questions']:
         ids = [item['id'] for item in [*run.get('deliveries', []), delivery] if item.get('question_id') == run['active_question_id']]
         response = next((run.get('responses', {}).get(item_id, {}).get(principal) for item_id in ids
@@ -362,30 +528,73 @@ def player_view(run, *, principal=None):
     return view
 
 
+def player_score(state, principal, audience):
+    """Score only explicitly revealed quiz questions available to this audience."""
+    earned = available = 0
+    now = time.time()
+    for run in state['runs']:
+        snapshot = run['snapshot']
+        if snapshot['kind'] != 'quiz' or audience not in snapshot.get('audiences', ['participant']):
+            continue
+        deliveries = [*run.get('deliveries', []), *([run['delivery']] if run.get('delivery') else [])]
+        released = {item['question_id'] for item in deliveries if _delivery_status(item, now) == 'revealed'}
+        for question in snapshot['questions']:
+            if question['id'] not in released:
+                continue
+            available += 1
+            response = next((run.get('responses', {}).get(item['id'], {}).get(principal) for item in deliveries
+                             if item.get('question_id') == question['id'] and
+                             principal in run.get('responses', {}).get(item['id'], {})), None)
+            if response:
+                selected = response['choice'] if isinstance(response['choice'], list) else [response['choice']]
+                earned += int(selected == question['correct'])
+    return {'earned':earned, 'available':available} if available else None
+
+
 def desk_view(state):
     """Project aggregate results without returning individual responses."""
     result = deepcopy(state)
-    result['qa'] = [{key:item[key] for key in ('id','text','status','answer','created_at','audience') if key in item}
+    for run in result['runs']:
+        _settle(run)
+    result['qa'] = [{**{key:item[key] for key in ('id','text','status','answer','created_at','audience') if key in item},
+                     'votes':len(item.get('votes', []))}
                     for item in result.get('qa', [])]
     for run in result['runs']:
         responses = run.pop('responses', {})
         delivery = run.get('delivery') or {}
-        question = next((q for q in run['snapshot']['questions'] if q['id'] == run.get('active_question_id')), None)
-        ids = [item['id'] for item in [*run.get('deliveries', []), delivery]
-               if item.get('id') and item.get('question_id') == run.get('active_question_id')]
-        people = {}
-        for item_id in ids:
-            people.update(responses.get(item_id, {}))
-        distribution = None
-        if question and len(people) >= 5 and question['type'] in {'single', 'multi', 'true_false', 'rating'}:
-            count = 5 if question['type'] == 'rating' else len(question['options'])
-            distribution = [0] * count
-            for answer in people.values():
-                selected = answer['choice'] if isinstance(answer['choice'], list) else [answer['choice']]
-                for choice in selected:
-                    distribution[choice - 1 if question['type'] == 'rating' else choice] += 1
-        run['analytics'] = {'respondents': len(people), 'denominator': len(people), 'distribution': distribution,
-                            'suppressed_below': 5}
+        deliveries = [*run.get('deliveries', []), *([delivery] if delivery else [])]
+        question_analytics = []
+        for question in run['snapshot']['questions']:
+            attempts = [item for item in deliveries if item.get('question_id') == question['id']]
+            if not attempts:
+                continue
+            people = {}
+            for attempt in attempts:
+                for principal, response in responses.get(attempt['id'], {}).items():
+                    people.setdefault(principal, (response, attempt))
+            total = len(people)
+            distribution = correct_count = median_seconds = None
+            if total >= 5:
+                if question['type'] in {'single', 'multi', 'true_false', 'rating'}:
+                    count = 5 if question['type'] == 'rating' else len(question['options'])
+                    distribution = [0] * count
+                    for response, _ in people.values():
+                        selected = response['choice'] if isinstance(response['choice'], list) else [response['choice']]
+                        for choice in selected:
+                            distribution[choice - 1 if question['type'] == 'rating' else choice] += 1
+                elapsed = [response.get('elapsed_seconds', max(0, response['receipt']['received_at'] - attempt['opened_at']))
+                           for response, attempt in people.values()]
+                median_seconds = round(statistics.median(elapsed), 1)
+                if run['snapshot']['kind'] == 'quiz' and any(item['status'] == 'revealed' for item in attempts):
+                    correct_count = sum((response['choice'] if isinstance(response['choice'], list) else [response['choice']]) == question['correct']
+                                        for response, _ in people.values())
+            question_analytics.append({'question_id':question['id'], 'respondents':total, 'denominator':total,
+                'distribution':distribution, 'correct_count':correct_count, 'median_seconds':median_seconds,
+                'viewed':None, 'suppressed_below':5})
+        run['question_analytics'] = question_analytics
+        run['analytics'] = next((item for item in question_analytics if item['question_id'] == run.get('active_question_id')),
+            {'respondents':0, 'denominator':0, 'distribution':None, 'correct_count':None, 'median_seconds':None,
+             'viewed':None, 'suppressed_below':5})
     return result
 
 
@@ -430,26 +639,39 @@ def hall_quiz(service):
     return result
 
 
-def _apply(state, action, payload, expected_revision):
+def _apply(state, action, payload, expected_revision, db=None):
     if action == 'save':
         return save_draft(state, payload, expected_revision=expected_revision)
     if action == 'publish':
         return publish(state, payload.get('activity_id'), expected_revision=expected_revision)
+    if action == 'archive_draft':
+        return archive_draft(state, payload.get('activity_id'), payload.get('archive'), expected_revision=expected_revision)
     if action == 'open_run':
         return open_run(state, payload.get('activity_id'), payload.get('version'), expected_revision=expected_revision)
+    if action == 'finish_run':
+        return finish_run(state, payload.get('run_id'), expected_revision=expected_revision)
     if action == 'open_question':
         return open_question(state, payload.get('run_id'), payload.get('question_id'), expected_revision=expected_revision,
-                             duration=payload.get('duration', 15))
+                             duration=payload.get('duration', 15), auto_reveal=payload.get('auto_reveal', False))
     if action == 'close_question':
         return close_question(state, payload.get('run_id'), expected_revision=expected_revision)
+    if action == 'pause_question':
+        return pause_question(state, payload.get('run_id'), expected_revision=expected_revision)
+    if action == 'resume_question':
+        return resume_question(state, payload.get('run_id'), expected_revision=expected_revision)
+    if action == 'extend_question':
+        return extend_question(state, payload.get('run_id'), payload.get('seconds'), expected_revision=expected_revision)
     if action == 'resend_question':
-        return resend_question(state, payload.get('run_id'), expected_revision=expected_revision, duration=payload.get('duration', 15))
+        return resend_question(state, payload.get('run_id'), expected_revision=expected_revision, duration=payload.get('duration', 15),
+                               auto_reveal=payload.get('auto_reveal', False))
     if action == 'share_hall':
         return share_hall(state, payload.get('run_id'), payload.get('share'), expected_revision=expected_revision)
     if action == 'configure_questions':
         return configure_questions(state, participants=payload.get('participants'), guests=payload.get('guests'), expected_revision=expected_revision)
     if action == 'moderate_question':
         return moderate_question(state, payload.get('id'), payload.get('decision'), answer=payload.get('answer'), expected_revision=expected_revision)
+    if action == 'copy_legacy_pack':
+        return copy_legacy_pack(state, db, payload, expected_revision=expected_revision)
     return reveal_question(state, payload.get('run_id'), expected_revision=expected_revision)
 
 
@@ -471,6 +693,110 @@ def _validate_command(action, payload):
         raise ValueError('Use the supported fields for this operation.')
 
 
+def _legacy_delivery_open(db):
+    now = time.time()
+    quiz = _read(db, 'event_quiz_v1', {})
+    if any(item.get('status') == 'open' and (item.get('end') is None or item['end'] > now)
+           for item in quiz.get('runs', [])):
+        return True
+    audience = _read(db, 'audience_questions_v1', {})
+    return any(item.get('status') == 'live' and (item.get('closesAt') is None or item['closesAt'] > now * 1000)
+               for item in audience.get('packs', []))
+
+
+def legacy_preview(db):
+    """Inventory historical data without interpreting or changing scores."""
+    quiz = _read(db, 'event_quiz_v1', {})
+    audience = _read(db, 'audience_questions_v1', {})
+    archive = _read(db, 'event_quiz_reset_archive_v1', [])
+    answers = quiz.get('answers', {})
+    packs = audience.get('packs', [])
+    drafts = [{'id':item['id'], 'title':item.get('title',''), 'question_count':len(item.get('questions', [])),
+               'digest':_legacy_digest(item)} for item in packs if item.get('status') == 'draft']
+    records = db.execute('SELECT count(*) AS n FROM kv WHERE k LIKE ?', ('audience_answers_v1:%',)).fetchone()['n']
+    return {'quiz':{'revision':quiz.get('rev', 0), 'runs':len(quiz.get('runs', [])),
+                    'answering_accounts':len(answers), 'archives':len(archive)},
+            'audience':{'revision':audience.get('rev', 0), 'packs':len(packs),
+                        'draft_packs':sum(item.get('status') == 'draft' for item in packs),
+                        'answer_records':records, 'drafts':drafts},
+            'historical_results':'retained_in_legacy', 'changes_made':False}
+
+
+def _legacy_digest(pack):
+    return hashlib.sha256(json.dumps(pack, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode()).hexdigest()
+
+
+def copy_legacy_pack(state, db, payload, *, expected_revision):
+    """Copy one frozen legacy draft; never mutate old packs or historical results."""
+    _revision(state, expected_revision)
+    pack_id, digest = payload.get('pack_id'), payload.get('source_digest')
+    if not isinstance(pack_id, str) or not re.fullmatch(r'[0-9a-f]{32}', pack_id) or not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest):
+        raise ValueError('Choose a valid legacy draft and preview.')
+    if os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+        raise Conflict('Enable the new runner before copying a legacy draft.')
+    if pack_id in state.get('legacy_imports', {}):
+        raise Conflict('This legacy draft was already copied.')
+    source = _read(db, 'audience_questions_v1', {})
+    pack = next((item for item in source.get('packs', []) if item.get('id') == pack_id), None)
+    if not pack or pack.get('status') != 'draft' or _legacy_digest(pack) != digest:
+        raise Conflict('The legacy draft changed. Review the inventory again.')
+    questions = pack.get('questions')
+    if not isinstance(questions, list) or not questions or any(
+            not isinstance(question, dict) or not isinstance(question.get('id'), str) or
+            not re.fullmatch(r'[0-9a-f]{32}', question['id']) for question in questions):
+        raise ValueError('This legacy draft has invalid question identifiers.')
+    if len({question['id'] for question in questions}) != len(questions):
+        raise ValueError('This legacy draft has duplicate question identifiers.')
+    converted = []
+    for question in questions:
+        kind = question.get('type')
+        if kind == 'choice':
+            options = question.get('options')
+            if not isinstance(options, list) or any(not isinstance(option, dict) for option in options):
+                raise ValueError('This legacy draft has invalid answer options.')
+            converted.append({'type':'single', 'prompt':question.get('prompt'),
+                              'options':[option.get('text') for option in options]})
+        elif kind in {'rating','text'}:
+            converted.append({'type':kind, 'prompt':question.get('prompt')})
+        else:
+            raise ValueError('This legacy draft contains an unsupported question type.')
+    draft = save_draft(state, {'title':pack.get('title'), 'description':pack.get('description',''),
+                               'kind':'poll', 'questions':converted}, expected_revision=expected_revision)
+    state.setdefault('legacy_imports', {})[pack_id] = {'activity_id':draft['id'], 'source_digest':digest,
+        'question_map':{old['id']:new['id'] for old, new in zip(pack['questions'], draft['questions'])}}
+    return draft
+
+
+def analytics_csv(state, workspace, run_id=None):
+    """Export aggregate response metrics; never include individual responses."""
+    def safe(value):
+        text = str(value)
+        return "'" + text if text.lstrip(' \t\r\n').startswith(('=','+','-','@')) or text.startswith(('\t','\r','\n')) else text
+    projected = desk_view(state)
+    runs = [run for run in projected['runs'] if run_id is None or run['id'] == run_id]
+    if run_id is not None and not runs:
+        raise Conflict('The requested run does not exist.')
+    if sum(len(run['question_analytics']) for run in runs) > 10000:
+        raise ValueError('Export one run at a time for this event.')
+    buffer = io.StringIO(newline='')
+    writer = csv.writer(buffer)
+    writer.writerow(['generated_utc','workspace','activity','version','run_id','question','respondents',
+                     'denominator','views','option_counts','correct_count','median_seconds','suppressed_below'])
+    generated = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    for run in runs:
+        questions = {item['id']:item for item in run['snapshot']['questions']}
+        for metric in run['question_analytics']:
+            question = questions[metric['question_id']]
+            labels = ['1','2','3','4','5'] if question['type'] == 'rating' else question['options']
+            counts = metric['distribution']
+            breakdown = '; '.join(f'{label}: {count}' for label, count in zip(labels, counts)) if counts is not None else 'suppressed or not applicable'
+            writer.writerow([generated, safe(workspace), safe(run['snapshot']['title']), run['version'], run['id'],
+                             safe(question['prompt']), metric['respondents'], metric['denominator'], 'not tracked',
+                             safe(breakdown), '' if metric['correct_count'] is None else metric['correct_count'],
+                             '' if metric['median_seconds'] is None else metric['median_seconds'], metric['suppressed_below']])
+    return ('\ufeff' + buffer.getvalue()).encode('utf-8')
+
+
 def persist(service, action, payload, *, expected_revision):
     """Apply one catalog operation atomically in the selected event workspace.
 
@@ -481,7 +807,7 @@ def persist(service, action, payload, *, expected_revision):
     db = service.DB
     with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
         state = _read(db, KEY, empty())
-        result = _apply(state, action, payload, expected_revision)
+        result = _apply(state, action, payload, expected_revision, db)
         _write(db, KEY, state)
         return result
 
@@ -503,19 +829,20 @@ def execute(service, action, payload, *, expected_revision, request_id, identity
         'effective': identity['credential_id']}, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode()).hexdigest()
     db = service.DB
     with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
-        receipts = _read(db, RECEIPTS_KEY, {})
-        if request_id in receipts:
-            receipt = receipts[request_id]
+        receipt_key = f'{RECEIPTS_KEY}:{request_id}'
+        receipt = _read(db, receipt_key, None)
+        if receipt is None:
+            receipt = _read(db, RECEIPTS_KEY, {}).get(request_id)
+        if receipt is not None:
             if receipt['fingerprint'] != fingerprint:
                 raise Conflict('Request ID was already used for a different operation.')
             return deepcopy(receipt['result'])
-        if len(receipts) >= 5000:
-            raise Conflict('Activity operation history is full; contact the administrator.')
         state = _read(db, KEY, empty())
-        result = _apply(state, action, payload, expected_revision)
-        receipts[request_id] = {'fingerprint': fingerprint, 'result': result}
+        if action in {'open_question','resend_question'} and os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1' and _legacy_delivery_open(db):
+            raise Conflict('Close the existing quiz or audience question before starting an Engagement Hub question.')
+        result = _apply(state, action, payload, expected_revision, db)
         _write(db, KEY, state)
-        _write(db, RECEIPTS_KEY, receipts)
+        _write(db, receipt_key, {'fingerprint': fingerprint, 'result': result})
         profile = identity.get('impersonation') or {}
         db.execute('''INSERT INTO audit(ts,actor,action,detail,actor_credential,actor_label,
                       effective_credential,effective_role,profile_id,impersonation_mode)
@@ -538,7 +865,7 @@ def answer(service, run_id, delivery_id, choice, *, identity):
     db = service.DB
     with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
         state = _read(db, KEY, empty())
-        run = _run(state, run_id)
+        run = _find_run(state, run_id)
         if audience not in run['snapshot'].get('audiences', ['participant']):
             raise PermissionError('This activity is not open to your audience.')
         receipt = submit_answer(state, run_id, delivery_id, principal, choice)
@@ -548,7 +875,7 @@ def answer(service, run_id, delivery_id, choice, *, identity):
 
 def handle(service, handler, path, body=None):
     """Experimental, explicitly enabled Organizer and participant adapters."""
-    if path not in {DESK, PLAYER, SHARED_PLAYER, QUESTIONS} or os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+    if path not in {DESK, LEGACY_PREVIEW, ANALYTICS_CSV, PLAYER, SHARED_PLAYER, QUESTIONS} or os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
         return False
     identity = service.event_access.session(service, handler.headers)
     if not identity:
@@ -574,12 +901,13 @@ def handle(service, handler, path, body=None):
             if body is not None:
                 if (identity.get('impersonation') or {}).get('mode') == 'preview':
                     raise PermissionError('This profile is a read-only preview.')
-                if not isinstance(body, dict) or set(body) != {'text','request_id'}:
+                if not isinstance(body, dict) or set(body) not in ({'text','request_id'}, {'question_id','upvote'}):
                     raise ValueError('Use the supported question fields.')
                 db = service.DB
                 with service.LOCK, database.named_lock(db, 'engagement-catalog'), db:
                     state = _read(db, KEY, empty())
-                    receipt = ask_question(state, principal, audience, body['text'], body['request_id'])
+                    receipt = (ask_question(state, principal, audience, body['text'], body['request_id'])
+                               if 'text' in body else vote_question(state, body['question_id'], principal, audience, body['upvote']))
                     _write(db, KEY, state)
                 handler.send(200, {'receipt':receipt})
                 return True
@@ -588,7 +916,7 @@ def handle(service, handler, path, body=None):
             own = [{key:item[key] for key in ('id','text','status','answer','created_at') if key in item}
                    for item in state.get('qa', []) if item['principal'] == principal]
             enabled = state.get('qa_settings', {}).get('participants' if audience == 'participant' else 'guests', False)
-            handler.send(200, {'enabled':enabled, 'questions':public_questions(state), 'own':own})
+            handler.send(200, {'enabled':enabled, 'questions':public_questions(state, principal=principal), 'own':own})
         except PermissionError as error:
             handler.send(403, {'error':str(error)})
         except Conflict as error:
@@ -628,7 +956,8 @@ def handle(service, handler, path, body=None):
                 if item.get('question_id') == run['active_question_id'] and
                 principal in run.get('responses', {}).get(item['id'], {})), None) if run else None
             handler.send(200, {'question': player_view(run, principal=principal) if run else None,
-                               'answered': bool(own), 'selection': own['choice'] if own else None, 'now': time.time()})
+                               'answered': bool(own), 'selection': own['choice'] if own else None,
+                               'score': player_score(state, principal, audience), 'now': time.time()})
         except PermissionError as error:
             handler.send(403, {'error': str(error)})
         except Conflict as error:
@@ -638,6 +967,33 @@ def handle(service, handler, path, body=None):
         return True
     if role not in {'admin', 'organizer', 'desk'}:
         handler.send(403, {'error': 'Organizer access is required.'})
+        return True
+    if path == ANALYTICS_CSV:
+        if body is not None:
+            handler.send(405, {'error':'Download analytics with GET.'})
+            return True
+        try:
+            query = parse_qs(urlparse(handler.path).query, keep_blank_values=True, strict_parsing=True)
+            if set(query) - {'run_id'} or any(len(value) != 1 for value in query.values()):
+                raise ValueError('Use a single run filter.')
+            run_id = query.get('run_id', [None])[0]
+            if run_id is not None and not re.fullmatch(r'[0-9a-f]{32}', run_id):
+                raise ValueError('Choose a valid run.')
+            with service.LOCK:
+                state = _read(service.DB, KEY, empty())
+            data = analytics_csv(state, service.WORKSPACE.mode if service.WORKSPACE else 'local', run_id)
+            handler.send(200, data, 'text/csv', {'Content-Disposition':'attachment; filename=engagement-analytics.csv'})
+        except Conflict as error:
+            handler.send(409, {'error':str(error)})
+        except ValueError as error:
+            handler.send(400, {'error':str(error)})
+        return True
+    if path == LEGACY_PREVIEW:
+        if body is not None:
+            handler.send(405, {'error':'Read the compatibility inventory with GET.'})
+        else:
+            with service.LOCK:
+                handler.send(200, legacy_preview(service.DB))
         return True
     if body is not None and (identity.get('impersonation') or {}).get('mode') == 'preview':
         handler.send(403, {'error': 'This profile is a read-only preview.'})

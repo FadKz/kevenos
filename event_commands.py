@@ -1105,22 +1105,30 @@ ENGAGEMENT_REV = integer(0, 2**31 - 1)
 ENGAGEMENT_DURATION = {'type':['integer','null'], 'minimum':1, 'maximum':3600}
 ENGAGEMENT_QUESTION = obj({'id':ENGAGEMENT_ID, 'type':choices('single','multi','true_false','rating','text'),
                            'prompt':string(500,1), 'options':array(string(150,1),8,2),
-                           'correct':array(integer(0,7),8,0,uniqueItems=True)}, ('type','prompt'))
+                           'correct':array(integer(0,7),8,0,uniqueItems=True), 'evidence':string(500,1)}, ('type','prompt'))
 ENGAGEMENT_DRAFT = obj({'id':ENGAGEMENT_ID, 'title':string(120,1), 'kind':choices('quiz','poll'),
+                        'description':string(500),
                         'audiences':array(choices('participant','guest'),2,1,uniqueItems=True),
                         'questions':array(ENGAGEMENT_QUESTION,100,1)}, ('title','kind','questions'))
 ENGAGEMENT_CONTROL = actions(
     save=({'revision':ENGAGEMENT_REV,'payload':ENGAGEMENT_DRAFT}, ('revision','payload')),
     publish=({'revision':ENGAGEMENT_REV,'payload':obj({'activity_id':ENGAGEMENT_ID},('activity_id',))}, ('revision','payload')),
+    archive_draft=({'revision':ENGAGEMENT_REV,'payload':obj({'activity_id':ENGAGEMENT_ID,'archive':BOOL},('activity_id','archive'))}, ('revision','payload')),
     open_run=({'revision':ENGAGEMENT_REV,'payload':obj({'activity_id':ENGAGEMENT_ID,'version':VERSION},('activity_id','version'))}, ('revision','payload')),
-    open_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'question_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION},('run_id','question_id'))}, ('revision','payload')),
+    finish_run=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
+    open_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'question_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION,'auto_reveal':BOOL},('run_id','question_id'))}, ('revision','payload')),
     close_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
+    pause_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
+    resume_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
+    extend_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'seconds':integer(1,3600)},('run_id','seconds'))}, ('revision','payload')),
     reveal_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID},('run_id',))}, ('revision','payload')),
-    resend_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION},('run_id',))}, ('revision','payload')),
+    resend_question=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'duration':ENGAGEMENT_DURATION,'auto_reveal':BOOL},('run_id',))}, ('revision','payload')),
     share_hall=({'revision':ENGAGEMENT_REV,'payload':obj({'run_id':ENGAGEMENT_ID,'share':BOOL},('run_id','share'))}, ('revision','payload')),
     configure_questions=({'revision':ENGAGEMENT_REV,'payload':obj({'participants':BOOL,'guests':BOOL},('participants','guests'))}, ('revision','payload')),
     moderate_question=({'revision':ENGAGEMENT_REV,'payload':obj({'id':ENGAGEMENT_ID,'decision':choices('approve','reject','answer'),
                            'answer':string(1000,1)},('id','decision'))}, ('revision','payload')),
+    copy_legacy_pack=({'revision':ENGAGEMENT_REV,'payload':obj({'pack_id':ENGAGEMENT_ID,
+                           'source_digest':string(64,64,pattern='^[0-9a-f]{64}$')},('pack_id','source_digest'))}, ('revision','payload')),
 )
 
 
@@ -1138,6 +1146,13 @@ def _engagement_state(s, args):
     values = state.get('qa', []) if collection == 'questions' else state[collection]
     return {'revision':state['revision'], 'collection':collection, 'question_settings':state.get('qa_settings', {}),
             **_page(values, {'limit':20, **args}, collection)}
+
+
+@resource('engagement.legacy_preview', 'Inventory legacy quiz and audience records without changing or disclosing individual answers.',
+          'engagement:read', obj())
+def _engagement_legacy_preview(s, args):
+    _engagement_enabled()
+    return engagement_catalog.legacy_preview(s.DB)
 
 
 @command('engagement.control', 'Create and publish activities or control a run. Confirm the exact action, workspace, version and audience before execution.',

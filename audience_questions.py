@@ -1,6 +1,7 @@
 """Workspace-scoped audience questions and voluntary, unscored responses."""
 from copy import deepcopy
 import json
+import os
 import re
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -114,6 +115,8 @@ def build_pack(raw, prior):
 
 def control(s, state, body, actor):
     action = body.get('action')
+    if os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1' and action in {'save','send','resend'}:
+        raise Conflict('Use Engagement Hub for new questions while the new runner is enabled. Existing audience history remains available.')
     supported = {'save':('pack',), 'send':('packId','minutes'), 'resend':('packId','minutes'), 'close':('packId',),
                  'cancel':('packId',), 'release':('packId',), 'show':('packId','questionId','results'), 'hide':()}
     if not isinstance(action, str) or action not in supported:
@@ -141,6 +144,8 @@ def control(s, state, body, actor):
     else:
         pack = find_pack(state,body['packId'])
         current = status(pack,at)
+        if os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1' and action == 'cancel' and current == 'draft':
+            raise Conflict('Legacy drafts are read-only while Engagement Hub is enabled.')
         if action in ('send', 'resend'):
             minutes = body.get('minutes')
             if 'minutes' in body and (type(minutes) is not int or not 1 <= minutes <= MAX_MINUTES):

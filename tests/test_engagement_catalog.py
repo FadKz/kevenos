@@ -5,12 +5,38 @@ import json
 import os
 import sqlite3
 import threading
+import tempfile
 from types import SimpleNamespace
 import engagement_catalog as catalog
+import event_quiz
+import audience_questions
 import test_workspace_routes as workspace
 
 
 class EngagementCatalogTests(unittest.TestCase):
+    def test_finishing_run_preserves_results_and_requires_question_closed(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[0]}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        receipt = catalog.submit_answer(state, run['id'], run['delivery']['id'], 'attendee', 0)
+        with self.assertRaises(catalog.Conflict):
+            catalog.finish_run(state, run['id'], expected_revision=4)
+        catalog.close_question(state, run['id'], expected_revision=4)
+        catalog.reveal_question(state, run['id'], expected_revision=5)
+        catalog.share_hall(state, run['id'], True, expected_revision=6)
+        finished = catalog.finish_run(state, run['id'], expected_revision=7)
+        self.assertEqual(finished['status'], 'completed')
+        self.assertFalse(finished['hall_shared'])
+        self.assertEqual(catalog.player_score(state, 'attendee', 'participant'), {'earned':1,'available':1})
+        self.assertEqual(catalog.submit_answer(state, run['id'], run['delivery']['id'], 'attendee', 0), receipt)
+        with self.assertRaises(catalog.Conflict):
+            catalog.submit_answer(state, run['id'], run['delivery']['id'], 'late', 0)
+        with self.assertRaises(catalog.Conflict):
+            catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=8)
+
     def test_storage_is_transactional_and_rejects_stale_writes(self):
         db = sqlite3.connect(':memory:')
         self.addCleanup(db.close)
@@ -52,6 +78,27 @@ class EngagementCatalogTests(unittest.TestCase):
             'questions':draft['questions']}, expected_revision=1)
         self.assertEqual(edited['audiences'], ['guest'])
 
+    def test_activity_description_is_preserved_in_published_snapshot(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Poll','kind':'poll','description':'Context for attendees',
+            'questions':[{'type':'text','prompt':'Question?'}]}, expected_revision=0)
+        version = catalog.publish(state, draft['id'], expected_revision=1)
+        self.assertEqual(version['snapshot']['description'], 'Context for attendees')
+
+    def test_draft_archive_can_be_restored_and_cannot_hide_published_history(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Poll','kind':'poll','questions':[
+            {'type':'text','prompt':'Question?'}]}, expected_revision=0)
+        catalog.archive_draft(state, draft['id'], True, expected_revision=1)
+        self.assertTrue(state['activities'][0]['archived'])
+        self.assertEqual(state['activities'][0]['draft']['title'], 'Poll')
+        with self.assertRaises(catalog.Conflict):
+            catalog.publish(state, draft['id'], expected_revision=2)
+        catalog.archive_draft(state, draft['id'], False, expected_revision=2)
+        catalog.publish(state, draft['id'], expected_revision=3)
+        with self.assertRaises(catalog.Conflict):
+            catalog.archive_draft(state, draft['id'], True, expected_revision=4)
+
     def test_published_version_and_run_are_immutable_when_draft_changes(self):
         state = catalog.empty()
         draft = catalog.save_draft(state, {'title': 'Session quiz', 'kind': 'quiz', 'questions': [
@@ -86,6 +133,16 @@ class EngagementCatalogTests(unittest.TestCase):
             ]}, expected_revision=0)
         self.assertEqual(state, catalog.empty())
 
+    def test_source_evidence_stays_with_draft_but_not_player_projection(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[1], 'evidence':'Source sentence.'}]}, expected_revision=0)
+        self.assertEqual(draft['questions'][0]['evidence'], 'Source sentence.')
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        self.assertNotIn('evidence', str(catalog.player_view(run)))
+
     def test_command_rejects_unrecognized_payload_fields(self):
         db = sqlite3.connect(':memory:')
         self.addCleanup(db.close)
@@ -110,9 +167,10 @@ class EngagementCatalogTests(unittest.TestCase):
             run = catalog.open_question(state, run['id'], first, expected_revision=3, duration=15)
         self.assertEqual(run['delivery']['ends_at'], 1015)
         self.assertNotIn('correct', str(catalog.player_view(run)))
-        with self.assertRaises(catalog.Conflict):
-            catalog.open_question(state, run['id'], second, expected_revision=4)
-        run = catalog.close_question(state, run['id'], expected_revision=4)
+        with patch.object(catalog.time, 'time', return_value=1001):
+            with self.assertRaises(catalog.Conflict):
+                catalog.open_question(state, run['id'], second, expected_revision=4)
+            run = catalog.close_question(state, run['id'], expected_revision=4)
         self.assertNotIn('correct', str(catalog.player_view(run)))
         run = catalog.reveal_question(state, run['id'], expected_revision=5)
         self.assertEqual(catalog.player_view(run)['questions'][0]['correct'], [1])
@@ -225,6 +283,108 @@ class EngagementCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.player_view(state['runs'][0], principal='p2')['result'], {'earned': 0, 'available': 1})
         self.assertNotIn('result', catalog.player_view(state['runs'][0], principal='p3'))
 
+    def test_cumulative_score_counts_only_revealed_quiz_questions(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'First?','options':['A','B'],'correct':[1]},
+            {'type':'single','prompt':'Secret later?','options':['A','B'],'correct':[0]}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        first, second = [item['id'] for item in run['snapshot']['questions']]
+        run = catalog.open_question(state, run['id'], first, expected_revision=3)
+        catalog.submit_answer(state, run['id'], run['delivery']['id'], 'person-1', 1)
+        catalog.close_question(state, run['id'], expected_revision=4)
+        self.assertIsNone(catalog.player_score(state, 'person-1', 'participant'))
+        catalog.reveal_question(state, run['id'], expected_revision=5)
+        catalog.open_question(state, run['id'], second, expected_revision=6)
+        self.assertEqual(catalog.player_score(state, 'person-1', 'participant'), {'earned':1,'available':1})
+        self.assertEqual(catalog.player_score(state, 'person-2', 'participant'), {'earned':0,'available':1})
+        self.assertIsNone(catalog.player_score(state, 'guest:one', 'guest'))
+
+    def test_timed_reveal_uses_server_clock_and_never_accepts_late_answers(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[1]},
+            {'type':'single','prompt':'Next?','options':['A','B'],'correct':[0]}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        first, second = [item['id'] for item in run['snapshot']['questions']]
+        with patch.object(catalog.time, 'time', return_value=100):
+            run = catalog.open_question(state, run['id'], first, expected_revision=3, duration=15, auto_reveal=True)
+            catalog.share_hall(state, run['id'], True, expected_revision=4)
+        with patch.object(catalog.time, 'time', return_value=114):
+            catalog.submit_answer(state, run['id'], run['delivery']['id'], 'person-1', 1)
+            self.assertNotIn('correct', str(catalog.player_view(state['runs'][0])))
+            self.assertNotIn('correct', str(catalog.hall_view(state)))
+        with patch.object(catalog.time, 'time', return_value=115):
+            self.assertEqual(catalog.player_view(state['runs'][0])['questions'][0]['correct'], [1])
+            self.assertEqual(catalog.hall_view(state)['correct'], [1])
+            self.assertEqual(catalog.player_score(state, 'person-1', 'participant'), {'earned':1,'available':1})
+            with self.assertRaises(catalog.Conflict):
+                catalog.submit_answer(state, run['id'], run['delivery']['id'], 'person-2', 0)
+            next_run = catalog.open_question(state, run['id'], second, expected_revision=5)
+            self.assertEqual(next_run['deliveries'][0]['status'], 'revealed')
+
+    def test_manual_reveal_stays_hidden_after_timeout(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[1]}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        with patch.object(catalog.time, 'time', return_value=100):
+            catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        with patch.object(catalog.time, 'time', return_value=116):
+            view = catalog.player_view(state['runs'][0])
+            self.assertEqual(view['delivery']['status'], 'closed')
+            self.assertNotIn('correct', str(view))
+            catalog.reveal_question(state, run['id'], expected_revision=4)
+            self.assertEqual(catalog.player_view(state['runs'][0])['questions'][0]['correct'], [1])
+
+    def test_pause_resume_and_extend_use_server_time(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'First?','options':['A','B'],'correct':[1]},
+            {'type':'single','prompt':'Next?','options':['A','B'],'correct':[0]}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        first, second = [item['id'] for item in run['snapshot']['questions']]
+        with patch.object(catalog.time, 'time', return_value=100):
+            run = catalog.open_question(state, run['id'], first, expected_revision=3, duration=15, auto_reveal=True)
+        with patch.object(catalog.time, 'time', return_value=105):
+            run = catalog.pause_question(state, run['id'], expected_revision=4)
+            self.assertEqual(run['delivery']['remaining_seconds'], 10)
+        with patch.object(catalog.time, 'time', return_value=200):
+            self.assertEqual(catalog.player_view(state['runs'][0])['delivery']['status'], 'paused')
+            with self.assertRaises(catalog.Conflict):
+                catalog.open_question(state, run['id'], second, expected_revision=5)
+            with self.assertRaises(catalog.Conflict):
+                catalog.submit_answer(state, run['id'], run['delivery']['id'], 'p1', 1)
+            run = catalog.resume_question(state, run['id'], expected_revision=5)
+            self.assertEqual(run['delivery']['ends_at'], 210)
+            run = catalog.extend_question(state, run['id'], 20, expected_revision=6)
+            self.assertEqual(run['delivery']['ends_at'], 230)
+        with patch.object(catalog.time, 'time', return_value=229):
+            catalog.submit_answer(state, run['id'], run['delivery']['id'], 'p1', 1)
+            self.assertNotIn('correct', str(catalog.player_view(state['runs'][0])))
+        with patch.object(catalog.time, 'time', return_value=230):
+            self.assertEqual(catalog.player_view(state['runs'][0])['questions'][0]['correct'], [1])
+
+    def test_response_time_excludes_paused_time(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Poll','kind':'poll','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B']}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        with patch.object(catalog.time, 'time', return_value=100):
+            run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3, duration=30)
+        with patch.object(catalog.time, 'time', return_value=105): catalog.pause_question(state, run['id'], expected_revision=4)
+        with patch.object(catalog.time, 'time', return_value=200): catalog.resume_question(state, run['id'], expected_revision=5)
+        for i in range(5):
+            with patch.object(catalog.time, 'time', return_value=201+i):
+                catalog.submit_answer(state, run['id'], run['delivery']['id'], f'p{i}', 0)
+        metric = catalog.desk_view(state)['runs'][0]['question_analytics'][0]
+        self.assertEqual(metric['median_seconds'], 8)
+
     def test_resend_keeps_first_answer_and_late_retry_does_not_double_score(self):
         state = catalog.empty()
         draft = catalog.save_draft(state, {'title': 'Quiz', 'kind': 'quiz', 'questions': [
@@ -266,6 +426,28 @@ class EngagementCatalogTests(unittest.TestCase):
         analytics = catalog.desk_view(state)['runs'][0]['analytics']
         self.assertEqual(analytics['distribution'], [3, 2])
         self.assertEqual(analytics['denominator'], 5)
+
+    def test_question_analytics_use_respondents_as_denominator_and_hide_unreleased_correctness(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'First?','options':['A','B'],'correct':[1]},
+            {'type':'single','prompt':'Not sent','options':['A','B'],'correct':[0]}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        with patch.object(catalog.time, 'time', return_value=100):
+            run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3, duration=None)
+        for i in range(5):
+            with patch.object(catalog.time, 'time', return_value=101 + i):
+                catalog.submit_answer(state, run['id'], run['delivery']['id'], f'p{i}', i % 2)
+        analytics = catalog.desk_view(state)['runs'][0]['question_analytics']
+        self.assertEqual(len(analytics), 1)
+        self.assertEqual((analytics[0]['respondents'],analytics[0]['denominator'],analytics[0]['median_seconds']), (5,5,3))
+        self.assertIsNone(analytics[0]['correct_count'])
+        catalog.close_question(state, run['id'], expected_revision=4)
+        catalog.reveal_question(state, run['id'], expected_revision=5)
+        analytics = catalog.desk_view(state)['runs'][0]['question_analytics'][0]
+        self.assertEqual(analytics['correct_count'], 2)
+        self.assertIsNone(analytics['viewed'], 'untracked views must never be invented')
 
     def test_hall_requires_explicit_sharing_and_hides_answer_until_reveal(self):
         state = catalog.empty()
@@ -414,6 +596,32 @@ class WorkspaceIsolationTests(unittest.TestCase):
             catalog.answer(service, run['id'], run['delivery']['id'], 1,
                            identity={**participant, 'impersonation': {'mode': 'preview'}})
 
+    def test_new_delivery_waits_for_an_existing_legacy_prompt(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        operator = {'role':'organizer', 'credential_id':'operator'}
+        draft = catalog.execute(service, 'save', {'title':'Poll','kind':'poll','questions':[
+            {'type':'single','prompt':'New?','options':['A','B']}]}, expected_revision=0, request_id='1'*32, identity=operator)
+        catalog.execute(service, 'publish', {'activity_id':draft['id']}, expected_revision=1, request_id='2'*32, identity=operator)
+        run = catalog.execute(service, 'open_run', {'activity_id':draft['id'],'version':1}, expected_revision=2, request_id='3'*32, identity=operator)
+        with service.DB:
+            catalog._write(service.DB, 'event_quiz_v1', {'enabled':True,'runs':[{'status':'open','end':None}]})
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            with self.assertRaises(catalog.Conflict):
+                catalog.execute(service, 'open_question', {'run_id':run['id'],'question_id':run['snapshot']['questions'][0]['id']},
+                                expected_revision=3, request_id='4'*32, identity=operator)
+            self.assertEqual(service.kv_get(catalog.KEY)['revision'], 3)
+
+    def test_legacy_launches_are_blocked_while_new_runner_is_enabled(self):
+        service = SimpleNamespace()
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            with self.assertRaises(event_quiz.Conflict):
+                event_quiz.command(service, event_quiz.empty_quiz(), {'action':'send'})
+            with self.assertRaises(audience_questions.Conflict):
+                audience_questions.control(service, {'rev':0,'packs':[]}, {'action':'send','packId':'x','expectedRev':0}, 'desk')
+
     def test_catalog_http_is_feature_gated_and_admin_scoped(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp()
@@ -482,6 +690,64 @@ class WorkspaceIsolationTests(unittest.TestCase):
                             identity={'role':'organizer', 'credential_id':'synthetic-operator'})
         self.assertIsNone(service.kv_get(catalog.KEY))
         self.assertIsNone(service.kv_get(catalog.RECEIPTS_KEY))
+        self.assertIsNone(service.kv_get(catalog.RECEIPTS_KEY + ':' + 'c' * 32))
+
+    def test_historical_receipt_volume_does_not_block_event_operations(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        with service.DB:
+            catalog._write(service.DB, catalog.RECEIPTS_KEY, {str(i):{} for i in range(5000)})
+        payload = {'title':'Poll','kind':'poll','questions':[{'type':'single','prompt':'Choose','options':['A','B']}]}
+        identity = {'role':'organizer','credential_id':'operator'}
+        first = catalog.execute(service, 'save', payload, expected_revision=0, request_id='a'*32, identity=identity)
+        self.assertEqual(first, catalog.execute(service, 'save', payload, expected_revision=0, request_id='a'*32, identity=identity))
+        self.assertEqual(service.kv_get(catalog.KEY)['revision'], 1)
+
+    def test_older_embedded_receipts_remain_replayable(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        payload = {'title':'Poll','kind':'poll','questions':[{'type':'single','prompt':'Choose','options':['A','B']}]}
+        identity = {'role':'organizer','credential_id':'operator'}
+        request_id = 'b'*32
+        original = catalog.execute(service, 'save', payload, expected_revision=0, request_id=request_id, identity=identity)
+        separate_key = catalog.RECEIPTS_KEY + ':' + request_id
+        receipt = service.kv_get(separate_key)
+        with service.DB:
+            catalog._write(service.DB, catalog.RECEIPTS_KEY, {request_id:receipt})
+            service.DB.execute('DELETE FROM kv WHERE k=?', (separate_key,))
+        self.assertEqual(original, catalog.execute(service, 'save', payload, expected_revision=0, request_id=request_id, identity=identity))
+        self.assertEqual(service.DB.execute("SELECT count(*) FROM audit WHERE action='engagement-save'").fetchone()[0], 1)
+
+    def test_sqlite_backup_restores_catalog_and_replay_receipts(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        payload = {'title':'Backup poll','kind':'poll','questions':[{'type':'single','prompt':'Choose','options':['A','B']}]}
+        identity = {'role':'organizer','credential_id':'operator'}
+        expected = catalog.execute(service, 'save', payload, expected_revision=0, request_id='a'*32, identity=identity)
+        with tempfile.TemporaryDirectory() as directory:
+            backup = sqlite3.connect(directory + '/backup.db')
+            try:
+                service.DB.backup(backup)
+                catalog.execute(service, 'save', {**payload,'title':'After backup'}, expected_revision=1,
+                                request_id='b'*32, identity=identity)
+                restored = sqlite3.connect(':memory:')
+                try:
+                    backup.backup(restored)
+                    restored.row_factory = sqlite3.Row
+                    recovered = SimpleNamespace(DB=restored, LOCK=threading.RLock())
+                    self.assertEqual(catalog.execute(recovered, 'save', payload, expected_revision=0,
+                                     request_id='a'*32, identity=identity), expected)
+                    self.assertEqual(catalog._read(restored, catalog.KEY, catalog.empty())['revision'], 1)
+                finally:
+                    restored.close()
+            finally:
+                backup.close()
 
     def test_catalog_writes_follow_live_and_rehearsal_workspaces(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')

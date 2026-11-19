@@ -49,7 +49,20 @@
     if (data.questions.length) {
       approved.append(node('h3', 'Questions shared by the event team'));
       const list = node('ul');
-      data.questions.forEach(item => { const li = node('li', item.text); if (item.answer) li.append(node('p', item.answer)); list.append(li); });
+      data.questions.forEach(item => {
+        const li = node('li', item.text); if (item.answer) li.append(node('p', item.answer));
+        const vote = node('button', `${item.upvoted ? 'Remove support' : 'Support'} · ${item.votes || 0} ${(item.votes || 0) === 1 ? 'support' : 'supports'}`);
+        vote.type = 'button'; vote.className = 'btn ghost'; vote.disabled = !data.enabled;
+        vote.setAttribute('aria-pressed', String(!!item.upvoted));
+        vote.addEventListener('click', async () => {
+          if (sending) return;
+          const stamp = generation; sending = true; vote.disabled = true;
+          try { await api(path, {body:{question_id:item.id, upvote:!item.upvoted}}); }
+          catch (error) { if (stamp === generation) root.querySelector('[role=status]').textContent = error?.message || 'Could not update support.'; }
+          finally { if (stamp === generation) { sending = false; vote.disabled = false; refresh(); } }
+        });
+        li.append(vote); list.append(li);
+      });
       approved.append(list);
     }
   }

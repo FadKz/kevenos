@@ -50,6 +50,10 @@ jobs:
           KEVENOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
           KEVENOS_TEST_SCHEMA_PREFIX: kevenos_ci
         run: python tools/qualify_postgres.py
+      - name: Test engagement concurrency on PostgreSQL
+        env:
+          KEVENOS_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+        run: PYTHONPATH=.:tests python -m unittest test_engagement_postgres
       - name: Install Node dependencies
         run: npm ci
       - name: Install live-display dependencies
@@ -64,6 +68,12 @@ jobs:
         run: npm run lint
       - name: Run browser-unit tests
         run: npm test
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run engagement browser rehearsals
+        run: |
+          KEVENOS_TEST_BROWSER=webkit node tests/test_engagement_rehearsal.cjs
+          KEVENOS_TEST_BROWSER=chromium node tests/test_engagement_rehearsal.cjs
       - name: Audit Node dependencies
         run: npm audit --audit-level=high
       - name: Audit live-display dependencies

@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const path = '/api/engagement/player';
-  let generation = 0, reading = false, sending = false, currentKey = '', dismissed = '', timer;
+  let generation = 0, reading = false, sending = false, currentKey = '', dismissed = '', timer, updateClock;
 
   function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -13,20 +13,27 @@
 
   function clear() {
     generation++; reading = false; sending = false; currentKey = ''; dismissed = '';
-    clearInterval(timer); timer = undefined;
+    clearInterval(timer); timer = undefined; updateClock = undefined;
     const root = document.getElementById('engagement-player');
     if (root) root.replaceChildren();
+    const score = document.getElementById('engagement-score');
+    if (score) { score.replaceChildren(); score.hidden = true; }
   }
 
   function render(data, api, stamp, keepOpen = false) {
     const root = document.getElementById('engagement-player');
     if (!root) return;
+    const score = document.getElementById('engagement-score');
+    if (score) {
+      score.hidden = !data.score;
+      score.textContent = data.score ? `Your quiz: ${data.score.earned} of ${data.score.available} points so far` : '';
+    }
     const run = data.question, delivery = run?.delivery, question = run?.questions?.[0];
-    if (!delivery || !question) { clearInterval(timer); timer = undefined; root.replaceChildren(); currentKey = ''; return; }
+    if (!delivery || !question) { clearInterval(timer); timer = undefined; updateClock = undefined; root.replaceChildren(); currentKey = ''; return; }
     const key = `${delivery.id}:${delivery.status}:${!!data.answered}`;
-    if (key === currentKey) return;
+    if (key === currentKey) { if (updateClock) updateClock(delivery.ends_at, data.now); return; }
     currentKey = key;
-    clearInterval(timer); timer = undefined;
+    clearInterval(timer); timer = undefined; updateClock = undefined;
     root.replaceChildren();
     const reopen = node('button', 'Open event question', 'engagement-reopen btn');
     reopen.type = 'button';
@@ -39,8 +46,10 @@
     const close = node('button', 'Return to event', 'btn ghost'); close.type = 'button';
     close.addEventListener('click', () => { dismissed = delivery.id; dialog.close(); reopen.hidden = false; reopen.focus(); });
     header.append(eyebrow, title, close); panel.append(header);
+    if (run.description) panel.append(node('p', run.description, 'engagement-description'));
     const status = node('p', '', 'engagement-status'); status.setAttribute('role', 'status');
     if (data.answered) status.textContent = 'Answer saved.';
+    else if (delivery.status === 'paused') status.textContent = 'The event team paused this question. Please wait.';
     else if (delivery.status !== 'open' || (delivery.ends_at != null && data.now >= delivery.ends_at)) status.textContent = 'This question is closed.';
     else status.textContent = delivery.ends_at == null ? 'Open until the event team closes it.' : 'Answer before the timer ends.';
     panel.append(status);
@@ -73,19 +82,26 @@
     inputs.forEach(input => { input.disabled = closed; }); submit.disabled = closed;
     form.append(submit); panel.append(form); dialog.append(panel); root.append(reopen, dialog);
     if (!closed && delivery.ends_at != null) {
-      const started = performance.now();
+      let started = performance.now(), deadline = delivery.ends_at, serverNow = data.now;
       const clock = node('p', '', 'engagement-timer');
       panel.insertBefore(clock, prompt);
       const tick = () => {
-        const remaining = Math.max(0, Math.ceil(delivery.ends_at - data.now - (performance.now() - started) / 1000));
+        const remaining = Math.max(0, Math.ceil(deadline - serverNow - (performance.now() - started) / 1000));
         clock.textContent = `${remaining} seconds remaining`;
         if (!remaining) {
           clearInterval(timer); timer = undefined;
           inputs.forEach(input => { input.disabled = true; }); submit.disabled = true;
           status.textContent = 'Time is up. Waiting for the event team.';
+        } else {
+          inputs.forEach(input => { input.disabled = false; }); submit.disabled = sending;
+          if (!sending) status.textContent = 'Answer before the timer ends.';
         }
       };
       tick(); timer = setInterval(tick, 500);
+      updateClock = (newDeadline, now) => {
+        deadline = newDeadline; serverNow = now; started = performance.now(); tick();
+        if (!timer && deadline > serverNow) timer = setInterval(tick, 500);
+      };
     }
     reopen.hidden = true;
     reopen.addEventListener('click', () => { reopen.hidden = true; dialog.showModal(); });

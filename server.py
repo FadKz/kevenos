@@ -26,6 +26,7 @@ import event_operations
 import participant_workspace
 import event_quiz
 import engagement_catalog
+import engagement_ai
 import audience_questions
 import event_push
 import registration_desk
@@ -769,6 +770,7 @@ def _desk_state_snapshot(ai, ip, host):
     configuration = event_config.config(sys.modules[__name__])
     prelim = preliminary_review(preliminary_receipts())
     return {"preliminary": prelim, "now": time.time(), "clock": c, "mode": mode(), "stations": stations, "reveal": kv_get("reveal", "hidden"), "final": final_event.state(sys.modules[__name__],f), "engagement_v2": os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1',
+            "engagement_ai": os.environ.get('KEVENOS_ENGAGEMENT_AI_ENABLED') == '1' and bool(os.environ.get('TM_LLM_GATEWAY_URL')) and bool(os.environ.get('TM_LLM_GATEWAY_KEY')),
             "configuration":configuration,"config":configuration,"rounds":CFG["rounds"],"judge_count":CFG["stations"],
             "calib": kv_get("calib") or {"active": False}, "public": public_mode(), "view_key": named_view_key(), "anonymous_view_key": anonymous_view_key(), "program": program_now(), "room": current_room(f, kv_get("reveal", "hidden"))[0], "agenda": [{"time": a.get("time"), "title": a.get("title"), "scene": a.get("scene", "info")} for a in agenda()], "versions": version_info(), "model": GATEWAY_ROLE if gateway_enabled() else "", "ai_enabled": gateway_enabled(), "ai": ai, "ip": ip, "host": host,
             "port": CFG["port"], "rehearsal": CFG.get("rehearsal", False), "pairs": CFG["pairs"],
@@ -1963,7 +1965,7 @@ class Handler(BaseHTTPRequestHandler):
                 # It checks the root session itself and never uses profile headers.
                 if path != registration_desk.REDEEM and event_profiles.guard(sys.modules[__name__], self, path, write=True):
                     return
-                serialized = path.startswith("/api/desk/") and path != "/api/desk/ai-summary"
+                serialized = path.startswith("/api/desk/") and path not in ("/api/desk/ai-summary", "/api/desk/engagement-ai")
                 with LOCK if serialized else nullcontext():
                     self._dispatch_POST(b)
             finally:
@@ -2003,6 +2005,8 @@ class Handler(BaseHTTPRequestHandler):
             if event_quiz.handle(sys.modules[__name__], self, path, b):
                 return
             if engagement_catalog.handle(sys.modules[__name__], self, path, b):
+                return
+            if engagement_ai.handle(sys.modules[__name__], self, path, b):
                 return
             if audience_questions.handle(sys.modules[__name__], self, path, b):
                 return

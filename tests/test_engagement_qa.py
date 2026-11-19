@@ -40,6 +40,24 @@ class ModeratedQuestions(unittest.TestCase):
             catalog.ask_question(state, 'guest:one', 'guest', 'One more?', 'f'*32)
         self.assertEqual(state['revision'], 1, 'attendee submissions must not invalidate organizer drafts')
 
+    def test_only_approved_questions_can_receive_idempotent_votes(self):
+        state = catalog.empty()
+        catalog.configure_questions(state, participants=True, guests=True, expected_revision=0)
+        receipt = catalog.ask_question(state, 'participant:one', 'participant', 'Question?', 'a'*32)
+        with self.assertRaises(catalog.Conflict):
+            catalog.vote_question(state, receipt['id'], 'guest:one', 'guest', True)
+        catalog.moderate_question(state, receipt['id'], 'approve', expected_revision=1)
+        catalog.vote_question(state, receipt['id'], 'guest:one', 'guest', True)
+        catalog.vote_question(state, receipt['id'], 'guest:one', 'guest', True)
+        catalog.vote_question(state, receipt['id'], 'participant:one', 'participant', True)
+        public = catalog.public_questions(state, principal='guest:one')
+        self.assertEqual(public[0]['votes'], 2)
+        self.assertTrue(public[0]['upvoted'])
+        self.assertNotIn('participant:one', str(public))
+        catalog.vote_question(state, receipt['id'], 'guest:one', 'guest', False)
+        self.assertEqual(catalog.public_questions(state)[0]['votes'], 1)
+        self.assertEqual(state['revision'], 2)
+
     def test_participant_and_guest_question_api_is_moderated_and_session_scoped(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp()
@@ -63,6 +81,12 @@ class ModeratedQuestions(unittest.TestCase):
                             request_id='3'*32, identity={'role':'organizer', 'credential_id':'operator'})
             result, _ = fixture.get(path, cookie=guest)
             self.assertEqual(result['questions'][0]['text'], 'Participant question?')
+            fixture.post(path, {'question_id':question_id, 'upvote':True}, cookie=guest)
+            fixture.post(path, {'question_id':question_id, 'upvote':True}, cookie=guest)
+            voted = fixture.get(path, cookie=guest)[0]['questions'][0]
+            self.assertEqual(voted['votes'], 1)
+            self.assertTrue(voted['upvoted'])
+            self.assertNotIn('guest:', str(voted))
             fixture.post(path, {'text':'Guest question?', 'request_id':'4'*32}, cookie=guest)
             second_guest = fixture.login(workspace.S.CFG['guest_password'])
             self.assertEqual(fixture.get(path, cookie=second_guest)[0]['own'], [])

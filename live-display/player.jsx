@@ -138,7 +138,7 @@ function QuizScene({quiz,now,reduced,rows}) {
     const denominator=quiz.bars?.reduce((sum,row)=>sum+row.count,0)||1;
     const content = <div className="hall-quiz">
       <div className="hall-quiz-title"><h2>{quiz.prompt}</h2>
-        <strong>{quiz.status==='open'?(quiz.end===null?'Open':time(quiz.end-now)):quiz.results_pending?'Results pending':quiz.bars?'Results':'Closed'}</strong></div>
+        <strong>{quiz.status==='open'?(quiz.end===null?'Open':time(quiz.end-now)):quiz.status==='paused'?'Paused':quiz.results_pending?'Results pending':quiz.bars?'Results':'Closed'}</strong></div>
       <ul>{(quiz.bars||quiz.options).map((option,i)=><li key={option.key} data-correct={quiz.correct?.includes(option.key)}>
         <Entrance delay={i*2} reduced={reduced}><div className="hall-quiz-option"><b>{option.key}</b><span>{option.text}</span>
           {quiz.correct?.includes(option.key) && <small className="hall-correct">Correct</small>}

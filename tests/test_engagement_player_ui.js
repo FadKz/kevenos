@@ -4,6 +4,24 @@ const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const {JSDOM} = require('jsdom');
 
+test('a time extension updates the visible timer without discarding a selection', async t => {
+  const dom = new JSDOM('<div id="engagement-player"></div>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  w.eval(readFileSync(join(__dirname, '../static/engagement-player.js'), 'utf8'));
+  const state = {now:100, answered:false, question:{id:'run',kind:'poll',title:'Poll',
+    delivery:{id:'delivery',status:'open',ends_at:115},questions:[{type:'single',prompt:'Question?',options:['A','B']}]}};
+  const api = async () => state;
+  await w.EngagementPlayer.refresh(api);
+  const choice = w.document.querySelectorAll('input[type=radio]')[1]; choice.click();
+  assert.match(w.document.querySelector('.engagement-timer').textContent, /15 seconds/);
+  state.question.delivery.ends_at = 130;
+  await w.EngagementPlayer.refresh(api);
+  assert.match(w.document.querySelector('.engagement-timer').textContent, /30 seconds/);
+  assert.equal(w.document.querySelectorAll('input[type=radio]')[1], choice);
+  assert.equal(choice.checked, true);
+});
+
 test('live question appears and sends the selected answer once', async t => {
   const dom = new JSDOM('<main><textarea aria-label="Pitch notes">draft</textarea><div id="engagement-player"></div></main>', {runScripts:'outside-only', pretendToBeVisual:true});
   const w = dom.window;
@@ -75,4 +93,27 @@ test('a closed question is not presented as a new live prompt', async t => {
   await w.EngagementPlayer.refresh(async () => ({now:200, answered:false, question:{id:'run',kind:'poll',title:'Past',
     delivery:{id:'delivery',status:'open',ends_at:150},questions:[{type:'single',prompt:'Past question?',options:['A','B']}]}}));
   assert.equal(w.document.querySelector('dialog[open]'), null);
+});
+
+test('a scored result is shown separately, and unscored polls do not show zero points', async t => {
+  const dom = new JSDOM('<div id="engagement-score"></div><div id="engagement-player"></div>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-player.js'), 'utf8'));
+  let score = null;
+  const api = async () => ({question:null, answered:false, now:100, score});
+  await w.EngagementPlayer.refresh(api);
+  assert.equal(w.document.querySelector('#engagement-score').hidden, true);
+  score = {earned:2, available:3};
+  await w.EngagementPlayer.refresh(api);
+  assert.match(w.document.querySelector('#engagement-score').textContent, /2 of 3/);
+});
+
+test('a paused question is described as paused rather than closed', async t => {
+  const dom = new JSDOM('<div id="engagement-player"></div>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-player.js'), 'utf8'));
+  await w.EngagementPlayer.refresh(async () => ({now:100, answered:false, question:{id:'run',kind:'poll',title:'Poll',
+    delivery:{id:'delivery',status:'paused',ends_at:null},questions:[{type:'single',prompt:'Question?',options:['A','B']}]}}));
+  assert.match(w.document.querySelector('#engagement-player').textContent, /paused/i);
+  assert.ok(w.document.querySelector('#engagement-player button[type=submit]').disabled);
 });

@@ -214,7 +214,7 @@ $('nav').addEventListener('click', e => {
 window.addEventListener('hashchange', () => { if (active) select(location.hash.slice(1), false); });
 
 function select(key, focus) {
-  if (tab === 'engagement' && key !== 'engagement' && window.EngagementDesk && !window.EngagementDesk.canLeave()) {
+  if (tab === 'engagement' && key !== 'engagement' && window.EngagementDesk && !window.EngagementDesk.canLeave(true)) {
     if (location.hash !== '#engagement') history.replaceState(null, '', '#engagement');
     return;
   }
@@ -438,7 +438,7 @@ function draw(force) {
     return;
   }
   if (tab === 'engagement') {
-    if (DS.engagement_v2) window.EngagementDesk?.mount($('main'), get, post);
+    if (DS.engagement_v2) window.EngagementDesk?.mount($('main'), get, post, {ai:!!DS.engagement_ai});
     else $('main').textContent = 'Engagement Hub is not enabled.';
     return;
   }

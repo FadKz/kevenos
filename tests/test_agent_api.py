@@ -83,6 +83,23 @@ class AgentAPI(unittest.TestCase):
                 request_id='a'*32, identity={'role':'organizer','credential_id':'operator'})
             code, changed = self.req('execute', pending)
             self.assertEqual((code, changed['error']['code']), (409, 'revision_changed'))
+
+    def test_agent_can_preview_and_confirm_copy_of_legacy_draft(self):
+        import engagement_catalog
+        self.principal['scopes'] += ['engagement:read', 'engagement:write']
+        self.save_grant()
+        old = {'rev':1,'packs':[{'id':'a'*32,'status':'draft','title':'Old','description':'',
+            'questions':[{'id':'b'*32,'type':'text','prompt':'Question?'}]}]}
+        with S.DB: engagement_catalog._write(S.DB, 'audience_questions_v1', old)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            code, result = self.req('read', {'resource':'engagement.legacy_preview','arguments':{}})
+            self.assertEqual(code, 200, result)
+            item = result['data']['audience']['drafts'][0]
+            args = {'action':'copy_legacy_pack','revision':0,'payload':{'pack_id':item['id'],'source_digest':item['digest']}}
+            code, result = self.req('execute', self.prepared('engagement.control', args))
+            self.assertEqual(code, 200, result)
+            self.assertEqual(S.kv_get('audience_questions_v1'), old)
+            self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['title'], 'Old')
     def test_revocation_expiry_and_realm_are_fail_closed(self):
         for key,value in [('revoked',True),('expires_at',0),('realm','mars'),('persona','mars'),('audience','another-app')]:
             old=self.principal[key];self.principal[key]=value;self.save_grant()

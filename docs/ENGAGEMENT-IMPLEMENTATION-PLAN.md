@@ -13,6 +13,8 @@ parity and full browser/recovery qualification remain incomplete. Experimental
 AI drafting is separately disabled and requires an approved gateway consumer.
 Historical migration constraints and qualification are described in
 [the migration design](ENGAGEMENT-MIGRATION.md).
+The proposed response-storage change and its bounded experiment are described
+in [the storage design](ENGAGEMENT-RESPONSE-STORAGE.md).
 Existing quiz and event data continue to use the legacy implementation.
 The experimental flag blocks new legacy sends, and the new runner waits for
 existing legacy prompts to close. Every serving instance must run this version

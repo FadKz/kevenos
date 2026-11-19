@@ -62,6 +62,8 @@ a question are separate actions; none implies approval of the next.
 Quiz questions may specify an integer `points` value from 1 to 100; omitted
 values default to one. Polls are unscored. A run retains the point values of
 its published snapshot even when the draft is edited later.
+An optional question `explanation` is withheld from attendee projections
+until the question is revealed.
 
 `engagement.legacy_preview` returns counts for the previous quiz and audience
 records and identifies copyable Audience drafts without changing them. Use a

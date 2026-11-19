@@ -14,10 +14,12 @@ test('organizer can set quiz points on a question', async t => {
   root.querySelector('[name=title]').value = 'Scored quiz';
   const kind = root.querySelector('[name=kind]'); kind.value = 'quiz'; kind.dispatchEvent(new w.Event('change', {bubbles:true}));
   root.querySelector('[name=prompt]').value = 'Question?'; root.querySelector('[name=options]').value = 'A\nB';
+  root.querySelector('[name=explanation]').value = 'This is why.';
   root.querySelector('[name=correct]').value = '1'; root.querySelector('[name=points]').value = '3';
   root.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles:true, cancelable:true}));
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(writes[0].payload.questions[0].points, 3);
+  assert.equal(writes[0].payload.questions[0].explanation, 'This is why.');
 });
 
 test('completed runs show per-question aggregate history', async t => {

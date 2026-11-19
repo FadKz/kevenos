@@ -14,6 +14,20 @@ import test_workspace_routes as workspace
 
 
 class EngagementCatalogTests(unittest.TestCase):
+    def test_explanations_stay_private_until_the_answer_is_revealed(self):
+        state = catalog.empty()
+        draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[
+            {'type':'single','prompt':'Question?','options':['A','B'],'correct':[0],
+             'explanation':'A is correct because of the source.'}]}, expected_revision=0)
+        catalog.publish(state, draft['id'], expected_revision=1)
+        run = catalog.open_run(state, draft['id'], 1, expected_revision=2)
+        run = catalog.open_question(state, run['id'], run['snapshot']['questions'][0]['id'], expected_revision=3)
+        self.assertNotIn('explanation', str(catalog.player_view(run)))
+        catalog.close_question(state, run['id'], expected_revision=4)
+        self.assertNotIn('explanation', str(catalog.player_view(state['runs'][0])))
+        catalog.reveal_question(state, run['id'], expected_revision=5)
+        self.assertEqual(catalog.player_view(state['runs'][0])['questions'][0]['explanation'], 'A is correct because of the source.')
+
     def test_configured_quiz_points_are_snapshotted_and_awarded_after_reveal(self):
         state = catalog.empty()
         draft = catalog.save_draft(state, {'title':'Quiz','kind':'quiz','questions':[

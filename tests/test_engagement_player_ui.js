@@ -136,3 +136,12 @@ test('a paused question is described as paused rather than closed', async t => {
   assert.match(w.document.querySelector('#engagement-player').textContent, /paused/i);
   assert.ok(w.document.querySelector('#engagement-player button[type=submit]').disabled);
 });
+
+test('revealed question explains the answer', async t => {
+  const dom = new JSDOM('<div id="engagement-player"></div>', {runScripts:'outside-only', pretendToBeVisual:true});
+  const w = dom.window; t.after(() => w.close());
+  w.eval(readFileSync(join(__dirname, '../static/engagement-player.js'), 'utf8'));
+  await w.EngagementPlayer.refresh(async () => ({now:100, answered:true, selection:0, question:{id:'run',kind:'quiz',title:'Quiz',
+    delivery:{id:'delivery',status:'revealed',ends_at:90},questions:[{type:'single',prompt:'Question?',options:['A','B'],correct:[0],explanation:'A is correct because…'}]}}));
+  assert.match(w.document.querySelector('#engagement-player').textContent, /A is correct because/);
+});

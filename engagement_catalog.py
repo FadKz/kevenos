@@ -103,7 +103,7 @@ def save_draft(state, payload, *, expected_revision):
     seen_ids = set()
     clean = []
     for question in questions:
-        if not isinstance(question, dict) or set(question) - {'id', 'prompt', 'type', 'options', 'correct', 'evidence', 'points'}:
+        if not isinstance(question, dict) or set(question) - {'id', 'prompt', 'type', 'options', 'correct', 'evidence', 'points', 'explanation'}:
             raise ValueError('Use the supported question fields.')
         question_id = question.get('id')
         if question_id is not None and (not isinstance(question_id, str) or question_id not in previous_ids or question_id in seen_ids):
@@ -139,6 +139,11 @@ def save_draft(state, payload, *, expected_revision):
             raise ValueError('Choose 1 to 100 points for a quiz question; polls are unscored.')
         if kind == 'quiz':
             item['points'] = points
+        explanation = question.get('explanation', '')
+        if not isinstance(explanation, str) or len(explanation) > 1000:
+            raise ValueError('Enter a valid explanation of at most 1000 characters.')
+        if explanation.strip():
+            item['explanation'] = _text(explanation, 1000, 'an explanation')
         if question.get('evidence'):
             item['evidence'] = _text(question['evidence'], 500, 'source evidence')
         elif 'evidence' in question and not isinstance(question['evidence'], str):
@@ -519,6 +524,7 @@ def player_view(run, *, principal=None):
         question.pop('evidence', None)
         if (delivery or {}).get('status') != 'revealed':
             question.pop('correct', None)
+            question.pop('explanation', None)
     view = {**snapshot, 'id': run['id'], 'activity_id': run['activity_id'], 'status': run['status'],
             'delivery': delivery}
     if snapshot['questions']:

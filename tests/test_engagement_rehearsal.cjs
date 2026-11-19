@@ -88,6 +88,7 @@ async function port() {
     await page.getByLabel('Options, one per line').fill('Correct answer\nOther answer');
     await page.getByLabel('Correct option numbers, separated by commas').fill('1');
     await page.getByLabel('Points for a correct answer').fill('3');
+    await page.getByLabel('Explanation shown after reveal (optional)').fill('Synthetic explanation for the correct answer.');
     await page.getByRole('button', {name:'Save draft'}).click();
     await page.getByRole('button', {name:'Publish draft'}).click();
     await page.getByRole('button', {name:'Start run'}).click();
@@ -112,6 +113,7 @@ async function port() {
     await until(async () => Number((await firstDialog.locator('.engagement-timer').innerText()).split(' ')[0]) > 120, 'extended timer reaches phone');
     assert(await firstDialog.getByLabel('Correct answer').isChecked(), 'extension preserves the selected answer');
     assert(!JSON.stringify(extended).includes('"correct"'), 'answers remain private before reveal');
+    assert(!JSON.stringify(extended).includes('Synthetic explanation'), 'explanations remain private before reveal');
     for (const attendee of [phone1,phone2,guest]) {
       const dialog = attendee.page.locator('dialog.engagement-dialog[open]');
       await dialog.waitFor({timeout:20000});
@@ -126,6 +128,7 @@ async function port() {
     await page.getByRole('button', {name:'Close question'}).click();
     await page.getByRole('button', {name:'Reveal answer'}).click();
     await until(async () => (await tv.locator('body').innerText()).includes('Correct answer'), 'hall reveal');
+    assert.equal((await phone1.api('/api/engagement/player')).question.questions[0].explanation, 'Synthetic explanation for the correct answer.');
     assert.deepEqual((await phone1.api('/api/engagement/player')).score, {earned:3,available:3});
     assert.deepEqual((await guest.api('/api/engagement/player')).score, {earned:3,available:3});
     await page.getByRole('button', {name:'Finish run'}).click();

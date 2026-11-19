@@ -109,7 +109,7 @@
       points.hidden = kind.value !== 'quiz';
     };
     type.addEventListener('change', update); kind.addEventListener('change', update); update();
-    box.append(options, correct, points);
+    box.append(options, correct, points, field('Explanation shown after reveal (optional)', 'explanation', item.explanation, true));
     if (item.evidence) box.append(field('Source excerpt — verify this supports the question', 'evidence', item.evidence, true));
     box.append(button('Move earlier', () => {
       const previous = box.previousElementSibling;
@@ -122,7 +122,7 @@
     box.append(button('Duplicate question', () => {
       const evidence = box.querySelector('[name=evidence]')?.value || '';
       const copy = questionEditor({evidence}, kind);
-      for (const name of ['prompt', 'type', 'options', 'correct', 'points', 'evidence']) {
+      for (const name of ['prompt', 'type', 'options', 'correct', 'points', 'explanation', 'evidence']) {
         const source = box.querySelector(`[name=${name}]`), target = copy.querySelector(`[name=${name}]`);
         if (source && target) target.value = source.value;
       }
@@ -253,6 +253,8 @@
           result.correct = correct ? correct.split(',').map(v => Number(v.trim()) - 1) : [];
           result.points = Number(box.querySelector('[name=points]').value);
         }
+        const explanation = box.querySelector('[name=explanation]').value.trim();
+        if (explanation) result.explanation = explanation;
         const evidence = box.querySelector('[name=evidence]')?.value.trim();
         if (evidence) result.evidence = evidence;
         return result;

@@ -63,6 +63,7 @@
     if (delivery.status === 'revealed' && question.correct?.length) {
       panel.append(node('p', `Correct answer: ${question.correct.map(index => question.options[index]).join(', ')}`, 'engagement-result'));
     }
+    if (delivery.status === 'revealed' && question.explanation) panel.append(node('p', question.explanation, 'engagement-result'));
     const form = node('form', null, 'engagement-form');
     const choices = node('fieldset', null, 'engagement-choices');
     choices.append(node('legend', question.type === 'multi' ? 'Select all that apply' : 'Your answer'));

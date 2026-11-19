@@ -619,7 +619,7 @@ function showIssued(issued, title = 'New passwords') {
 
 
 function roleName(role) {
-  return ({guest: 'Guest', participant: 'Participant', desk: 'Legacy Desk', organizer: 'Organizer', scoring: 'Scoring Desk',
+  return ({guest: 'Guest', participant: 'Participant', desk: 'Legacy Desk', organizer: 'Organizer', operator: 'Engagement Operator', scoring: 'Scoring Desk',
     admin: 'Admin', judge: 'Judge', registration: 'Registration', anonymous: 'Anonymous'})[role] || role || 'Unknown';
 }
 
@@ -1040,12 +1040,12 @@ async function vAccess(message = '') {
   if (!active || generation !== sectionKey) return;
   staffDirty = false;
   const rehearsal = KEV.workspaceMode === 'rehearsal';
-  const staff = accounts.filter(a => a.account_type === 'staff' || a.grants.some(g => ['admin','organizer','scoring','registration','judge'].includes(g.role)));
+  const staff = accounts.filter(a => a.account_type === 'staff' || a.grants.some(g => ['admin','organizer','operator','scoring','registration','judge'].includes(g.role)));
   const visible = new Set(data.credentials.map(c => c.id));
   const rows = staff.flatMap(a => a.credentials.filter(c => visible.has(c.id)).map(c => ({...data.credentials.find(v=>v.id===c.id), account:a})));
   const used = new Set(accounts.filter(a=>a.credentials.some(c=>c.active)).flatMap(a=>a.grants.filter(g=>g.role==='judge').map(g=>g.station)));
   const stations = DS.stations.map(s=>s.station).filter(station=>!used.has(station));
-  const roles = ['judge','registration','organizer','scoring','admin'];
+  const roles = ['judge','registration','organizer',...(DS.engagement_v2?['operator']:[]),'scoring','admin'];
   $('main').innerHTML = '<section class="card"><h2>Staff passwords</h2><p>Create one named staff account and choose the dashboards they need. The same password opens all assigned roles. Participants are added through the team roster.</p>' +
     '<form id="staff-access-form"><div class="form-row"><label class="field">Staff name<input type="text" name="label" required maxlength="80" autocomplete="off"></label>' +
     '<label class="field">Password (optional)<input name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" placeholder="Leave blank to generate"></label></div>' +

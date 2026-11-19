@@ -30,9 +30,9 @@ def epoch(s):
 
 
 def destination(ident):
-    if ident.get('dashboard') in ('home','organizer','scoring'):return '/'+ident['dashboard']
+    if ident.get('dashboard') in ('home','organizer','operator','scoring'):return '/'+ident['dashboard']
     return '/judge/%d' % ident['station'] if ident['role'] == 'judge' else {
-        'organizer':'/organizer','scoring':'/scoring','admin': '/admin', 'desk': '/desk', 'registration': '/registration', 'participant': '/participant', 'guest': '/guest'}[ident['role']]
+        'organizer':'/organizer','operator':'/operator','scoring':'/scoring','admin': '/admin', 'desk': '/desk', 'registration': '/registration', 'participant': '/participant', 'guest': '/guest'}[ident['role']]
 
 
 def draft_key(s, ident):

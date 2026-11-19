@@ -9,6 +9,13 @@ const py = spawn('python3', [path.join(__dirname, 'bridge.py')], {env: Object.as
 let buf = '', waiters = {}, nid = 1, readyRes; const ready = new Promise(r => readyRes = r);
 py.stdout.on('data', d => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); if (!l.trim()) continue; const m = JSON.parse(l); if (m.ready) readyRes(m); else { waiters[m.id](m); delete waiters[m.id]; } } });
 py.stderr.on('data', d => process.stderr.write(d));
+// An unresolved readiness promise alone does not keep Node alive. A bridge
+// that exits early must fail the suite instead of silently reporting success.
+py.on('exit', (code, signal) => {
+  console.error(`UI bridge exited unexpectedly (${signal || code}).`);
+  process.exitCode = 1;
+});
+py.on('error', error => { console.error('UI bridge could not start:', error.message); process.exitCode = 1; });
 const bridge = (method, p, body, token, extra = {}) => new Promise(res => { const id = nid++; waiters[id] = res; py.stdin.write(JSON.stringify({id, method, path: p, body, token, ...extra}) + '\n'); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let fails = 0, errors = [];

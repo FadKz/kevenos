@@ -43,7 +43,7 @@ PUBLIC_ASSETS = frozenset((
     'event-operations.js', 'event-operations.css', 'judging-operations.css', 'live-transition.js', 'live-transition.css', 'agenda.js', 'agenda.css', 'accounts.js', 'roles.css', 'role-home.css', 'app.css', 'common.js', 'event.css', 'profile.css', 'assistant.css', 'assistant.js',
     'participant-workspace.css', 'participant-workspace.js', 'participant-messages.js', 'participant-desk.js',
     'participant-prep.js', 'participant-prep-player.js', 'participant-push.js', 'participant-icon.png', 'event-quiz.js', 'event-quiz.css', 'audience-questions.js', 'audience-questions.css', 'engagement-player.js', 'engagement-player.css',
-    'registration.css', 'registration.js', 'registration-join.js', 'live-hall.css', 'live-player.js', 'engagement-desk.js', 'engagement-desk.css', 'engagement-questions.js', 'engagement-settings.js',
+    'registration.css', 'registration.js', 'registration-join.js', 'live-hall.css', 'live-player.js', 'engagement-desk.js', 'engagement-desk.css', 'engagement-questions.js', 'engagement-settings.js', 'engagement-operator.js',
 ))
 DATA = os.environ.get("KEVENOS_DATA") or os.path.join(HERE, "data")    # KEVENOS_DATA: a mounted volume when run in a container
 ROUND_SECONDS = 900          # 10 pitch + 3 feedback + 2 change over
@@ -1793,6 +1793,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.page("home.html")
             if path in ("/organizer", "/scoring"):
                 return self.page("desk.html")
+            if path == "/operator":
+                return self.page("operator.html")
             if path in ("/", "/index.html"):
                 return self.page("index.html" if hosted() or authed else "gate.html")
             if path in ("/guest", "/participant"):

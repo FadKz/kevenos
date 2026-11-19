@@ -73,6 +73,31 @@ Guests join only activities explicitly enabled for guests. Their responses are
 associated with their current browser session, not a verified identity. Guest
 rejoin and long-term retention policies still require qualification.
 
+## Engagement Operator
+
+When Engagement Hub is enabled, an Admin may give a named staff account the
+**Engagement Operator** dashboard. Staff grants are shared between Live and
+Rehearsal; the Admin must confirm shared-role changes from Rehearsal. Revoking
+the grant signs the account out. Each person should use their own account.
+
+The operator opens **Engagement Operator**, starts an Organizer-published
+activity version, chooses a duration or leaves it untimed, and sends questions
+one at a time. The console shows the active question, response count and an
+indicative countdown. The server controls the deadline. The operator can pause,
+resume, add time, close, resend and reveal a question, and separately choose
+whether to share it with the hall. Finishing ends the run permanently; reveal
+any intended results first. Automatic reveal is not offered in this console.
+
+Operators do not see unpublished drafts, private audience questions,
+individual answers or analytics exports, and cannot edit or publish content,
+change event settings or manage the agenda. Their view includes only published
+activity versions and operational counts. Organizer and agent permissions do
+not change when this role is assigned. All servers must understand the new
+role before any operator grant is issued; mixed-version deployments have not
+been qualified. Before rolling back to a version that does not recognize the
+operator role, revoke every operator grant and verify affected sessions are
+closed; disabling the feature flag by itself does not remove those grants.
+
 ## Audience questions
 
 In **Audience questions**, the Organizer enables submissions for participants,

@@ -22,11 +22,11 @@ import event_roles
 
 RETENTION_DAYS = 30
 MAX_EVENTS = 50000
-ROUTES = {'organizer':'/organizer','scoring':'/scoring','admin': '/admin', 'desk': '/desk', 'registration': '/registration', 'participant': '/participant', 'guest': '/guest', 'judge': '/judge'}
+ROUTES = {'organizer':'/organizer','operator':'/operator','scoring':'/scoring','admin': '/admin', 'desk': '/desk', 'registration': '/registration', 'participant': '/participant', 'guest': '/guest', 'judge': '/judge'}
 CREDENTIAL_FIELDS = 'id,label,role,pair,member,station,revision,active,created,last_used,dataset'
 DESK_GET = {'/api/content','/api/desk/state','/api/desk/scores','/api/desk/sheets','/api/desk/calib','/api/desk/export.csv'}
 DESK_POST = {'/api/desk/clock','/api/desk/mode','/api/desk/program','/api/desk/public','/api/desk/reveal','/api/desk/final','/api/desk/calib','/api/desk/sheet','/api/desk/ai-summary'}
-PAGES = {'/home','/event','/organizer','/scoring','/','/index.html','/guest','/participant','/admin','/desk','/judge','/live','/board','/registration','/join'}
+PAGES = {'/home','/event','/organizer','/operator','/scoring','/','/index.html','/guest','/participant','/admin','/desk','/judge','/live','/board','/registration','/join'}
 
 
 def migrate(db):
@@ -190,6 +190,8 @@ def _demo_roles_current(s, roles):
 def create_credential(s, role, label, pair=0, member=0, password=None, cid=None, station=0, revision=1, demo=False):
     if role not in ROUTES:
         raise ValueError('Choose a valid access role.')
+    if role == 'operator' and os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+        raise ValueError('Enable Engagement Hub before assigning the operator role.')
     label = str(label or '').strip()
     if not 1 <= len(label) <= 80:
         raise ValueError('Enter a name or label (up to 80 characters).')
@@ -357,7 +359,7 @@ def session_info(r):
 def mint_session(s, role, cid, label, station=0, assurance="password"):
     token = secrets.token_urlsafe(32)
     c=auth_db(s).execute('SELECT account_id FROM access_credentials WHERE id=?',(cid,)).fetchone()
-    staff=bool(c and auth_db(s).execute("SELECT 1 FROM account_grants WHERE account_id=? AND role IN ('admin','organizer','scoring','registration')",(c['account_id'],)).fetchone())
+    staff=bool(c and auth_db(s).execute("SELECT 1 FROM account_grants WHERE account_id=? AND role IN ('admin','organizer','operator','scoring','registration')",(c['account_id'],)).fetchone())
     ttl = s.ORGANISER_TTL if assurance=='password' and (staff or role in ('admin','desk','registration')) else 24*3600
     auth_db(s).execute('DELETE FROM role_sessions WHERE expires<=?',(time.time(),))
     auth_db(s).execute('INSERT INTO role_sessions(digest,role,station,judge,expires,credential_id,legacy_gate,dataset) VALUES(?,?,?,?,?,?,0,?)',

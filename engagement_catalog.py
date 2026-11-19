@@ -670,6 +670,33 @@ def desk_view(state):
     return result
 
 
+def operator_view(state):
+    """Published activities and operational counts, without drafts or private data."""
+    def snapshot(source):
+        return {**{k:deepcopy(source[k]) for k in ('id','title','kind','description','audiences') if k in source},
+                'questions':[{k:deepcopy(q[k]) for k in ('id','type','prompt','options','points') if k in q}
+                             for q in source.get('questions', [])]}
+
+    activities = [{'id':item['id'], 'versions':[{'version':v['version'], 'snapshot':snapshot(v['snapshot'])}
+                                               for v in item.get('versions', [])]}
+                  for item in state.get('activities', []) if item.get('versions')]
+    runs = []
+    for source in state.get('runs', []):
+        run = deepcopy({k:source[k] for k in ('id','activity_id','version','status','delivery',
+                                               'deliveries','active_question_id','hall_shared') if k in source})
+        run['snapshot'] = snapshot(source['snapshot'])
+        _settle(run)
+        delivery = run.get('delivery') or {}
+        attempts = [item for item in [*run.get('deliveries', []), delivery]
+                    if item.get('question_id') == run.get('active_question_id')]
+        respondents = {principal for attempt in attempts
+                       for principal in source.get('responses', {}).get(attempt.get('id'), {})}
+        run['respondents'] = len(respondents)
+        runs.append(run)
+    return {'revision':state['revision'], 'quiz_enabled':state.get('quiz_enabled', True), 'now':time.time(),
+            'activities':activities, 'runs':runs}
+
+
 def hall_view(state):
     """Return only explicitly shared, currently released information."""
     run = next((item for item in state['runs'] if item.get('hall_shared') and item.get('status') == 'open'), None)
@@ -925,14 +952,21 @@ def persist(service, action, payload, *, expected_revision):
         return result
 
 
+OPERATOR_ACTIONS = frozenset({'open_run', 'finish_run', 'open_question', 'close_question',
+    'pause_question', 'resume_question', 'extend_question', 'resend_question',
+    'reveal_question', 'share_hall'})
+
+
 def execute(service, action, payload, *, expected_revision, request_id, identity):
     """Authorize and atomically persist an audited, replay-safe command.
 
     identity must originate from the server's authenticated session, never
     directly from a request body. This is not yet an HTTP or MCP endpoint.
     """
-    if not isinstance(identity, dict) or identity.get('dashboard', identity.get('role')) not in {'admin', 'organizer', 'desk'} or not identity.get('credential_id') or (identity.get('impersonation') or {}).get('mode') == 'preview':
+    if not isinstance(identity, dict) or identity.get('dashboard', identity.get('role')) not in {'admin', 'organizer', 'desk', 'operator'} or not identity.get('credential_id') or (identity.get('impersonation') or {}).get('mode') == 'preview':
         raise PermissionError('Organizer access is required.')
+    if identity.get('dashboard', identity.get('role')) == 'operator' and action not in OPERATOR_ACTIONS:
+        raise PermissionError('This action requires Organizer access.')
     if action == 'set_quiz_enabled' and identity.get('dashboard', identity.get('role')) != 'admin':
         raise PermissionError('Admin access is required to change quiz availability.')
     _validate_command(action, payload)
@@ -1106,7 +1140,10 @@ def handle(service, handler, path, body=None):
         except ValueError as error:
             handler.send(400, {'error': str(error)})
         return True
-    if role not in {'admin', 'organizer', 'desk'}:
+    if role == 'operator' and path != DESK:
+        handler.send(403, {'error':'This action requires Organizer access.'})
+        return True
+    if role not in {'admin', 'organizer', 'desk', 'operator'}:
         handler.send(403, {'error': 'Organizer access is required.'})
         return True
     if path == DESK and isinstance(body, dict) and body.get('action') == 'set_quiz_enabled':
@@ -1154,7 +1191,7 @@ def handle(service, handler, path, body=None):
                     request_id=body['request_id'], identity=identity)
         with service.LOCK:
             state = _read(service.DB, KEY, empty())
-        handler.send(200, desk_view(state))
+        handler.send(200, operator_view(state) if role == 'operator' else desk_view(state))
     except PermissionError as error:
         handler.send(403, {'error': str(error)})
     except Conflict as error:

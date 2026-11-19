@@ -61,6 +61,10 @@ async function port() {
     const admin = await session('admin', adminPassword);
     await admin.api('/api/admin/credentials', {action:'create',role:'desk',label:'Synthetic organizer',password:deskPassword});
     await admin.api('/api/admin/workspace', {mode:'rehearsal',confirm:'REHEARSAL'});
+    const operatorPassword = 'Synthetic-Engagement-Operator9!';
+    await admin.api('/api/admin/credentials', {action:'create-staff',label:'Synthetic Operator',
+      password:operatorPassword, grants:[{role:'operator'}], confirm_shared_roles:true});
+    const operator = await session('operator', operatorPassword, {viewport:{width:390,height:844}});
     await admin.page.goto(address+'/admin#system');
     const settings = admin.page.locator('#engagement-settings');
     await settings.getByRole('button', {name:'Disable quizzes'}).click();
@@ -87,6 +91,7 @@ async function port() {
     const key = (await admin.api('/api/desk/state')).view_key;
     await Promise.all([phone1.page.goto(address+'/participant'), phone2.page.goto(address+'/participant'),
       guest.page.goto(address+'/guest'), judge.page.goto(address+'/judge/1'), desk.page.goto(address+'/organizer#engagement'),
+      operator.page.goto(address+'/operator'),
       tv.goto(address+'/live?key='+encodeURIComponent(key))]);
     const page = desk.page;
     await page.getByRole('heading', {name:'Create a draft'}).waitFor();
@@ -119,10 +124,13 @@ async function port() {
     await preview.getByRole('button', {name:'Close preview'}).click();
     await page.getByRole('button', {name:'Save draft'}).click();
     await page.getByRole('button', {name:'Publish draft'}).click();
-    await page.getByRole('button', {name:'Start run'}).click();
-    await page.getByLabel('Question duration in seconds (leave blank for no timer)').fill('120');
-    await page.getByRole('button', {name:'Open question'}).click();
-    await page.getByRole('button', {name:'Share on hall'}).click();
+    await operator.page.getByRole('button', {name:'Start Synthetic knowledge check · version 1'}).click();
+    await operator.page.getByLabel('Question duration in seconds (blank for no timer)').fill('120');
+    assert(await operator.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'operator console fits a phone viewport');
+    await operator.page.getByRole('button', {name:'Send: Which answer is correct?'}).click();
+    await operator.page.getByRole('button', {name:'Share on hall'}).click();
+    await page.reload();
+    await page.getByRole('button', {name:'Pause question'}).waitFor();
     const phoneDialog = phone1.page.locator('dialog.engagement-dialog[open]');
     await phoneDialog.getByLabel('Correct answer').check();
     const phoneLayout = await phoneDialog.evaluate(element => ({width:element.getBoundingClientRect().width, radius:getComputedStyle(element).borderRadius}));

@@ -2,6 +2,7 @@ KEV.accounts = {
   descriptions: {
     admin: 'Manage access, settings, content, reports and backups.',
     organizer: 'Run the programme, event communications, quiz and audience display.',
+    operator: 'Run published engagement activities and control their hall display.',
     scoring: 'Run judging clocks, review sheets, manage feedback and publish results.',
     registration: 'Check arrivals, manage teams and help participants sign in.',
     judge: 'Work at an assigned judging station and on assigned Final panels.',

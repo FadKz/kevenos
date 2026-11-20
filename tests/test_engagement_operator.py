@@ -97,6 +97,9 @@ class OperatorHTTP(unittest.TestCase):
             self.assertEqual(opened['runs'][0]['status'], 'open')
             audit = multi_role.S.DB.execute("SELECT actor_credential,effective_credential,impersonation_mode FROM audit WHERE action='engagement-open_run'").fetchone()
             self.assertEqual(tuple(audit), ('owner-recovery', credential, 'support'))
+            self.call('POST', '/api/admin/accounts', {'action':'roles', 'id':credential, 'revision':1,
+                'reason':'Change operator coverage', 'grants':[{'role':'registration'}]})
+            self.request('GET', '/api/desk/engagement', cookie=self.admin, profile=support, status=401)
 
     def test_operator_grant_cannot_be_added_when_feature_is_disabled(self):
         with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'0'}):

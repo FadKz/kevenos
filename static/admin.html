@@ -1116,7 +1116,7 @@ async function vProfiles() {
   if (!active || generation !== sectionKey) return;
   const requested = new URLSearchParams(location.search).get('view');
   const dashboard = target => target.dashboard || target.role;
-  const availableRoles = ['guest','participant','judge','registration','organizer','scoring','desk'].filter(role => targets.some(target=>dashboard(target)===role));
+  const availableRoles = ['guest','participant','judge','registration','organizer','operator','scoring','desk'].filter(role => targets.some(target=>dashboard(target)===role));
   $('main').innerHTML = '<section class="card"><h2>Preview and Support</h2><p>Preview is read-only. Support mode lets you help with the selected person’s permitted actions. Activity records both identities.</p>' +
     '<form id="profile-form"><div class="form-row"><label class="field">Role<select id="profile-role">' + availableRoles.map(role => '<option value="' + role + '">' + roleName(role) + '</option>').join('') +
     '</select></label><label class="field grow">Profile<select id="profile-target" required></select></label></div>' +

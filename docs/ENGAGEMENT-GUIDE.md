@@ -93,8 +93,10 @@ any intended results first. Automatic reveal is not offered in this console.
 Operators do not see unpublished drafts, private audience questions,
 individual answers or analytics exports, and cannot edit or publish content,
 change event settings or manage the agenda. Their view includes only published
-activity versions and operational counts. Organizer and agent permissions do
-not change when this role is assigned. All servers must understand the new
+activity versions and operational counts. An Admin can open a named operator's
+read-only preview or use Support mode; support actions are recorded against
+both the Admin and the operator. Organizer and agent permissions do not change
+when this role is assigned. All servers must understand the new
 role before any operator grant is issued; mixed-version deployments have not
 been qualified. Before rolling back to a version that does not recognize the
 operator role, revoke every operator grant and verify affected sessions are

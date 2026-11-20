@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import os
 import secrets
 
 
@@ -47,11 +48,13 @@ def target(s, body):
     dashboard=body.get('dashboard') or body.get('role')
     if dashboard=='desk':dashboard='organizer'
     role='desk' if dashboard in ('organizer','scoring') else dashboard
-    if role not in ('guest', 'participant', 'judge', 'desk', 'admin', 'registration'):
+    if role not in ('guest', 'participant', 'judge', 'desk', 'admin', 'registration', 'operator'):
         raise ValueError('Choose a valid profile role.')
     cid = body.get('credential_id') or ''
     if not isinstance(cid, str) or len(cid) > 128:
         raise ValueError('Choose a valid profile account.')
+    if role == 'operator' and not cid:
+        raise ValueError('Choose an assigned operator account.')
     credential = None
     if cid:
         credential = access.auth_db(s).execute('SELECT * FROM access_credentials WHERE id=? AND active=1', (cid,)).fetchone()
@@ -132,6 +135,13 @@ def targets(s):
         out.append(value | {'id': opaque, 'available': True})
     for role in ('guest', 'organizer', 'scoring', 'registration'):
         add({'role': role})
+    if os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1':
+        for row in s.event_access.auth_db(s).execute('''SELECT c.id FROM access_credentials c
+                JOIN person_accounts a ON a.id=c.account_id
+                JOIN account_grants g ON g.account_id=a.id
+                WHERE c.active=1 AND a.active=1 AND g.role='operator' AND g.dataset='global'
+                ORDER BY a.label, c.id'''):
+            add({'role':'operator', 'credential_id':row['id']})
     for row in s.event_config.list_roster(s):
         for member in row['members']:
             if member['name'].strip():

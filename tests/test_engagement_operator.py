@@ -66,6 +66,37 @@ class OperatorHTTP(unittest.TestCase):
     login = multi_role.MultiRole.login
     issue = multi_role.MultiRole.issue
     call = multi_role.MultiRole.call
+    profile = multi_role.MultiRole.profile
+
+    def test_admin_can_preview_and_support_a_named_operator_without_extra_rights(self):
+        with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            created, _ = self.call('POST', '/api/admin/credentials', {'action':'create-staff',
+                'label':'Synthetic Operator', 'grants':[{'role':'operator'}]})
+            credential = created['credential']['id']
+            targets, _ = self.request('GET', '/api/admin/profiles', cookie=self.admin)
+            self.assertTrue(any(t['role'] == 'operator' and t['credential_id'] == credential for t in targets['targets']))
+            payload = {'title':'Approved poll','kind':'poll','questions':[{'type':'single',
+                       'prompt':'Choose','options':['A','B']}]}
+            state, _ = self.call('POST', '/api/desk/engagement', {'action':'save','payload':payload,
+                'revision':0,'request_id':'b'*32})
+            activity_id = state['activities'][0]['id']
+            self.call('POST', '/api/desk/engagement', {'action':'publish','payload':{'activity_id':activity_id},
+                'revision':1,'request_id':'c'*32})
+            preview = self.profile('operator', credential_id=credential)
+            self.request('GET', '/api/desk/engagement', cookie=self.admin, profile=preview)
+            command = {'action':'save','payload':{},'revision':0,'request_id':'a'*32}
+            self.request('POST', '/api/desk/engagement', command, self.admin, profile=preview, status=403)
+            self.request('POST', '/api/desk/program', {}, self.admin, profile=preview, status=403)
+            self.request('POST', '/api/access/impersonate/end', {}, self.admin, profile=preview)
+            support = self.profile('operator', mode='support', credential_id=credential)
+            self.request('POST', '/api/desk/engagement', command, self.admin, profile=support, status=403)
+            self.request('POST', '/api/desk/program', {}, self.admin, profile=support, status=403)
+            opened, _ = self.request('POST', '/api/desk/engagement', {'action':'open_run',
+                'payload':{'activity_id':activity_id,'version':1},'revision':2,'request_id':'d'*32},
+                self.admin, profile=support)
+            self.assertEqual(opened['runs'][0]['status'], 'open')
+            audit = multi_role.S.DB.execute("SELECT actor_credential,effective_credential,impersonation_mode FROM audit WHERE action='engagement-open_run'").fetchone()
+            self.assertEqual(tuple(audit), ('owner-recovery', credential, 'support'))
 
     def test_operator_grant_cannot_be_added_when_feature_is_disabled(self):
         with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'0'}):

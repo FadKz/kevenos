@@ -75,7 +75,7 @@ KEV.profile = {
   get token() { return this.hosted ? sessionStorage.getItem('kevenos:profile-token') || '' : ''; },
   get isPreview() { return this.identity?.impersonation?.mode === 'preview'; },
   get active() { return !this.locked && !this.transitioning; },
-  label(role) { return ({guest:'Guest',participant:'Participant',judge:'Judge',desk:'Organizer',organizer:'Organizer',scoring:'Scoring Desk',admin:'Admin',registration:'Registration',home:'Home'})[role] || 'Profile'; },
+  label(role) { return ({guest:'Guest',participant:'Participant',judge:'Judge',desk:'Organizer',organizer:'Organizer',operator:'Engagement Operator',scoring:'Scoring Desk',admin:'Admin',registration:'Registration',home:'Home'})[role] || 'Profile'; },
   error(message='Your profile changed. Sign in again.', code='access_changed') { const error=new Error(message);error.code=code;error.status=code==='preview_read_only'?403:code==='profile_expired'?401:409;return error; },
   clearLegacy() {
     for (const key of Object.keys(localStorage)) if (key.startsWith('kevenos:token:') || key.startsWith('kevenos:judge-identity:') || key === 'kevenos:judgeName') localStorage.removeItem(key);
@@ -233,12 +233,12 @@ KEV.nav = {
     if (this.privateDisplay && ['/live','/board'].includes(this.path)) return '';
     if (/^\/judge(?:\/\d+)?$/.test(this.path)) return 'judge';
     return ({'/':'home','/index.html':'home','/home':'home','/event':'guest','/guest':'guest','/participant':'participant',
-      '/admin':'admin','/desk':'home','/organizer':'organizer','/scoring':'scoring','/registration':'registration',
+      '/admin':'admin','/desk':'home','/organizer':'organizer','/operator':'operator','/scoring':'scoring','/registration':'registration',
       '/board':'home','/live':'home'})[this.path] || '';
   },
   get page() {
     const labels={'/':'Sign in','/index.html':'Sign in','/home':'Home','/event':'Event information','/guest':'Event information','/participant':'My Event',
-      '/admin':'Event Administration','/desk':'Scoring Desk','/organizer':'Event Operations','/scoring':'Judging Operations',
+      '/admin':'Event Administration','/desk':'Scoring Desk','/organizer':'Event Operations','/operator':'Engagement Operator','/scoring':'Judging Operations',
       '/registration':'Registration Desk','/judge':'Judge stations','/live':'Live View','/board':'Scoreboard'};
     return document.body.dataset.navPage || labels[this.path] || (/^\/judge\/\d+$/.test(this.path) ? 'Station '+this.path.split('/').pop() : 'Event');
   },
@@ -314,7 +314,7 @@ KEV.nav = {
     return me.dashboards.filter(d => d && typeof d.label==='string' &&
       (d.role==='judge' ? /^\/judge\/\d+$/.test(d.url) : ({
         guest:['/event','/guest'],participant:['/participant'],admin:['/admin'],registration:['/registration'],
-        organizer:['/organizer'],scoring:['/scoring']
+        organizer:['/organizer'],operator:['/operator'],scoring:['/scoring']
       })[d.role]?.includes(d.url)));
   },
   taskKey(me) {

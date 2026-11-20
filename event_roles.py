@@ -1,5 +1,6 @@
 """Person grants and per-request dashboard authority. No mutable active-role cookie."""
 import json
+import os
 import secrets
 import sqlite3
 import database
@@ -9,10 +10,10 @@ import time
 ROLES = {
  'guest': ('Event information','/guest'), 'participant': ('My Event','/participant'),
  'judge': ('Judging','/judge'), 'registration': ('Registration Desk','/registration'),
- 'organizer': ('Event Operations','/organizer'), 'scoring': ('Judging Operations','/scoring'),
+ 'organizer': ('Event Operations','/organizer'), 'operator': ('Engagement Operator','/operator'), 'scoring': ('Judging Operations','/scoring'),
  'admin': ('Event Administration','/admin')}
-STAFF = {'admin','organizer','scoring','registration','judge'}
-ORDER = ('admin','organizer','scoring','registration','judge','participant','guest')
+STAFF = {'admin','organizer','operator','scoring','registration','judge'}
+ORDER = ('admin','organizer','operator','scoring','registration','judge','participant','guest')
 
 def migrate(db):
     db.executescript('''
@@ -115,7 +116,7 @@ def guard(s,h,path,body=None):
     if not ident:return False # Domain handlers retain their unauthenticated checks.
     role=ident.get('dashboard',ident['role'])
     if role=='admin':
-        operations={'/api/desk/clock':'scoring','/api/desk/mode':'scoring','/api/desk/sheet':'scoring','/api/desk/calib':'scoring','/api/desk/reveal':'scoring','/api/desk/final':'scoring','/api/desk/public':'scoring','/api/desk/audience':'organizer','/api/desk/program':'organizer','/api/desk/quiz':'organizer','/api/registration':'registration'}
+        operations={'/api/desk/clock':'scoring','/api/desk/mode':'scoring','/api/desk/sheet':'scoring','/api/desk/calib':'scoring','/api/desk/reveal':'scoring','/api/desk/final':'scoring','/api/desk/public':'scoring','/api/desk/audience':'organizer','/api/desk/program':'organizer','/api/desk/quiz':'organizer','/api/desk/engagement':'organizer','/api/desk/engagement-ai':'organizer','/api/registration':'registration'}
         if h.command=='POST' and path in operations:
             if h.headers.get('X-Dashboard') or operations[path] not in {g['role'] for g in ident.get('grants',[])}:
                 h.send(403,{'error':'Open the assigned operational dashboard for this action.'});return True
@@ -124,6 +125,12 @@ def guard(s,h,path,body=None):
             if h.headers.get('X-Dashboard') or (body is not None and required not in {g['role'] for g in ident.get('grants',[])}):
                 h.send(403,{'error':'Open Event Operations or Judging Operations for this action.'});return True
         return False
+    if role=='operator':
+        allowed={'/api/access/me','/api/activity','/api/info','/api/public','/api/board',
+                 '/api/help','/api/event','/api/access/logout','/api/access/impersonate/end',
+                 '/api/desk/engagement'}
+        if path in allowed:return False
+        h.send(403,{'error':'This action is not available in this dashboard.'});return True
     if role=='desk' or ident.get('impersonation') and role not in ('organizer','scoring'):return False
     if role=='home':
         if path in ('/api/access/me','/api/activity','/api/info','/api/public','/api/board','/api/access/logout'):return False
@@ -137,8 +144,8 @@ def guard(s,h,path,body=None):
     gets={'/api/content','/api/desk/state','/api/event-operations'}
     posts={'/api/event-operations'}
     if role=='organizer':
-        gets|={'/api/desk/audience','/api/desk/audience/responses','/api/desk/quiz','/api/desk/quiz/questions.csv','/api/desk/participant-workspace'}
-        posts|={'/api/desk/audience','/api/desk/program','/api/desk/quiz','/api/desk/participant-workspace'}
+        gets|={'/api/desk/audience','/api/desk/audience/responses','/api/desk/quiz','/api/desk/quiz/questions.csv','/api/desk/participant-workspace','/api/desk/engagement','/api/desk/engagement/legacy-preview','/api/desk/engagement/analytics.csv'}
+        posts|={'/api/desk/audience','/api/desk/program','/api/desk/quiz','/api/desk/participant-workspace','/api/desk/engagement','/api/desk/engagement-ai'}
     else:
         gets|={'/api/desk/scores','/api/desk/sheets','/api/desk/calib','/api/desk/export.csv','/api/desk/participant-workspace'}
         posts|={'/api/desk/public','/api/desk/clock','/api/desk/mode','/api/desk/reveal','/api/desk/final','/api/desk/calib','/api/desk/sheet','/api/desk/ai-summary','/api/desk/participant-workspace'}
@@ -152,7 +159,7 @@ def guard(s,h,path,body=None):
 def desk_projection(s,ident,data):
     role=(ident or {}).get('dashboard')
     if role!='organizer':return data
-    safe={k:data[k] for k in ('now','program','room','agenda','versions','public','configuration','config','rounds','judge_count','pairs','rehearsal','port','anonymous_view_key','clock','mode') if k in data}
+    safe={k:data[k] for k in ('now','program','room','agenda','versions','public','configuration','config','rounds','judge_count','pairs','rehearsal','port','anonymous_view_key','clock','mode','engagement_v2','engagement_ai') if k in data}
     safe['stations']=[{k:r[k] for k in ('station','submitted','seen','pair','clock') if k in r} for r in data['stations']]
     safe['final']=s.public_state(names=False).get('final',{})
     return safe
@@ -165,6 +172,8 @@ def validated(s,body):
     for value in values:
         if not isinstance(value,dict) or value.get('role') not in ROLES:raise ValueError('Choose a valid role.')
         role=value['role']
+        if role=='operator' and os.environ.get('KEVENOS_ENGAGEMENT_V2') != '1':
+            raise ValueError('Enable Engagement Hub before assigning the operator role.')
         if role in seen:raise ValueError('Assign each role once per event dataset.')
         seen.add(role)
         dataset=s.event_access.active_dataset(s) if role in ('participant','judge') else 'global'

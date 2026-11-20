@@ -6,6 +6,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip==26.3 \
     && python -m pip install --no-cache-dir -r agent-requirements.txt
 COPY database.py event_operations.py event_transition.py admin_agenda.py database_guard.py event_roles.py event_push.py event_quiz.py audience_questions.py quiz-bank.json agent_api.py agent_mcp.py agent_client.py event_commands.py event_schedule.py event_assistant.py rehearsal_reconcile.py server.py participant_companion.py participant_workspace.py registration_desk.py final_event.py event_config.py event_access.py event_profiles.py event_mail.py event_workspace.py event-guide.json usage-guides.json content.json ./
 COPY static ./static
+COPY engagement_catalog.py engagement_ai.py ./
 COPY docs ./docs
 COPY tools/vercel_entrypoint.py ./tools/vercel_entrypoint.py
 RUN addgroup --system app && adduser --system --ingroup app app

@@ -7,6 +7,7 @@
 <title>Event overview | KevenOS</title>
 <link href="/static/app.css" rel="stylesheet"/>
 <link href="/static/event.css" rel="stylesheet"/>
+<link href="/static/engagement-player.css" rel="stylesheet"/>
 <link href="/static/role-home.css" rel="stylesheet"/></head>
 <body class="role-home-page guest-home-page">
 <main class="event-shell event-main">
@@ -35,7 +36,7 @@
 <h2 id="now-heading">Follow the event</h2>
 <p id="now-description">The scoring desk updates the live display throughout the day.</p><p class="role-next" id="guest-next"></p>
 <div aria-live="polite" id="final-summary"></div><div class="event-actions"><a class="btn" href="/live?names=0">Open Live View</a></div>
-<div class="role-help-note">Here to support the teams? Follow the host, watch the pitches and cheer on the finalists. Results appear only when the Desk releases them.</div></section>
+<div class="role-help-note">Here to support the teams? Follow the host, watch the pitches and cheer on the finalists. Results appear only when the Desk releases them.</div><p class="card event-section" id="engagement-score" hidden></p><div id="engagement-questions" hidden></div></section>
 
 <section class="card event-section event-disclosure" data-guest-panel="agenda" hidden="">
 <h2>Event schedule</h2>
@@ -46,8 +47,11 @@
 <p>Check the event schedule for the latest timings. Join the live example, support the teams in the Final and stay for the awards. Follow the host if plans change during the day.</p>
 <p hidden="" id="intro"></p></section></div>
 <p class="small mut event-privacy" hidden="" id="privacy">Admins can see sign-ins, IP addresses, available country information and site activity for 30 days.</p>
+<div id="engagement-player"></div>
 </main>
 <script src="/static/common.js"></script>
+<script src="/static/engagement-questions.js"></script>
+<script src="/static/engagement-player.js"></script>
 <script>
     const $ = id => document.getElementById(id), esc = KEV.esc;
     let liveCheck = null, profileEnded = false, requestVersion = 0, activePoll = null;
@@ -65,6 +69,10 @@
     }
 
     function setProgramme(state) {
+      if (state?.engagement_v2) {
+        window.EngagementQuestions?.mount($('engagement-questions'), KEV.api);
+        window.EngagementPlayer?.refresh(KEV.api);
+      } else { window.EngagementQuestions?.clear(); window.EngagementPlayer?.clear(); }
       const programme = state?.program;
       const current = programme?.items?.[programme.index];
       setSchedule(programme?.items);
@@ -110,6 +118,8 @@
       activePoll = null;
       clearInterval(liveCheck);
       $('guest-help').hidden = true;
+      window.EngagementQuestions?.clear();
+      window.EngagementPlayer?.clear();
       KEV.closeHelp();
       $('overview').hidden = true;
       $('status-box').hidden = false;
@@ -132,7 +142,7 @@
         KEV.nav.render();
         if(KEV.staff.hosted)$('signout').hidden=true;
         $('status-box').hidden = true;
-        liveCheck = setInterval(refreshProgramme, 15000);
+        liveCheck = setInterval(refreshProgramme, now?.engagement_v2 ? 5000 : 15000);
       } catch (error) {
         if (!currentRequest(version, profileRevision)) return;
         const needsSignin = error.status === 401 || error.status === 403;
@@ -149,7 +159,7 @@
     KEV.bindHelp($('guest-help'));
     $('signout').onclick = () => KEV.profile.signOut();
     if(KEV.staff.hosted)KEV.profile.mount({onEnd:message=>{
-      profileEnded=true;requestVersion++;activePoll=null;clearInterval(liveCheck);KEV.closeHelp();
+      profileEnded=true;requestVersion++;activePoll=null;clearInterval(liveCheck);KEV.closeHelp();window.EngagementQuestions?.clear();window.EngagementPlayer?.clear();
       for(const id of ['intro','date','venue','agenda','now-heading','now-description','final-summary','guest-next','guest-announcement-text'])$(id).replaceChildren();
       $('overview').hidden=$('intro').hidden=$('meta').hidden=$('guest-help').hidden=$('signout').hidden=true;
       $('status-box').hidden=false;$('status-heading').textContent='Sign in to continue';$('status').textContent=message;$('signin').hidden=false;$('retry').hidden=true;

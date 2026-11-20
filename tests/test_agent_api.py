@@ -13,6 +13,37 @@ import event_workspace
 S = access.S
 
 class AgentAPI(unittest.TestCase):
+    def test_quiz_availability_requires_separate_agent_admin_scope(self):
+        self.principal['scopes'] += ['engagement:read','engagement:write']; self.save_grant()
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            code, capabilities = self.req('capabilities')
+            self.assertNotIn('engagement.settings', [item['name'] for item in capabilities['data']['commands']])
+            self.principal['scopes'].append('engagement:admin'); self.save_grant()
+            body = self.prepared('engagement.settings', {'revision':0,'enabled':False})
+            code, result = self.req('execute', body)
+            self.assertEqual(code, 200, result)
+            self.assertFalse(S.kv_get('engagement_catalog_v1')['quiz_enabled'])
+            code, result = self.req('read', {'resource':'engagement.state','arguments':{}})
+            self.assertEqual(code, 200, result)
+            self.assertFalse(result['data']['quiz_enabled'])
+
+    def test_agent_can_confirm_combining_questions(self):
+        import engagement_catalog as catalog
+        self.principal['scopes'] += ['engagement:read', 'engagement:write']; self.save_grant()
+        state = catalog.empty()
+        catalog.configure_questions(state, participants=True, guests=True, expected_revision=0)
+        target = catalog.ask_question(state, 'participant:a', 'participant', 'Public question?', 'a'*32)
+        source = catalog.ask_question(state, 'guest:b', 'guest', 'Similar question?', 'b'*32)
+        catalog.moderate_question(state, target['id'], 'approve', expected_revision=1)
+        with S.DB: catalog._write(S.DB, catalog.KEY, state)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            body = self.prepared('engagement.control', {'action':'merge_question','revision':2,
+                'payload':{'id':source['id'],'target_id':target['id']}})
+            code, result = self.req('execute', body)
+            self.assertEqual(code, 200, result)
+        stored = S.kv_get(catalog.KEY)
+        self.assertEqual(stored['qa'][1]['merged_into'], target['id'])
+
     def setUp(self):
         self.before={k:getattr(S,k) for k in ('CFG','DB','DATA','CONTENT','AUTH_DB','WORKSPACE')}
         self.tmp=TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
@@ -50,6 +81,68 @@ class AgentAPI(unittest.TestCase):
         code,value=self.req('capabilities');self.assertEqual(code,200,value)
         self.assertTrue(value['data']['resources'])
         self.assertNotIn(self.token,json.dumps(value))
+
+    def test_engagement_agent_commands_require_grant_and_exact_confirmation(self):
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            code, result = self.req('capabilities')
+            self.assertNotIn('engagement.control', [item['name'] for item in result['data']['commands']])
+            code, result = self.req('read', {'resource':'engagement.state','arguments':{}})
+            self.assertEqual((code, result['error']['code']), (403, 'scope_forbidden'))
+            self.principal['scopes'] += ['engagement:read', 'engagement:write']
+            self.save_grant()
+            code, result = self.req('capabilities')
+            self.assertIn('engagement.control', [item['name'] for item in result['data']['commands']])
+            args = {'action':'save','revision':0,'payload':{'title':'Agent poll','kind':'poll','questions':[
+                {'type':'single','prompt':'Choose','options':['A','B']}]}}
+            body = self.prepared('engagement.control', args)
+            code, result = self.req('execute', {k:v for k,v in body.items() if k not in ('confirmation_id','confirm')})
+            self.assertEqual((code, result['error']['code']), (409, 'confirmation_required'))
+            code, result = self.req('execute', body)
+            self.assertEqual(code, 200, result)
+            self.assertEqual(result['data']['revision'], 1)
+            code, replay = self.req('execute', body)
+            self.assertEqual(code, 200, replay)
+            self.assertTrue(replay['replayed'])
+            self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['title'], 'Agent poll')
+            read_body = {'resource':'engagement.state','arguments':{'collection':'activities','limit':1}}
+            code, page = self.req('read', read_body)
+            self.assertEqual(code, 200, page)
+            self.assertEqual((page['data']['total'], len(page['data']['activities'])), (1, 1))
+            pending = self.prepared('engagement.control', {'action':'save','revision':1,'payload':{**args['payload'],'title':'Next'}})
+            import engagement_catalog
+            engagement_catalog.execute(S, 'save', {**args['payload'],'title':'Concurrent'}, expected_revision=1,
+                request_id='a'*32, identity={'role':'organizer','credential_id':'operator'})
+            code, changed = self.req('execute', pending)
+            self.assertEqual((code, changed['error']['code']), (409, 'revision_changed'))
+
+    def test_agent_can_prepare_quiz_with_explicit_points(self):
+        self.principal['scopes'] += ['engagement:read', 'engagement:write']
+        self.save_grant()
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            args = {'action':'save','revision':0,'payload':{'title':'Agent quiz','kind':'quiz','questions':[
+                {'type':'single','prompt':'Choose','options':['A','B'],'correct':[0],'points':3,
+                 'explanation':'Why A is correct.'}]}}
+            code, result = self.req('execute', self.prepared('engagement.control', args))
+            self.assertEqual(code, 200, result)
+            self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['questions'][0]['points'], 3)
+            self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['questions'][0]['explanation'], 'Why A is correct.')
+
+    def test_agent_can_preview_and_confirm_copy_of_legacy_draft(self):
+        import engagement_catalog
+        self.principal['scopes'] += ['engagement:read', 'engagement:write']
+        self.save_grant()
+        old = {'rev':1,'packs':[{'id':'a'*32,'status':'draft','title':'Old','description':'',
+            'questions':[{'id':'b'*32,'type':'text','prompt':'Question?'}]}]}
+        with S.DB: engagement_catalog._write(S.DB, 'audience_questions_v1', old)
+        with patch.dict(os.environ, {'KEVENOS_ENGAGEMENT_V2':'1'}):
+            code, result = self.req('read', {'resource':'engagement.legacy_preview','arguments':{}})
+            self.assertEqual(code, 200, result)
+            item = result['data']['audience']['drafts'][0]
+            args = {'action':'copy_legacy_pack','revision':0,'payload':{'pack_id':item['id'],'source_digest':item['digest']}}
+            code, result = self.req('execute', self.prepared('engagement.control', args))
+            self.assertEqual(code, 200, result)
+            self.assertEqual(S.kv_get('audience_questions_v1'), old)
+            self.assertEqual(S.kv_get('engagement_catalog_v1')['activities'][0]['draft']['title'], 'Old')
     def test_revocation_expiry_and_realm_are_fail_closed(self):
         for key,value in [('revoked',True),('expires_at',0),('realm','mars'),('persona','mars'),('audience','another-app')]:
             old=self.principal[key];self.principal[key]=value;self.save_grant()

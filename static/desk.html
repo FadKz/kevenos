@@ -8,6 +8,7 @@
 <link href="/static/app.css" rel="stylesheet"/>
 <link href="/static/assistant.css" rel="stylesheet"/>
 <link href="/static/event-quiz.css" rel="stylesheet"/>
+<link href="/static/engagement-desk.css" rel="stylesheet"/>
 <link href="/static/audience-questions.css" rel="stylesheet"/>
 <link href="/static/judging-operations.css" rel="stylesheet"/>
 <link href="/static/role-home.css" rel="stylesheet"/><link href="/static/event-operations.css" rel="stylesheet"/></head>
@@ -59,6 +60,7 @@
 <script src="/static/common.js"></script>
 <script src="/static/event-operations.js"></script>
 <script src="/static/event-quiz.js"></script>
+<script src="/static/engagement-desk.js"></script>
 <script src="/static/audience-questions.js"></script>
 <script src="/static/assistant.js"></script>
 <script src="/static/participant-desk.js"></script>
@@ -93,6 +95,7 @@ if (dashboard === 'organizer') {
   TABS.display=['Run of show','Move through cues and check what the room is seeing.'];
   TABS.quiz=['Quiz','Prepare questions, run the scored quiz and review results.'];
   TABS.audience=['Audience questions','Send unscored polls and feedback questions.'];
+  TABS.engagement=['Engagement Hub','Create and run interactive activities.'];
   delete TABS.participants;
   TABS.messages=['Messages','Choose where your message should appear and check delivery.'];
   TABS.attendees=['Attendee support','Answer private help requests and manage customer nominations.'];
@@ -134,6 +137,7 @@ function login(message, switching = false) {
   $('main').replaceChildren();
   window.ParticipantDesk?.clear();
   window.EventQuiz?.clear();
+  window.EngagementDesk?.clear();
   window.AudienceQuestions?.clear();
   $('desk-documents').replaceChildren();
   $('err').textContent = message;
@@ -195,12 +199,12 @@ KEV.bindHelp($('desk-help'), () => KEV.staff.token, '/api/help?context=desk');
 
 const organizerNav = [
   ['Event day', [['home','Current cue & readiness'],['display','Programme & projector'],['messages','Announcements & delivery']]],
-  ['Engagement', [['quiz','Scored questions'],['audience','Polls & feedback']]],
+  ['Engagement', [['quiz','Scored questions'],['audience','Polls & feedback'],['engagement','New activity workspace']]],
   ['Participants', [['attendees','Help & nominations']]]
 ];
 $('nav').innerHTML = dashboard === 'organizer'
   ? organizerNav.map(([group, items]) => '<div class="ops-nav-group"><p>'+group+'</p>'+
-    items.map(([key, hint]) => '<button type="button" data-t="'+key+'"><strong>'+TABS[key][0]+
+    items.map(([key, hint]) => '<button type="button" data-t="'+key+'"'+(key === 'engagement' ? ' hidden' : '')+'><strong>'+TABS[key][0]+
       '</strong><small aria-hidden="true">'+hint+'</small></button>').join('')+'</div>').join('')
   : Object.entries(TABS).filter(([key]) => dashboard !== 'scoring' || scoringNav.includes(key)).map(([key, [label]]) => '<button type="button" data-t="'+key+'">'+label+'</button>').join('');
 $('nav').addEventListener('click', e => {
@@ -210,6 +214,10 @@ $('nav').addEventListener('click', e => {
 window.addEventListener('hashchange', () => { if (active) select(location.hash.slice(1), false); });
 
 function select(key, focus) {
+  if (tab === 'engagement' && key !== 'engagement' && window.EngagementDesk && !window.EngagementDesk.canLeave(true)) {
+    if (location.hash !== '#engagement') history.replaceState(null, '', '#engagement');
+    return;
+  }
   const participantDestination = dashboard === 'organizer' &&
     (key === 'attendees' ? 'help' : Object.keys(PARTICIPANT_VIEWS).find(view => PARTICIPANT_VIEWS[view][1] === key));
   const participantSection = participantDestination && PARTICIPANT_VIEWS[participantDestination][2];
@@ -219,6 +227,7 @@ function select(key, focus) {
   }
   window.ParticipantDesk?.clear();
   window.EventQuiz?.clear();
+  window.EngagementDesk?.clear();
   window.AudienceQuestions?.clear();
   KEV.operations?.clear?.();
   quizEditor = key === 'quiz-editor' && Object.hasOwn(TABS, 'quiz');
@@ -290,6 +299,8 @@ async function refresh(force = false) {
     if (request !== sequence || !active) return false;
     if (!DS) $('desk-status').textContent = '';
     DS = state;
+    const engagementNav = $('nav').querySelector('[data-t="engagement"]');
+    if (engagementNav) engagementNav.hidden = !state.engagement_v2;
     recv = Date.now();
     if (scores) SC = scores;
     if (calibration) calib = calibration;
@@ -424,6 +435,11 @@ function draw(force) {
   }
   if (tab === 'quiz') {
     window.EventQuiz?.desk($('main'), get, post, quizEditor);
+    return;
+  }
+  if (tab === 'engagement') {
+    if (DS.engagement_v2) window.EngagementDesk?.mount($('main'), get, post, {ai:!!DS.engagement_ai});
+    else $('main').textContent = 'Engagement Hub is not enabled.';
     return;
   }
   if (tab === 'audience') {

@@ -6,6 +6,7 @@ from functools import lru_cache
 import csv
 import io
 import json
+import os
 import re
 from pathlib import Path
 from uuid import uuid4
@@ -885,6 +886,8 @@ def operator_state(s,state,context,standings,audience):
 
 def command(s,state,body):
     action = body.get('action')
+    if os.environ.get('KEVENOS_ENGAGEMENT_V2') == '1' and action in {'send','resend','warmup','post','catchup'}:
+        raise Conflict('Use Engagement Hub for new questions while the new runner is enabled. Existing quiz history remains available.')
     check_revision(state,body)
     current = phase(s)
     q = next((q for q in current_bank(state) if q['id']==body.get('qid')),None)

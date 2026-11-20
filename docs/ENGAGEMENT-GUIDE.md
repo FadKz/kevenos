@@ -54,8 +54,10 @@ qualified.
 inventory. An old Audience draft can be copied into a new, unpublished poll
 after confirmation; its original and historical results are left untouched.
 The inventory also counts saved answers and special cases such as voids,
-exclusions and predictions. These case counts can overlap. Malformed legacy
-records require inspection and prevent a new question from being sent.
+exclusions and predictions. These case counts can overlap. Malformed active
+legacy delivery records prevent a new question from being sent. Reset archives
+are counted separately with their runs and answer entries; malformed archives
+stop the inventory instead of being silently counted as valid.
 The app checks that the source still matches the preview and prevents the same
 draft from being copied twice. Previous scored runs and responses are not yet
 migrated into the new scoring model.

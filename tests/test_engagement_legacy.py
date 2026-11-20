@@ -8,6 +8,32 @@ import test_workspace_routes as workspace
 
 
 class LegacyInventory(unittest.TestCase):
+    def test_reset_archive_inventory_accounts_for_preserved_runs_and_answers(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        db = workspace.S.DB
+        archived = [{'id':'a'*32,'state':{'runs':[{'id':'r1','status':'closed','points':1}],
+                    'answers':{'private-person':{'r1':{'key':'private-answer'}}}}}]
+        with db: catalog._write(db, 'event_quiz_reset_archive_v1', archived)
+        result = catalog.legacy_preview(db)
+        self.assertEqual(result['quiz']['archive_runs'], 1)
+        self.assertEqual(result['quiz']['archive_answer_entries'], 1)
+        self.assertNotIn('private-person', json.dumps(result))
+        self.assertNotIn('private-answer', json.dumps(result))
+        self.assertEqual(catalog._read(db, 'event_quiz_reset_archive_v1', []), archived)
+
+    def test_malformed_reset_archive_cannot_be_reported_as_safe_inventory(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        db = workspace.S.DB
+        for archived in ([{'state':{'runs':'bad','answers':{}}}], [{'state':{'runs':[], 'answers':{'p':'bad'}}}], [None]):
+            with self.subTest(archived=archived):
+                with db: catalog._write(db, 'event_quiz_reset_archive_v1', archived)
+                with self.assertRaises(ValueError): catalog.legacy_preview(db)
+                with patch.dict('os.environ', {'KEVENOS_ENGAGEMENT_V2':'1'}):
+                    result, _ = fixture.get('/api/desk/engagement/legacy-preview', cookie=fixture.admin, status=409)
+                self.assertIn('require inspection', result['error'])
+
     def test_disabling_quizzes_waits_for_legacy_quiz_but_not_legacy_poll(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp(); self.addCleanup(fixture.doCleanups)

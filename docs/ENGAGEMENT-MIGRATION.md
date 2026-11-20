@@ -45,3 +45,15 @@ Guest identities must not be inferred from shared credentials.
 Neither successful dry runs nor backup creation alone authorize switching a
 live event. A qualified release also requires physical-device, accessibility,
 load, recovery and independent security review.
+
+## Current evidence and limits
+
+The read-only inventory checks the structure of quiz reset archives and counts
+their runs and answer entries without exposing participant data. A synthetic
+SQLite test takes backups of the Live/auth database and Rehearsal database
+under the local workspace write guard and checks their data, staff grants and
+receipts remain separate. A separate disposable PostgreSQL test has restored
+one synthetic database including an answer, moderation and replay receipt.
+These tests do not demonstrate a coordinated multi-host backup, preserve writes
+made after a backup, or migrate historical results. They do not replace the
+cutover and reconciliation tests above.

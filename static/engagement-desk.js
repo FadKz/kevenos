@@ -239,6 +239,9 @@
         const result = await read('/api/desk/engagement/legacy-preview');
         if (stamp === generation) {
           legacyResult.textContent = `${result.quiz.runs} legacy quiz runs and ${result.audience.packs} audience packs (${result.audience.draft_packs} drafts). No changes were made.`;
+          if (result.quiz.archive_runs != null && result.quiz.archive_answer_entries != null) {
+            legacyResult.textContent += ` Reset history — archives: ${result.quiz.archives}; runs: ${result.quiz.archive_runs}; saved answers: ${result.quiz.archive_answer_entries}.`;
+          }
           if (result.quiz.cases) {
             const c = result.quiz.cases;
             legacyResult.textContent += ` ${result.quiz.answer_entries} saved answers; ${c.voided} voided, ${c.unscored} unscored, ${c.excluded_audiences} with exclusions, ${c.predictions} predictions, ${c.warmup_or_post} warm-up or post, ${c.catchup_or_waiting} waiting or catch-up, and ${c.open} marked open. Counts can overlap.`;

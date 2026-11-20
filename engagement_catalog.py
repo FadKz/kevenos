@@ -836,6 +836,18 @@ def legacy_preview(db):
         raise ValueError('Legacy quiz records require inspection before inventory.')
     if any(not isinstance(entries, dict) for entries in answers.values()):
         raise ValueError('Legacy quiz answer records require inspection before inventory.')
+    archive_runs = archive_answers = 0
+    for entry in archive:
+        if not isinstance(entry, dict) or not isinstance(entry.get('state'), dict):
+            raise ValueError('Legacy quiz reset archives require inspection before inventory.')
+        previous = entry['state']
+        previous_runs, previous_answers = previous.get('runs'), previous.get('answers')
+        if (not isinstance(previous_runs, list) or any(not isinstance(run, dict) for run in previous_runs)
+                or not isinstance(previous_answers, dict)
+                or any(not isinstance(items, dict) for items in previous_answers.values())):
+            raise ValueError('Legacy quiz reset archives require inspection before inventory.')
+        archive_runs += len(previous_runs)
+        archive_answers += sum(len(items) for items in previous_answers.values())
     cases = {'voided':sum(run.get('status') == 'void' for run in runs),
              'unscored':sum(run.get('points') == 0 for run in runs),
              'excluded_audiences':sum(bool(run.get('excluded')) for run in runs),
@@ -854,7 +866,8 @@ def legacy_preview(db):
     records = db.execute('SELECT count(*) AS n FROM kv WHERE k LIKE ?', ('audience_answers_v1:%',)).fetchone()['n']
     return {'quiz':{'revision':quiz.get('rev', 0), 'runs':len(runs),
                     'answering_accounts':len(answers), 'answer_entries':sum(len(entries) for entries in answers.values()),
-                    'archives':len(archive), 'cases':cases},
+                    'archives':len(archive), 'archive_runs':archive_runs,
+                    'archive_answer_entries':archive_answers, 'cases':cases},
             'audience':{'revision':audience.get('rev', 0), 'packs':len(packs),
                         'draft_packs':sum(item.get('status') == 'draft' for item in packs),
                         'answer_records':records, 'drafts':drafts},

@@ -847,6 +847,36 @@ class WorkspaceIsolationTests(unittest.TestCase):
             finally:
                 backup.close()
 
+    def test_quiesced_sqlite_backup_preserves_both_workspaces_and_staff_grants(self):
+        fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
+        fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        service = workspace.S
+        password = fixture.issue('organizer')
+        self.assertTrue(password)
+        actor = {'role':'organizer','credential_id':'synthetic-organizer'}
+        payload = {'title':'Live poll','kind':'poll','questions':[{'type':'single','prompt':'Choose','options':['A','B']}]}
+        catalog.execute(service, 'save', payload, expected_revision=0, request_id='a'*32, identity=actor)
+        archive = [{'id':'reset', 'state':{'runs':[{'id':'old','status':'closed','points':1}],
+                   'answers':{'synthetic-person':{'old':{'key':'A','elapsed':2}}}}}]
+        with service.DB: catalog._write(service.DB, 'event_quiz_reset_archive_v1', archive)
+        fixture.switch('rehearsal')
+        catalog.execute(service, 'save', {**payload,'title':'Practice poll'}, expected_revision=0,
+                        request_id='b'*32, identity=actor)
+        live_backup, practice_backup = sqlite3.connect(':memory:'), sqlite3.connect(':memory:')
+        self.addCleanup(live_backup.close); self.addCleanup(practice_backup.close)
+        with fixture.controller.write(), service.LOCK:
+            fixture.controller.live.backup(live_backup)
+            fixture.controller.rehearsal.backup(practice_backup)
+        live_backup.row_factory = practice_backup.row_factory = sqlite3.Row
+        live = catalog._read(live_backup, catalog.KEY, catalog.empty())
+        practice = catalog._read(practice_backup, catalog.KEY, catalog.empty())
+        self.assertEqual(live['activities'][0]['draft']['title'], 'Live poll')
+        self.assertEqual(practice['activities'][0]['draft']['title'], 'Practice poll')
+        self.assertEqual(catalog._read(live_backup, 'event_quiz_reset_archive_v1', []), archive)
+        self.assertIsNotNone(live_backup.execute("SELECT 1 FROM account_grants WHERE role='organizer'").fetchone())
+        self.assertIsNotNone(catalog._read(live_backup, catalog.RECEIPTS_KEY + ':' + 'a'*32, None))
+        self.assertIsNotNone(catalog._read(practice_backup, catalog.RECEIPTS_KEY + ':' + 'b'*32, None))
+
     def test_catalog_writes_follow_live_and_rehearsal_workspaces(self):
         fixture = workspace.WorkspaceRoutes('test_event_configuration_is_admin_only_and_context_bound')
         fixture.setUp()

@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -95,6 +97,119 @@ class PostgresDialectTests(unittest.TestCase):
             postgres_sql("SELECT v FROM kv WHERE k LIKE 'sclock:%'"),
             "SELECT v FROM kv WHERE k LIKE 'sclock:%%'",
         )
+
+
+
+class RawConnection:
+    """Stands in for the psycopg connection behind PostgresConnection."""
+
+    def __init__(self):
+        from psycopg.pq import TransactionStatus
+        self._status = TransactionStatus
+        self.state = TransactionStatus.IDLE
+        self.statements = []
+        self.closed = False
+        self.fail_on = {}
+
+    @property
+    def info(self):
+        return SimpleNamespace(transaction_status=self.state)
+
+    def execute(self, statement):
+        self.statements.append(statement)
+        if statement in self.fail_on:
+            raise self.fail_on[statement]
+        if statement == "BEGIN":
+            self.state = self._status.INTRANS
+
+    def commit(self):
+        self.statements.append("COMMIT")
+        self.state = self._status.IDLE
+
+    def rollback(self):
+        self.statements.append("ROLLBACK")
+        if "ROLLBACK" in self.fail_on:
+            raise self.fail_on["ROLLBACK"]
+        self.state = self._status.IDLE
+
+
+
+class PostgresConnectionLockTests(unittest.TestCase):
+    """Once a unit of work ends, every other request thread must be able to use the connection."""
+
+    def setUp(self):
+        try:
+            import psycopg  # noqa: F401
+        except ImportError:
+            self.skipTest("psycopg is required for the PostgreSQL connection wrapper")
+        import database
+        self.database = database
+        self.raw = RawConnection()
+        self.connection = database.PostgresConnection(self.raw, "kevenos_live", "postgres")
+
+    def free_for_other_threads(self, timeout=2.0):
+        outcome = []
+
+        def probe():
+            acquired = self.connection._lock.acquire(timeout=timeout)
+            if acquired:
+                self.connection._lock.release()
+            outcome.append(acquired)
+
+        worker = threading.Thread(target=probe)
+        worker.start()
+        worker.join()
+        return outcome == [True]
+
+    def test_begin_immediate_inside_a_transaction_block_releases_the_connection(self):
+        with self.connection:
+            self.database.begin_immediate(self.connection)
+            self.assertFalse(self.free_for_other_threads(timeout=0.05), "the block must hold the connection")
+        self.assertTrue(self.free_for_other_threads(), "connection stayed locked after the block ended")
+        self.assertFalse(self.connection._manual_transaction)
+        self.assertEqual(self.raw.statements, ["BEGIN", "COMMIT"])
+
+    def test_failed_block_with_begin_immediate_rolls_back_and_releases(self):
+        with self.assertRaises(RuntimeError):
+            with self.connection:
+                self.database.begin_immediate(self.connection)
+                raise RuntimeError("synthetic failure")
+        self.assertTrue(self.free_for_other_threads(), "connection stayed locked after the failed block")
+        self.assertFalse(self.connection._manual_transaction)
+        self.assertEqual(self.raw.statements, ["BEGIN", "ROLLBACK"])
+
+    def test_manual_transaction_releases_on_commit_and_on_rollback(self):
+        for finish, expected in ((self.connection.commit, "COMMIT"), (self.connection.rollback, "ROLLBACK")):
+            self.raw.statements.clear()
+            self.database.begin_immediate(self.connection)
+            self.assertFalse(self.free_for_other_threads(timeout=0.05), "an open transaction must hold the connection")
+            finish()
+            self.assertTrue(self.free_for_other_threads(), "connection stayed locked after " + expected)
+            self.assertEqual(self.raw.statements, ["BEGIN", expected])
+
+    def test_a_block_that_cannot_begin_leaves_the_connection_free(self):
+        self.raw.fail_on["BEGIN"] = ConnectionError("synthetic: server went away")
+        with self.assertRaises(ConnectionError):
+            with self.connection:
+                self.fail("the block must not run")
+        self.assertEqual(self.connection._context_depth, 0)
+        self.assertTrue(self.free_for_other_threads(), "connection stayed locked after a failed BEGIN")
+
+    def test_a_block_whose_rollback_fails_leaves_the_connection_free(self):
+        self.raw.fail_on["ROLLBACK"] = ConnectionError("synthetic: server went away")
+        with self.assertRaises(ConnectionError):
+            with self.connection:
+                raise RuntimeError("synthetic failure")
+        self.assertEqual(self.connection._context_depth, 0)
+        self.assertTrue(self.free_for_other_threads(), "connection stayed locked after a failed rollback")
+
+    def test_repeated_begin_in_one_manual_transaction_still_releases(self):
+        self.database.begin_immediate(self.connection)
+        self.database.begin_immediate(self.connection)
+        self.connection.commit()
+        self.assertTrue(self.free_for_other_threads(), "connection stayed locked after a repeated begin")
+        self.assertEqual(self.raw.statements, ["BEGIN", "COMMIT"])
+
 
 
 if __name__ == "__main__":

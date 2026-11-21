@@ -275,24 +275,36 @@ class PostgresConnection:
 
     def __enter__(self):
         self._lock.acquire()
-        if self._context_depth == 0:
-            self._connection.execute("BEGIN")
+        try:
+            if self._context_depth == 0:
+                self._connection.execute("BEGIN")
+        except BaseException:
+            self._lock.release()
+            raise
         self._context_depth += 1
         return self
 
     def __exit__(self, kind, value, traceback):
         self._context_depth -= 1
-        if self._context_depth == 0:
-            if kind is None:
-                self._connection.commit()
-            else:
-                self._connection.rollback()
-        self._lock.release()
+        try:
+            if self._context_depth == 0:
+                if kind is None:
+                    self._connection.commit()
+                else:
+                    self._connection.rollback()
+        finally:
+            # A lost server must not leave the connection locked for every other thread.
+            self._lock.release()
         return False
 
     def begin(self):
         self._lock.acquire()
         try:
+            if self._context_depth or self._manual_transaction:
+                # This thread already owns the open block or transaction. It holds
+                # the lock and will release it once, so do not acquire it again.
+                self._lock.release()
+                return
             from psycopg.pq import TransactionStatus
             if self._connection.info.transaction_status == TransactionStatus.IDLE:
                 self._connection.execute("BEGIN")

@@ -134,6 +134,13 @@ def load_config(path):
 
 
 def open_db(path):
+    db = _open_and_migrate(path)
+    # Best effort and outside the migration transaction: see database.widen_real_columns.
+    database.widen_real_columns(db)
+    return db
+
+
+def _open_and_migrate(path):
     db = database.connect(path)
     with database.migration_lock(db):
         # Refuse future schemas before changing journal mode or creating tables.

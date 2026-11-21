@@ -15,7 +15,9 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import sys
 import threading
+import time
 from typing import Iterable, Mapping, MutableMapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -104,6 +106,12 @@ def postgres_sql(statement: str) -> str:
         return "BEGIN"
     sql = re.sub(r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", "BIGSERIAL PRIMARY KEY", sql, flags=re.I)
     sql = re.sub(r"\bBLOB\b", "BYTEA", sql, flags=re.I)
+    if re.match(r"\s*(?:CREATE\s+(?:(?:GLOBAL|LOCAL)\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?|ALTER\s+)TABLE\b", sql, re.I):
+        # SQLite REAL is an 8-byte float; PostgreSQL REAL has 4 bytes and rounds
+        # epoch timestamps to 128-second steps. Quoted text and names are kept.
+        pieces = re.split(r"('(?:[^']|'')*'|\"(?:[^\"]|\"\")*\")", sql)
+        sql = "".join(piece if index % 2 else re.sub(r"\bREAL\b", "DOUBLE PRECISION", piece, flags=re.I)
+                      for index, piece in enumerate(pieces))
     ignored = re.match(r"^(\s*)INSERT\s+OR\s+IGNORE\s+INTO\s+", sql, re.I)
     if ignored:
         sql = re.sub(r"^(\s*)INSERT\s+OR\s+IGNORE\s+INTO\s+", r"\1INSERT INTO ", sql, count=1, flags=re.I)
@@ -410,6 +418,53 @@ def named_lock(connection, name: str):
     with connection:
         connection.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (lock_name,))
         yield
+
+
+def widen_real_columns(connection, lock_timeout_ms: int = 2000) -> int:
+    """Give timestamp columns created by releases up to 1.2.0 full precision.
+
+    Those releases created PostgreSQL REAL (4-byte) columns. Each table is
+    converted in its own short transaction, so the conversion never holds two
+    table locks at once, and it waits at most ``lock_timeout_ms`` for a table
+    that requests are using. A table that cannot be converted now is left for
+    the next start, and the whole pass gives up after three such waits' worth
+    of time, so busy tables cannot hold start-up back. Only a lost connection
+    is raised. Returns the number of columns converted. Stored values keep the
+    precision they were written with.
+    """
+    if not is_server(connection):
+        return 0
+    import psycopg
+
+    tables: dict[str, list[str]] = {}
+    for table, column in connection.execute(
+        "SELECT c.relname, a.attname FROM pg_attribute a "
+        "JOIN pg_class c ON c.oid=a.attrelid "
+        "JOIN pg_namespace n ON n.oid=c.relnamespace "
+        "WHERE n.nspname=current_schema() AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped "
+        "AND a.atttypid=CAST('float4' AS regtype) ORDER BY c.relname, a.attnum"
+    ).fetchall():
+        tables.setdefault(table, []).append(column)
+    converted = 0
+    deadline = time.monotonic() + 3 * int(lock_timeout_ms) / 1000
+    for table, columns in tables.items():
+        if time.monotonic() > deadline:
+            print("Startup timestamp-conversion postponed: time budget spent", file=sys.stderr)
+            break
+        changes = ", ".join('ALTER COLUMN "%s" TYPE DOUBLE PRECISION' % column.replace('"', '""') for column in columns)
+        try:
+            with connection:
+                # Bound every wait in this transaction, including the wait for another instance.
+                connection.execute("SET LOCAL lock_timeout = '%dms'" % int(lock_timeout_ms))
+                connection.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("kevenos:migrate:" + connection.schema,))
+                connection.execute('ALTER TABLE "%s" %s' % (table.replace('"', '""'), changes))
+        except psycopg.Error as error:
+            print("Startup timestamp-conversion postponed for %s: %s" % (table, type(error).__name__), file=sys.stderr)
+            if connection._connection.closed:
+                raise
+            continue
+        converted += len(columns)
+    return converted
 
 
 def begin_immediate(connection) -> None:

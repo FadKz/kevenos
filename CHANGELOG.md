@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Fix PostgreSQL and Supabase deployments becoming unresponsive after an admin
+  email action: the connection lock is now released when a transaction is begun
+  inside an open transaction block.
+- Fix timestamps on PostgreSQL and Supabase being rounded to 128-second steps,
+  which affected sign-in link expiry, rate limits and audit order. Existing
+  databases are converted in place, one table at a time, when the new release
+  starts; see `docs/DATABASES.md`.
+- Fix the admin activity view failing on PostgreSQL and Supabase.
+- Extend the PostgreSQL qualification to cover storage precision, column
+  conversion, connection release and the activity view.
+
 ## 1.2.0 — 2026-11-19
 
 - Improve cold-start asset delivery and reduce database work for public assets and health checks.

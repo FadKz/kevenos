@@ -49,6 +49,19 @@ Rehearsal and demo access are ready; health checks wait for readiness and can
 return `503` with `Retry-After` during a long first bootstrap. Once the schema
 version matches, later cold starts skip historical migrations.
 
+Timestamps are stored as 8-byte values. Releases up to 1.2.0 created them as
+4-byte `REAL` columns on PostgreSQL and Supabase, which rounds a current time to
+128-second steps. A later release converts those columns in place when it
+starts. Each table is converted in its own short transaction and is locked only
+for that moment; if requests are using a table, the conversion waits at most two
+seconds, leaves that table for the next start and logs
+`Startup timestamp-conversion postponed`. It stops trying after about six
+seconds in total, so busy tables cannot hold a start back, and only a lost
+database connection stops the application starting. The schema version is unchanged, so release
+1.2.0 can still run against the converted database. Values written before the
+conversion keep the precision they were stored with. Every start makes one
+catalog query per schema to check whether anything is left to convert.
+
 Before deploying a new release, run the normal test suite and the two-process
 qualification against a disposable database:
 
@@ -58,9 +71,14 @@ KEVENOS_TEST_SCHEMA_PREFIX=kevenos_ci \
 python tools/qualify_postgres.py
 ```
 
-The qualification requires one event context, signs in every synthetic role on
-one process and reads the session on the other, then publishes a content edit
-through one process and verifies it through the second.
+The qualification first checks the storage layer directly: timestamp precision,
+conversion of a column shaped like one from release 1.2.0 (including a table
+that is busy at the time), and that the connection is free again after a
+transaction block. It also plants such a column in the Live schema before the
+processes start, to prove start-up converts it. It then requires one event context, signs
+in every synthetic role on one process and reads the session on the other, reads
+the admin activity view, and publishes a content edit through one process and
+verifies it through the second.
 
 ## Backup and recovery
 

@@ -600,7 +600,7 @@ def handle_get(s,h,path,q):
         if role: where.append('role=?'); args.append(role)
         with s.LOCK,auth_db(s):
             prune(s)
-            stats=auth_db(s).execute("SELECT count(DISTINCT visitor_id) visitors, sum(action='view') views, sum(action='signin') signins, sum(action NOT IN ('view','signin','signin-failed')) actions FROM visitor_activity WHERE dataset=?",(active_dataset(s),)).fetchone()
+            stats=auth_db(s).execute("SELECT count(DISTINCT visitor_id) visitors, sum(CASE WHEN action='view' THEN 1 ELSE 0 END) views, sum(CASE WHEN action='signin' THEN 1 ELSE 0 END) signins, sum(CASE WHEN action NOT IN ('view','signin','signin-failed') THEN 1 ELSE 0 END) actions FROM visitor_activity WHERE dataset=?",(active_dataset(s),)).fetchone()
             rows=[dict(r) for r in auth_db(s).execute('SELECT * FROM visitor_activity WHERE '+' AND '.join(where)+' ORDER BY id DESC LIMIT ?',(*args,limit))]
         h.send(200,{'summary':{k:stats[k] or 0 for k in stats.keys()},'events':rows,'next_before':rows[-1]['id'] if len(rows)==limit else None,'retention_days':RETENTION_DAYS}); return True
     if ident['role']=='registration':

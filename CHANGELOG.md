@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Fix a malformed judge sheet causing a server error, and one malformed stored
+  sheet breaking the Scoring Desk scores view. Invalid sheets and corrections
+  are now refused with a message, and a correction for a sheet that no longer
+  exists is reported as such.
+- Report where an unexpected request failure happened in the server log, without
+  request data or the error text, and stop announcing the release and Python
+  version in the `Server` header.
+- Fix `run.sh` building an image tagged 1.0.0; it now uses the packaged version,
+  and the release check also covers `compose.event.yaml`.
+- Fix emailed sign-in details pointing at a placeholder address when
+  `KEVENOS_PUBLIC_URL` is unset or incomplete: sharing is declined with
+  instructions and nothing is sent.
+- Correct the agent guide: how to enable agent access, the HTTP API address and
+  how to start the MCP server.
+
 ## 1.2.0 — 2026-11-19
 
 - Improve cold-start asset delivery and reduce database work for public assets and health checks.

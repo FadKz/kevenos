@@ -53,6 +53,36 @@ class ReleaseToolTests(unittest.TestCase):
             self.make_repo(root)
             self.assertEqual(release.validate_version(root, "v1.2.3"), "1.2.3")
 
+    def test_version_validation_checks_the_event_compose_file(self):
+        release = load_release_tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_repo(root)
+            event = root / "compose.event.yaml"
+            event.write_text("services:\n  app:\n    image: kevenos:1.2.3\n  db:\n    image: postgres:17\n")
+            self.assertEqual(release.validate_version(root, "v1.2.3"), "1.2.3")
+            event.write_text("services:\n  app:\n    image: kevenos:1.2.2\n")
+            with self.assertRaisesRegex(ValueError, r"compose\.event\.yaml=1\.2\.2"):
+                release.validate_version(root, "v1.2.3")
+
+    def test_the_local_run_script_builds_the_packaged_version(self):
+        version = json.loads((ROOT / "package.json").read_text())["version"]
+        result = subprocess.run(["bash", "-c", 'eval "$(grep -E "^image_name=" run.sh)"; printf %s "$image_name"'],
+                                cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertEqual(result.stdout, "kevenos:" + version)
+
+    def test_the_run_script_reads_the_package_version_however_the_file_is_laid_out(self):
+        line = next(line for line in (ROOT / "run.sh").read_text().splitlines() if line.startswith("image_name="))
+        layouts = ('{"name":"x","version":"3.4.5","config":{"version":"9.9.9"}}',
+                   '{\n  "name": "x",\n  "version" : "3.4.5",\n  "config": {"version": "9.9.9"}\n}\n',
+                   '{"version":"3.4.5"}')
+        for layout in layouts:
+            with tempfile.TemporaryDirectory() as tmp:
+                (Path(tmp) / "package.json").write_text(layout)
+                result = subprocess.run(["bash", "-c", 'set -euo pipefail; ' + line + '; printf %s "$image_name"'],
+                                        cwd=tmp, capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout, "kevenos:3.4.5", layout)
+
     def test_version_validation_rejects_mismatch(self):
         release = load_release_tool()
         with tempfile.TemporaryDirectory() as tmp:

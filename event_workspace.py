@@ -123,13 +123,17 @@ class Controller:
 
     def sync(self):
         """Refresh cached workspace selection after another process changes it."""
-        row = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
-        if not row:
-            return
-        control = json.loads(row['v'])
-        if control.get('mode') == self.mode and control.get('context') == self._selection_context:
-            self._refresh_context()
-            return
+        # Both live and active workspace connections are shared across request
+        # threads. Read under the database lock, but release it before acquiring
+        # the exclusive workspace guard to preserve the guard -> lock order.
+        with self.s.LOCK:
+            row = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
+            if not row:
+                return
+            control = json.loads(row['v'])
+            if control.get('mode') == self.mode and control.get('context') == self._selection_context:
+                self._refresh_context()
+                return
         with self.write(), self.s.LOCK:
             row = self.live.execute("SELECT v FROM kv WHERE k='workspace_control'").fetchone()
             if not row:

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Fix a repeated Start on a running judge clock discarding the time already run.
+- Fix sign-in QR codes pointing at a placeholder address when `KEVENOS_PUBLIC_URL`
+  is unset: a local desk on a private network address now uses that address, and
+  every other case is declined with instructions instead of issuing an unusable code.
+- Fix intermittent failed requests under concurrent load by reading the shared
+  workspace selection under the database lock.
+- Fix device-alert setup guidance never appearing on iPhone.
+- Fix garbled wording in the built-in judge feedback shown when AI is unavailable.
+
 ## 1.2.0 — 2026-11-19
 
 - Improve cold-start asset delivery and reduce database work for public assets and health checks.

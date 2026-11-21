@@ -619,6 +619,13 @@ def tick_labels():
     return [t for g in CONTENT["rubric"] for t in g["ticks"]]
 
 
+def _mid_sentence(label):
+    """Rubric labels start a line; inside a sentence only an abbreviation keeps its capitals."""
+    first = label.split(None, 1)[0] if label.strip() else ""
+    keeps_capitals = first == "I" or (len(first) > 1 and first[:2].isupper())
+    return label if keeps_capitals else label[:1].lower() + label[1:]
+
+
 def template_feedback(ticks, guess_type=None):
     labels = tick_labels()
     got = [i for i, t in enumerate(ticks) if t]
@@ -629,9 +636,8 @@ def template_feedback(ticks, guess_type=None):
     bi = [i for i in range(*GROUPS[best]) if ticks[i]]
     if bi:
         worked = labels[bi[0]]["short"]
-    add = labels[miss[0]]["short"] if miss else "keep the same clear order in your next pitch"
-    add_txt = ("one to add: %s." % add[0].lower() + add[1:]) if miss else "one to add: %s." % add
-    return "One thing that worked: %s. %s" % (worked[0].lower() + worked[1:], add_txt[0].upper() + add_txt[1:])
+    add = _mid_sentence(labels[miss[0]]["short"]) if miss else "keep the same clear order in your next pitch"
+    return "One thing that worked: %s. One to add: %s." % (_mid_sentence(worked), add)
 
 
 def ai_feedback(d):

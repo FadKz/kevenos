@@ -29,7 +29,7 @@ import audience_questions
 import event_push
 import registration_desk
 from contextlib import nullcontext
-import sys, threading, time
+import sys, threading, time, traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -1537,6 +1537,13 @@ def cards_html():
             "@media print{section{border:0;height:128mm}}</style>" + "".join(cards))
 
 
+def log_request_failure(error):
+    """Report where an unexpected failure happened. The error text and request data are never printed."""
+    frames = traceback.extract_tb(error.__traceback__)[-6:]
+    where = " < ".join("%s:%d %s" % (os.path.basename(frame.filename), frame.lineno, frame.name) for frame in reversed(frames))
+    print("Request failed: %s at %s" % (type(error).__name__, where or "unknown"), file=sys.stderr)
+
+
 class EventHTTPServer(ThreadingHTTPServer):
     # Quiz release and QR sign-in can open many connections simultaneously.
     # This bounds pending TCP admission; handlers and auth rules stay unchanged.
@@ -1547,7 +1554,9 @@ class Handler(BaseHTTPRequestHandler):
     def redirect_legacy_host(self):
         return False
 
-    server_version = "KevenOS/1.0"
+    def version_string(self):
+        # Name the product only: no release number to drift and no interpreter version to disclose.
+        return "KevenOS"
 
     def log_message(self, fmt, *args):
         if "--verbose" in sys.argv:
@@ -1910,7 +1919,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, dump, "application/json", {"Content-Disposition": "attachment; filename=kevenos-backup.json"})
             return self.send(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001
-            print("Request failed: " + type(e).__name__, file=sys.stderr)
+            log_request_failure(e)
             return self.send(500, {"error": "Internal server error."})
 
     def do_HEAD(self):
@@ -2242,7 +2251,7 @@ class Handler(BaseHTTPRequestHandler):
                 LIVE.clear(); audit("desk", "reset"); return self.send(200, {"ok": True})
             return self.send(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001
-            print("Request failed: " + type(e).__name__, file=sys.stderr)
+            log_request_failure(e)
             return self.send(500, {"error": "Internal server error."})
 
 

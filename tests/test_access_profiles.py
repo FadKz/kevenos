@@ -32,7 +32,8 @@ class AccessProfiles(unittest.TestCase):
             for key, value in previous.items():
                 setattr(S, key, value)
         self.addCleanup(restore)
-        env = patch.dict(os.environ, {'KEVENOS_HOSTED': '1', 'KEVENOS_GATEWAY_ENABLED': '0', 'KEVENOS_SMTP_ENABLED': '0'})
+        env = patch.dict(os.environ, {'KEVENOS_HOSTED': '1', 'KEVENOS_GATEWAY_ENABLED': '0', 'KEVENOS_SMTP_ENABLED': '0',
+                                      'KEVENOS_PUBLIC_URL': 'https://event.example.com'})
         env.start()
         self.addCleanup(env.stop)
         self.cookies = {}

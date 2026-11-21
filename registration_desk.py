@@ -2,11 +2,13 @@
 import base64
 from copy import deepcopy
 import hashlib
+import ipaddress
 import json
 import os
 import re
 import secrets
 import sqlite3
+from urllib.parse import urlsplit
 import database
 
 PATH = '/api/registration'
@@ -16,6 +18,47 @@ LINK_TTL = 300
 
 class Conflict(ValueError):
     pass
+
+
+LOCAL_HOST = re.compile(r'(?:localhost|127\.0\.0\.1)(?::[0-9]{1,5})?', re.I)
+LAN_NAME = re.compile(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.local', re.I)
+LAN_NETWORKS = tuple(ipaddress.ip_network(block) for block in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16'))
+NO_ADDRESS = ('QR sign-in needs the address attendees open on their phones. '
+              'Set KEVENOS_PUBLIC_URL, restart, and generate the code again.')
+BAD_ADDRESS = 'KEVENOS_PUBLIC_URL must be a complete web address beginning with https:// or http://.'
+
+
+def join_origin(s, host):
+    """Return the address a sign-in QR points at; never a placeholder or a guessed public host."""
+    host = host or ''
+    if LOCAL_HOST.fullmatch(host):
+        return 'http://' + host
+    configured = os.environ.get('KEVENOS_PUBLIC_URL', '').strip().rstrip('/')
+    if configured:
+        try:
+            parts = urlsplit(configured)
+            usable = (parts.scheme in ('http', 'https') and parts.hostname and parts.port != 0
+                      and not (parts.query or parts.fragment or parts.username or parts.password)
+                      and not re.search(r'\s', configured))
+        except ValueError:          # an invalid port or bracketed host
+            usable = False
+        if not usable:
+            raise Conflict(BAD_ADDRESS)
+        return configured
+    if not s.hosted():
+        # A venue network without a configured address: phones reach the desk's own address.
+        # Only a private IPv4 literal or a .local name qualifies. Bare names and numeric
+        # forms are refused: a phone may not resolve them, or may read them as a public address.
+        name, separator, port = host.partition(':')
+        if not separator or (port.isascii() and port.isdigit() and 0 < int(port) < 65536):
+            try:
+                address = ipaddress.ip_address(name)
+                reachable = address.version == 4 and any(address in network for network in LAN_NETWORKS)
+            except ValueError:
+                reachable = bool(LAN_NAME.fullmatch(name))
+            if reachable:
+                return 'http://' + host
+    raise Conflict(NO_ADDRESS)
 
 
 def migrate(db):
@@ -160,6 +203,7 @@ def credential_action(s, h, body, action, actor):
         raise Conflict('A password already exists. Use a sign-in QR or explicitly reset it.')
     if action in ('reset', 'revoke') and not current:
         raise Conflict('There is no active password for this participant.')
+    origin = join_origin(s, h.headers.get('Host', '')) if action == 'qr' else None
     with db:
         result = {}
         if action == 'revoke':
@@ -185,9 +229,6 @@ def credential_action(s, h, body, action, actor):
                         access.active_dataset(s), s.WORKSPACE.context, now + LINK_TTL))
             from qrcode import make
             from qrcode.image.svg import SvgPathFillImage
-            host = h.headers.get('Host', '')
-            local = re.fullmatch(r'(?:localhost|127\.0\.0\.1)(?::[0-9]{1,5})?', host)
-            origin = 'http://' + host if local else os.environ.get('KEVENOS_PUBLIC_URL', 'https://event.example.com').rstrip('/')
             link = origin + '/join#' + code
             svg = make(link, image_factory=SvgPathFillImage).to_string()
             result.update(link=link, qr_image='data:image/svg+xml;base64,' + base64.b64encode(svg).decode(),

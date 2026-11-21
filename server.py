@@ -29,7 +29,7 @@ import audience_questions
 import event_push
 import registration_desk
 from contextlib import nullcontext
-import sys, threading, time
+import sys, threading, time, traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -481,6 +481,46 @@ def group_counts(ticks):
     return [sum(1 for t in ticks[a:b] if t) for a, b in GROUPS]
 
 
+INVALID_SHEET = "This sheet has an invalid value for %s. Reload the judging page and submit again."
+
+
+def _yes_no(value):
+    return type(value) is bool or (type(value) is int and value in (0, 1))
+
+
+def sheet_ticks(value):
+    """Up to ten yes/no ticks, padded to ten. Anything else is refused, never guessed."""
+    value = [] if value is None else value
+    if not isinstance(value, list) or len(value) > 10 or not all(_yes_no(tick) for tick in value):
+        raise ValueError(INVALID_SHEET % "the ticks")
+    return [int(tick) for tick in value] + [0] * (10 - len(value))
+
+
+def sheet_flag(value, name):
+    if value is None:
+        return 0
+    if not _yes_no(value):
+        raise ValueError(INVALID_SHEET % name)
+    return int(value)
+
+
+SHEET_NAME_LENGTH, SHEET_QUESTIONS, SHEET_OBJECTIONS = 200, 500, 100
+
+
+def sheet_log(value, key, limit, name):
+    """The judge page's question or objection log: a list of entries that each name their item.
+
+    The limits match what event content may define (see validate_content), so a
+    question an organizer configured can always be logged.
+    """
+    value = [] if value is None else value
+    if (not isinstance(value, list) or len(value) > limit
+            or not all(isinstance(entry, dict) and isinstance(entry.get(key), str)
+                       and 0 < len(entry[key]) <= SHEET_NAME_LENGTH for entry in value)):
+        raise ValueError(INVALID_SHEET % name)
+    return value
+
+
 def sheet_score(d):
     return sum(1 for t in d["ticks"] if t) * 10 + (2 if d["ai"] else 0)
 
@@ -539,8 +579,10 @@ def flags():
             out.append({"level": "check", "station": s["station"], "sheet": s["id"], "text": tag + "all ten ticks. Confirm with the judge."})
         if t == 0:
             out.append({"level": "check", "station": s["station"], "sheet": s["id"], "text": tag + "no ticks at all. Confirm with the judge."})
-        asked = {a["q"] for a in s["asked"]}
-        if s["ticks"][0] and not ({"Q1", "Q2"} <= asked) and s["asked"]:
+        # Sheets stored before submissions were checked can hold entries in any shape.
+        asked = ({a["q"] for a in s["asked"] if isinstance(a, dict) and isinstance(a.get("q"), str)}
+                 if isinstance(s["asked"], list) else set())
+        if s["ticks"][:1] and s["ticks"][0] and not ({"Q1", "Q2"} <= asked) and s["asked"]:
             out.append({"level": "note", "station": s["station"], "sheet": s["id"], "text": tag + "Discover tick 1 ticked, but Q1 and Q2 were not both logged."})
         if t <= 4 and not (s["notes"] or "").strip():
             out.append({"level": "note", "station": s["station"], "sheet": s["id"], "text": tag + "a low score with no notes."})
@@ -1081,6 +1123,9 @@ def validate_content(new):
             errs.append("Questions: ids must be unique.")
         if not {"Q1", "Q2", "Q3", "Q13"} <= set(qids):
             errs.append("Questions: Q1, Q2, Q3 and Q13 must stay (they suggest Discover ticks).")
+        if len(qids) > SHEET_QUESTIONS or not all(isinstance(q, (str, int)) and not isinstance(q, bool)
+                                                   and 0 < len(str(q)) <= SHEET_NAME_LENGTH for q in qids):
+            errs.append("Questions: use at most %d questions, each with an id of 1 to %d characters." % (SHEET_QUESTIONS, SHEET_NAME_LENGTH))
         if set(new["mock"]["key"]) != set(base["mock"]["key"]):
             errs.append("Mock pitch: the answer key must cover the same ticks.")
         for k in ("bonus_tick",):
@@ -1179,6 +1224,13 @@ def history_list():
 
 def save_sheet(role_station, body, actor):
     kind = body.get("kind", "round"); station = int(role_station)
+    try:
+        ticks = sheet_ticks(body.get("ticks"))
+        ai, spoke = sheet_flag(body.get("ai"), "the bonus point"), sheet_flag(body.get("spoke"), "whether all team members spoke")
+        asked = sheet_log(body.get("asked"), "q", SHEET_QUESTIONS, "the questions asked")
+        raised = sheet_log(body.get("raised"), "k", SHEET_OBJECTIONS, "the objections raised")
+    except ValueError as error:
+        return {"error": str(error)}, 400
     with LOCK:
         receipt = body.get('submission_id')
         receipt_key_name = None
@@ -1228,20 +1280,18 @@ def save_sheet(role_station, body, actor):
             wrap_rating=body.get('wrap_rating',0)
             if kind=='round' and (type(wrap_rating) is not int or not 1<=wrap_rating<=5):
                 return {"error":"Choose an overall impression and confidence rating from one to five stars."},400
-        ticks = [1 if x else 0 for x in body.get("ticks", [])][:10]
-        ticks += [0] * (10 - len(ticks))
         with DB:
             DB.execute("UPDATE sheets SET voided=1 WHERE kind=? AND station=? AND pair=? AND voided=0 AND round=? AND final_run=?",
                        (kind, station, pair, round_no, run_id))
             cur = DB.execute("INSERT INTO sheets(kind,pair,station,round,judge,ticks,ai,spoke,notes,feedback,asked,raised,created,app_version,content_version,final_run,wrap_rating,final_rating) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                          (kind, pair, station, round_no, str(body.get("judge", ""))[:60], json.dumps(ticks),
-                          1 if body.get("ai") else 0, 1 if body.get("spoke") else 0, str(body.get("notes", ""))[:4000],
-                          str(body.get("feedback", ""))[:2000], json.dumps(body.get("asked", [])[:60]),
-                          json.dumps(body.get("raised", [])[:20]), time.time(), APP_VERSION, str(CONTENT.get("content_version", 1)),run_id,wrap_rating,final_rating))
+                          ai, spoke, str(body.get("notes", ""))[:4000],
+                          str(body.get("feedback", ""))[:2000], json.dumps(asked),
+                          json.dumps(raised), time.time(), APP_VERSION, str(CONTENT.get("content_version", 1)),run_id,wrap_rating,final_rating))
             sid = cur.lastrowid
             if kind == 'round' and body.get('participant_feedback_approved') is True and str(body.get('feedback', ''))[:2000].strip():
                 DB.execute('UPDATE sheets SET participant_feedback_approved=1 WHERE id=?', (sid,))
-            result = {"ok": True, "id": sid, "score": final_rating if kind == 'final' else sum(ticks) * 10 + (2 if body.get("ai") else 0), "run_id": run_id}
+            result = {"ok": True, "id": sid, "score": final_rating if kind == 'final' else sum(ticks) * 10 + (2 if ai else 0), "run_id": run_id}
             if receipt_key_name:
                 DB.execute('INSERT INTO kv(k,v) VALUES(?,?)',
                            (receipt_key_name, json.dumps({'fingerprint': fingerprint, 'result': result})))
@@ -1537,6 +1587,13 @@ def cards_html():
             "@media print{section{border:0;height:128mm}}</style>" + "".join(cards))
 
 
+def log_request_failure(error):
+    """Report where an unexpected failure happened. The error text and request data are never printed."""
+    frames = traceback.extract_tb(error.__traceback__)[-6:]
+    where = " < ".join("%s:%d %s" % (os.path.basename(frame.filename), frame.lineno, frame.name) for frame in reversed(frames))
+    print("Request failed: %s at %s" % (type(error).__name__, where or "unknown"), file=sys.stderr)
+
+
 class EventHTTPServer(ThreadingHTTPServer):
     # Quiz release and QR sign-in can open many connections simultaneously.
     # This bounds pending TCP admission; handlers and auth rules stay unchanged.
@@ -1547,7 +1604,9 @@ class Handler(BaseHTTPRequestHandler):
     def redirect_legacy_host(self):
         return False
 
-    server_version = "KevenOS/1.0"
+    def version_string(self):
+        # Name the product only: no release number to drift and no interpreter version to disclose.
+        return "KevenOS"
 
     def log_message(self, fmt, *args):
         if "--verbose" in sys.argv:
@@ -1910,7 +1969,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, dump, "application/json", {"Content-Disposition": "attachment; filename=kevenos-backup.json"})
             return self.send(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001
-            print("Request failed: " + type(e).__name__, file=sys.stderr)
+            log_request_failure(e)
             return self.send(500, {"error": "Internal server error."})
 
     def do_HEAD(self):
@@ -2188,22 +2247,33 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/desk/sheet":
                 if (event_access.session(sys.modules[__name__],self.headers) or {}).get("dashboard")=="scoring" and (not isinstance(b.get("why"),str) or not 3<=len(b["why"].strip())<=300):
                     return self.send(400,{"error":"Enter a short reason for the score correction."})
-                sid = int(b.get("id", 0)); act = b.get("action")
+                sid = b.get("id"); act = b.get("action")
+                if type(sid) is not int:
+                    return self.send(400, {"error": "Choose the sheet to correct."})
                 with LOCK:
                     sheet = DB.execute("SELECT kind,final_run,wrap_rating,final_rating FROM sheets WHERE id=?",(sid,)).fetchone()
+                    if not sheet:
+                        return self.send(404, {"error": "That sheet no longer exists. Refresh the scores."})
                     f=final_event.get(sys.modules[__name__])
                     if sheet and sheet["kind"]=="final" and sheet["final_run"]==f.get("run_id") and f.get("status")=="completed":
                         return self.send(409,{"error":"Published Final scores are locked. Reopen results with a reason first."})
-                    if sheet and sheet["kind"]=="final":final_event.invalidate_decision(sys.modules[__name__],f)
-                    if act == "void":
-                        DB.execute("UPDATE sheets SET voided=1, edited_by='desk' WHERE id=?", (sid,))
-                    elif act == "ticks":
-                        t = [1 if x else 0 for x in b.get("ticks", [])][:10]; t += [0] * (10 - len(t))
+                    # Check the whole correction first: a refused one must change nothing, including the Final decision.
+                    if act == "ticks":
+                        try:
+                            t = sheet_ticks(b.get("ticks")); corrected_ai = sheet_flag(b.get("ai"), "the bonus point")
+                        except ValueError as error:
+                            return self.send(400, {"error": str(error)})
                         wrap_rating=b.get('wrap_rating',sheet['wrap_rating']);final_rating=b.get('final_rating',sheet['final_rating'])
                         required=final_rating if sheet['kind']=='final' else wrap_rating if sheet['kind']=='round' else 1
                         if type(required) is not int or not 1<=required<=5:
                             return self.send(400,{"error":"Choose the applicable rating from one to five."})
-                        DB.execute("UPDATE sheets SET ticks=?, ai=?, wrap_rating=?, final_rating=?, edited_by='desk' WHERE id=?", (json.dumps(t), 1 if b.get("ai") else 0,wrap_rating,final_rating,sid))
+                    elif act != "void":
+                        return self.send(400, {"error": "Choose whether to correct or void the sheet."})
+                    if sheet["kind"]=="final":final_event.invalidate_decision(sys.modules[__name__],f)
+                    if act == "void":
+                        DB.execute("UPDATE sheets SET voided=1, edited_by='desk' WHERE id=?", (sid,))
+                    else:
+                        DB.execute("UPDATE sheets SET ticks=?, ai=?, wrap_rating=?, final_rating=?, edited_by='desk' WHERE id=?", (json.dumps(t), corrected_ai,wrap_rating,final_rating,sid))
                     DB.commit()
                 audit("desk", "sheet-" + str(act), "sheet %d %s" % (sid, b.get("why", "")))
                 return self.send(200, {"ok": True})
@@ -2242,7 +2312,7 @@ class Handler(BaseHTTPRequestHandler):
                 LIVE.clear(); audit("desk", "reset"); return self.send(200, {"ok": True})
             return self.send(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001
-            print("Request failed: " + type(e).__name__, file=sys.stderr)
+            log_request_failure(e)
             return self.send(500, {"error": "Internal server error."})
 
 

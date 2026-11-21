@@ -33,7 +33,7 @@ class CredentialSharing(unittest.TestCase):
             for key, value in previous.items():
                 setattr(S, key, value)
         self.addCleanup(restore)
-        self.env = patch.dict(os.environ, {'KEVENOS_HOSTED': '1'})
+        self.env = patch.dict(os.environ, {'KEVENOS_HOSTED': '1', 'KEVENOS_PUBLIC_URL': 'https://event.example.com'})
         self.env.start(); self.addCleanup(self.env.stop)
         with S.LOCK, S.DB:
             admin = A.create_credential(S, 'admin', 'Synthetic administrator')
@@ -62,6 +62,30 @@ class CredentialSharing(unittest.TestCase):
         reply = Reply(self.cookie if cookie is None else cookie)
         self.assertTrue(M.handle_post(S, reply, '/api/admin/credentials/share', body))
         return reply.code, reply.body
+
+    def test_sign_in_details_are_not_emailed_without_a_usable_event_address(self):
+        for value in (None, '', 'event.example.com', 'https://event.example.com/?x=1', 'https://user:secret@event.example.com',
+                      'https://event.example.com#', 'https://event.example.com?', 'https://event.example.com/#'):
+            issued = self.issue()
+            with patch.dict(os.environ):
+                os.environ.pop('KEVENOS_PUBLIC_URL', None)
+                if value is not None:
+                    os.environ['KEVENOS_PUBLIC_URL'] = value
+                code, response = self.post(self.payload(issued))
+            self.assertEqual(code, 409, '%r: %r' % (value, response))
+            self.assertIn('KEVENOS_PUBLIC_URL', response['error'])
+        self.assertEqual(self.smtp.return_value.sendmail.call_count, 0)
+        self.assertEqual(S.DB.execute('SELECT count(*) FROM notifications').fetchone()[0], 0)
+
+    def test_sign_in_details_use_the_configured_event_address(self):
+        issued = self.issue()
+        with patch.dict(os.environ, {'KEVENOS_PUBLIC_URL': 'https://tickets.example.org/'}):
+            code, response = self.post(self.payload(issued))
+        self.assertEqual(code, 200, response)
+        raw = self.smtp.return_value.sendmail.call_args.args[2]
+        body = BytesParser(policy=policy.default).parsebytes(raw).get_content()
+        self.assertIn('Sign in: https://tickets.example.org/\n', body.replace('\r\n', '\n'))
+        self.assertNotIn('event.example.com', body)
 
     def test_issued_password_is_sent_once_using_fixed_template_without_storage(self):
         issued = self.issue()

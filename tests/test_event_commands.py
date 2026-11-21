@@ -1,5 +1,6 @@
 """Agent domain workflow using a temporary workspace and synthetic delivery."""
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -27,6 +28,9 @@ class EventCommands(unittest.TestCase):
         self.addCleanup(lambda: [setattr(S, key, value) for key, value in previous.items()])
         self.addCleanup(workspace.close)
         self.principal = {'id': 'synthetic-agent', 'label': 'Synthetic Agent'}
+        address = patch.dict(os.environ, {'KEVENOS_PUBLIC_URL': 'https://event.example.com'})
+        address.start()
+        self.addCleanup(address.stop)
 
     def read(self, name, **args):
         schema = E.RESOURCES[name][0]['input_schema']
@@ -163,6 +167,22 @@ class EventCommands(unittest.TestCase):
         self.assertNotEqual(S.WORKSPACE.context, practice_context)
         self.call('workspace.switch', mode='live')
         self.assertEqual(self.read('attendees.checkins', category='guest')['attendees'][0]['name'], 'Live guest')
+
+    def test_credential_email_is_declined_without_an_event_address_and_issues_nothing(self):
+        self.call('roster.update_team', pair=1, partner='Company',
+                  members=[{'id': 1, 'name': 'Synthetic Participant', 'coach': False}])
+        credentials = lambda: S.AUTH_DB.execute('SELECT count(*) FROM access_credentials').fetchone()[0]
+        before = credentials()
+        with patch.object(M, 'smtp_password', return_value='synthetic-smtp'), \
+                patch.object(M, 'deliver', return_value=('sent', '')) as delivery, patch.dict(os.environ):
+            os.environ.pop('KEVENOS_PUBLIC_URL')
+            with self.assertRaises(E.CommandError) as refused:
+                self.call('credentials.issue', role='participant', pair=1, member=1, recipient='a@example.com')
+        self.assertEqual((refused.exception.code, refused.exception.status), ('state_conflict', 409))
+        self.assertIn('KEVENOS_PUBLIC_URL', str(refused.exception))
+        delivery.assert_not_called()
+        self.assertEqual(credentials(), before)
+        self.assertEqual(S.DB.execute('SELECT count(*) FROM notifications').fetchone()[0], 0)
 
     def test_receipts_metadata_without_password_and_revision_stability(self):
         self.call('roster.update_team', pair=1, partner='Company',

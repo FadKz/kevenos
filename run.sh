@@ -9,7 +9,7 @@ set -euo pipefail
 # inject secrets through their managed runtime rather than this helper.
 cd "$(dirname "$0")"
 container_name=kevenos-app
-image_name=kevenos:1.0.0
+image_name="kevenos:$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' package.json 2>/dev/null | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/' | grep . || echo local)"
 port=${PORT:-8080}
 if ! command -v docker >/dev/null; then
   echo "Install Docker before using this local helper." >&2

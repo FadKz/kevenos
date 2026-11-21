@@ -20,6 +20,7 @@ import socket
 import ssl
 import time
 from typing import Any
+from urllib.parse import urlsplit
 import uuid
 
 import event_access
@@ -27,10 +28,11 @@ import event_access
 ENDPOINT = '/api/admin/notifications'
 SHARE_ENDPOINT = '/api/admin/credentials/share'
 ISSUANCE_TTL = 10 * 60
-SIGN_IN_URL = os.environ.get('KEVENOS_PUBLIC_URL', 'https://event.example.com').rstrip('/') + '/'
 ROLE_LABELS = {'guest': 'Guest', 'participant': 'Participant', 'judge': 'Judge',
                'desk': 'Organizer and Scoring Desk', 'organizer':'Organizer','scoring':'Scoring Desk', 'admin': 'Admin', 'registration': 'Registration'}
 SHARE_EXPIRED = 'This password-sharing window is no longer valid. Generate or reset the password and try again.'
+NO_SIGN_IN_ADDRESS = ('Sign-in details cannot be emailed until the event address is set. '
+                      'Set KEVENOS_PUBLIC_URL to a complete https:// or http:// address and restart.')
 SENDER = os.environ.get('KEVENOS_MAIL_SENDER', 'noreply@example.com')
 SMTP_HOST = os.environ.get('KEVENOS_SMTP_HOST', 'smtp.example.com')
 SMTP_SOCKET = '/run/notifications/smtp.sock'
@@ -181,6 +183,21 @@ def _share_message(s: Any, ident: dict, body: dict, grant: dict) -> tuple[str, s
     return credential_message(s, credential, password)
 
 
+def sign_in_url() -> str:
+    """The address recipients open; never a placeholder. Sharing is refused until one is configured."""
+    value = os.environ.get('KEVENOS_PUBLIC_URL', '').strip().rstrip('/')
+    try:
+        parts = urlsplit(value)
+        usable = (parts.scheme in ('http', 'https') and parts.hostname and parts.port != 0
+                  and not (parts.username or parts.password)
+                  and not re.search(r'[\s?#]', value))
+    except ValueError:          # an invalid port or bracketed host
+        usable = False
+    if not usable:
+        raise ValueError(NO_SIGN_IN_ADDRESS)
+    return value + '/'
+
+
 def credential_message(s: Any, credential: dict, password: str) -> tuple[str, str]:
     """Format the fixed access message from a newly issued or verified password."""
     roles=event_access.event_roles.grants(s,credential.get('account_id') or credential['id'])
@@ -195,7 +212,7 @@ def credential_message(s: Any, credential: dict, password: str) -> tuple[str, st
         if not assignment or not assignment['name'].strip():raise ValueError(SHARE_EXPIRED)
         lines.extend(['Team: ' + str(assignment['pair']), 'Assigned station: ' + str(assignment['station']),
                       'Round: ' + str(assignment['round']), 'Customer scenario: ' + str(assignment['scenario'])])
-    sign_in = SIGN_IN_URL + ('?access=registration' if credential['role'] == 'registration' else '')
+    sign_in = sign_in_url() + ('?access=registration' if credential['role'] == 'registration' else '')
     lines.extend(['', 'Sign in: ' + sign_in, 'Enter this password to open your assigned dashboards:',
                   password, '', 'Keep this password private. If access has been reset, ask the event Admin for a new password.'])
     return 'Your KevenOS sign-in details', '\n'.join(lines)

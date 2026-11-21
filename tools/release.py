@@ -48,6 +48,10 @@ def validate_version(root: Path, tag: str | None = None) -> str:
         ),
         "compose.yaml": match_version(root / "compose.yaml", r"image:\s*kevenos:([^\s]+)", "compose.yaml"),
     }
+    if (root / "compose.event.yaml").exists():
+        sources["compose.event.yaml"] = match_version(
+            root / "compose.event.yaml", r"image:\s*kevenos:([^\s]+)", "compose.event.yaml"
+        )
     mismatches = [f"{name}={value}" for name, value in sources.items() if value != version]
     if mismatches:
         raise ValueError(f"release version {version} does not match " + ", ".join(mismatches))

@@ -70,3 +70,35 @@ test('agenda and help alerts open the relevant participant view on warm and cold
     }
   }
 });
+
+test('an unsupported browser gets install steps on iOS and a plain notice elsewhere', async () => {
+  const agents = {
+    iphone:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    ipad:'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    other:'Mozilla/5.0 (Linux; Android 9; Synthetic) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0 Mobile Safari/537.36'
+  };
+  const outcome = {};
+  for (const [device, userAgent] of Object.entries(agents)) {
+    const dom = new JSDOM(readFileSync('static/participant.html', 'utf8'), {
+      url:'https://example.test/participant', runScripts:'outside-only'
+    });
+    const w = dom.window;
+    Object.defineProperty(w.navigator, 'userAgent', {value:userAgent});
+    assert.equal(w.navigator.userAgent, userAgent);
+    w.KEV = {api:async () => ({available:true, public_key:'AQ'})};
+    w.eval(readFileSync('static/participant-push.js','utf8'));
+    await new Promise(resolve => setImmediate(resolve));
+    outcome[device] = {
+      status:w.document.querySelector('#notification-status').textContent,
+      inviteHidden:w.document.querySelector('#notification-invitation-enable').hidden
+    };
+    w.close();
+  }
+  for (const device of ['iphone','ipad']) {
+    assert.match(outcome[device].status, /Add to Home Screen/, device);
+    assert.match(outcome[device].status, /iPhone or iPad/, device);
+    assert.equal(outcome[device].inviteHidden, true, device);
+  }
+  assert.match(outcome.other.status, /does not support device alerts/);
+  assert.doesNotMatch(outcome.other.status, /Home Screen/);
+});

@@ -16,6 +16,22 @@ CURRENT = object()
 
 
 class WorkspaceRoutes(unittest.TestCase):
+    def test_sync_serializes_shared_connection_reads(self):
+        live = self.controller.live
+        class CheckedConnection:
+            def execute(self, *args):
+                self_test.assertTrue(S.LOCK._is_owned(), 'workspace selection read must hold the database lock')
+                return live.execute(*args)
+        self_test = self
+        self.controller.live = CheckedConnection()
+        self.addCleanup(setattr, self.controller, 'live', live)
+        original_refresh = self.controller._refresh_context
+        def checked_refresh():
+            self.assertTrue(S.LOCK._is_owned(), 'workspace context read must hold the database lock')
+            return original_refresh()
+        with patch.object(self.controller, '_refresh_context', side_effect=checked_refresh):
+            self.controller.sync()
+
     def setUp(self):
         previous = {key: getattr(S, key, None) for key in ("DB", "DATA", "CFG", "CONTENT", "AUTH_DB", "WORKSPACE")}
         tmp = tempfile.TemporaryDirectory()
@@ -35,7 +51,8 @@ class WorkspaceRoutes(unittest.TestCase):
         S.FAILS.clear()
         self.controller = event_workspace.initialize(S, str(db_path), S.DATA)
         self.addCleanup(restore)
-        env = patch.dict("os.environ", {"KEVENOS_HOSTED": "1", "KEVENOS_GATEWAY_ENABLED": "0", "KEVENOS_SMTP_ENABLED": "0"})
+        env = patch.dict("os.environ", {"KEVENOS_HOSTED": "1", "KEVENOS_GATEWAY_ENABLED": "0", "KEVENOS_SMTP_ENABLED": "0",
+                                        "KEVENOS_PUBLIC_URL": "https://event.example.com"})
         env.start()
         self.addCleanup(env.stop)
         self.admin = self.login(S.CFG["password"], S.CFG["desk_pin"])

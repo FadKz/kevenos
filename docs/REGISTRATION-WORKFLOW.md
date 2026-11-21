@@ -12,6 +12,12 @@ they need access; show it privately and ask them to open it on their phone.
 **Next arrival** clears the search and returns focus to it, retaining the selected
 filter. Checking in does not automatically create or reveal a password.
 
+The sign-in QR opens the address in `KEVENOS_PUBLIC_URL`. On a venue network with
+no address configured, a local (non-hosted) desk reached by its private IPv4
+address or `.local` name uses that same address for the QR. In every other case
+the desk declines to create the code and asks for `KEVENOS_PUBLIC_URL`, so a code
+never points at a placeholder or an address the operator did not choose.
+
 **Details** shows teammates and their arrival status, plus the scenario and
 assignment. Corrections, moves, swaps and password actions sit under **Manage team
 & access**. Undo check-in requires confirmation and should be used only for an

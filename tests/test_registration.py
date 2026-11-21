@@ -1,7 +1,11 @@
+import os
 import unittest
 import base64
+from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.parse import urlsplit
 
+import registration_desk
 import test_workspace_routes as workspace
 
 S = workspace.S
@@ -33,6 +37,72 @@ class Registration(unittest.TestCase):
         self.assertTrue(team['members'][0]['checked_in'])
         self.assertEqual(team['members'][0]['name'], 'Walk-in Example')
         self.assertFalse(team['members'][0]['has_password'])
+
+    def qr_from(self, host, status, public_url=None):
+        body = {'action': 'qr', 'revision': self.snapshot()['revision'], 'pair': 1, 'member': 1}
+        with patch.dict(os.environ):
+            os.environ.pop('KEVENOS_PUBLIC_URL', None)
+            if public_url:
+                os.environ['KEVENOS_PUBLIC_URL'] = public_url
+            return self.f.post(PATH, body, cookie=self.desk, status=status, headers={'Host': host})[0]
+
+    def test_qr_points_at_the_configured_event_address(self):
+        qr = self.qr_from('event.example.com', 200, public_url='https://tickets.example.org/')
+        self.assertTrue(qr['link'].startswith('https://tickets.example.org/join#'), qr['link'])
+
+    def test_qr_is_refused_without_an_event_address_instead_of_using_a_placeholder(self):
+        refused = self.qr_from('event.example.com', 409)
+        self.assertIn('KEVENOS_PUBLIC_URL', refused['error'])
+        self.assertNotIn('link', refused)
+        member = next(row for row in self.snapshot()['teams'] if row['pair'] == 1)['members'][0]
+        self.assertFalse(member['has_password'], 'a refused QR must not issue access')
+        qr = self.qr_from('event.example.com', 200, public_url='https://event.example.com')
+        self.assertTrue(qr['link'].startswith('https://event.example.com/join#'), qr['link'])
+
+    def test_join_address_rules(self):
+        local, hosted = SimpleNamespace(hosted=lambda: False), SimpleNamespace(hosted=lambda: True)
+        with patch.dict(os.environ):
+            os.environ.pop('KEVENOS_PUBLIC_URL', None)
+            origin = registration_desk.join_origin
+            # The desk on the event laptop itself keeps working as before.
+            self.assertEqual(origin(hosted, 'localhost:8080'), 'http://localhost:8080')
+            self.assertEqual(origin(local, '127.0.0.1:18155'), 'http://127.0.0.1:18155')
+            # A venue network without a configured address: phones use the address the desk used.
+            self.assertEqual(origin(local, '192.168.1.20:8080'), 'http://192.168.1.20:8080')
+            self.assertEqual(origin(local, '10.0.0.7'), 'http://10.0.0.7')
+            self.assertEqual(origin(local, '172.20.4.9:8080'), 'http://172.20.4.9:8080')
+            self.assertEqual(origin(local, '169.254.10.2:8080'), 'http://169.254.10.2:8080')
+            self.assertEqual(origin(local, 'event-laptop.local:8080'), 'http://event-laptop.local:8080')
+            # Anything a client could point at the wider internet is refused, never guessed.
+            for host in ('event.example.com', '203.0.113.9:8080', '8.8.8.8', 'evil.example.org', '', 'bad host', '192.168.1.20:99999', '192.168.1.20:x',
+                         # Numeric and bare names: browsers read the first three as public addresses,
+                         # and a bare service name is not something a phone can open.
+                         '134744072:8080', '0x8080808', '0', 'kevenos:8080', 'event-laptop', '192.168.1.20:\u00b2',
+                         '192.168.1.20.example.org', '192.168.001.020', '.local', 'a..local'):
+                with self.assertRaises(registration_desk.Conflict, msg=host):
+                    origin(local, host)
+            # A hosted deployment must state its address.
+            for host in ('192.168.1.20:8080', 'event.example.com'):
+                with self.assertRaises(registration_desk.Conflict, msg=host):
+                    origin(hosted, host)
+            os.environ['KEVENOS_PUBLIC_URL'] = 'https://event.example.com/'
+            self.assertEqual(origin(hosted, 'event.example.com'), 'https://event.example.com')
+            self.assertEqual(origin(local, '192.168.1.20:8080'), 'https://event.example.com')
+            # A configured address must be a complete web address.
+            for value in ('event.example.com', 'ftp://event.example.com', 'https://', 'javascript:alert(1)',
+                          'https://event.example.com/path?x#y', 'https://event.example.com?x=1', 'https://event.example.com#top',
+                          'https://user:secret@event.example.com', 'https://event.example.com:99999',
+                          'https://event.example.com:abc', 'https://event .example.com', 'https://event.example.com\nx',
+                          'https://event.example.com#', 'https://event.example.com?', 'https://event.example.com/#'):
+                os.environ['KEVENOS_PUBLIC_URL'] = value
+                with self.assertRaises(registration_desk.Conflict, msg=value):
+                    origin(hosted, 'event.example.com')
+            os.environ['KEVENOS_PUBLIC_URL'] = 'http://192.168.1.20:8080'
+            self.assertEqual(origin(local, 'event-laptop'), 'http://192.168.1.20:8080')
+            os.environ['KEVENOS_PUBLIC_URL'] = 'https://event.example.com:8443/desk/'
+            self.assertEqual(origin(hosted, 'event.example.com'), 'https://event.example.com:8443/desk')
+            os.environ.pop('KEVENOS_PUBLIC_URL')
+            self.assertEqual(origin(local, 'LOCALHOST:8080'), 'http://LOCALHOST:8080')
 
     def test_qr_uses_one_time_token_and_preserves_existing_password(self):
         issued = self.command('issue', pair=1, member=1)

@@ -81,7 +81,7 @@ async function until(check,label,limit=20000) {
       await owner.api('/api/admin/credentials',{action:'create',role,label,password,...fields});
       return password;
     };
-    const first=await session('participant',await seed('participant','Alex',{pair:1,member:1}),devices['mobile device 13']);
+    const first=await session('participant',await seed('participant','Alex',{pair:1,member:1}),devices['iPhone 13']);
     const second=await session('participant',await seed('participant','Sam',{pair:2,member:1}),devices['Pixel 7']);
     const assignment=(await first.api('/api/participant/state')).participant;
     const station=assignment.station;

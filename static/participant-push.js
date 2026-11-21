@@ -9,10 +9,10 @@
   if (!button || !invitation) return;
 
   const path = '/api/participant/push';
-  const ios = /iPad|mobile device|iPod/.test(navigator.userAgent) ||
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-  const installation = 'On mobile device or iPad, use Share → Add to Home Screen, then open KevenOS from its icon.';
+  const installation = 'On an iPhone or iPad, use Share → Add to Home Screen, then open KevenOS from its icon.';
   const dismissal = 'kevenos-notification-invitation-dismissed-v1';
   let config;
   let busy = false;

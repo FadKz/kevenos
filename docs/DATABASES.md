@@ -71,9 +71,14 @@ KEVENOS_TEST_SCHEMA_PREFIX=kevenos_ci \
 python tools/qualify_postgres.py
 ```
 
-The qualification requires one event context, signs in every synthetic role on
-one process and reads the session on the other, then publishes a content edit
-through one process and verifies it through the second.
+The qualification first checks the storage layer directly: timestamp precision,
+conversion of a column shaped like one from release 1.2.0 (including a table
+that is busy at the time), and that the connection is free again after a
+transaction block. It also plants such a column in the Live schema before the
+processes start, to prove start-up converts it. It then requires one event context, signs
+in every synthetic role on one process and reads the session on the other, reads
+the admin activity view, and publishes a content edit through one process and
+verifies it through the second.
 
 ## Backup and recovery
 

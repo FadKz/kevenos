@@ -28,7 +28,8 @@ set `KEVENOS_HOSTED=1`, project credentials from read-only secret files and conf
 ## Optional integrations
 
 - Mail: `KEVENOS_MAIL_SENDER`, `KEVENOS_SMTP_HOST`, `KEVENOS_MAIL_HELO`,
-  `KEVENOS_MAIL_ID_DOMAIN` and the SMTP secret.
+  `KEVENOS_MAIL_ID_DOMAIN` and the SMTP secret. Emailing sign-in details also
+  needs `KEVENOS_PUBLIC_URL`.
 - Push: `KEVENOS_VAPID_SUBJECT` and a VAPID private key.
 - AI: an HTTPS OpenAI-compatible `KEVENOS_AI_BASE_URL`, `KEVENOS_AI_API_KEY` and an
   optional restricted relay socket in `KEVENOS_AI_SOCKET`.

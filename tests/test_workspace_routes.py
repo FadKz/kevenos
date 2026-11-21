@@ -35,7 +35,8 @@ class WorkspaceRoutes(unittest.TestCase):
         S.FAILS.clear()
         self.controller = event_workspace.initialize(S, str(db_path), S.DATA)
         self.addCleanup(restore)
-        env = patch.dict("os.environ", {"KEVENOS_HOSTED": "1", "KEVENOS_GATEWAY_ENABLED": "0", "KEVENOS_SMTP_ENABLED": "0"})
+        env = patch.dict("os.environ", {"KEVENOS_HOSTED": "1", "KEVENOS_GATEWAY_ENABLED": "0", "KEVENOS_SMTP_ENABLED": "0",
+                                        "KEVENOS_PUBLIC_URL": "https://event.example.com"})
         env.start()
         self.addCleanup(env.stop)
         self.admin = self.login(S.CFG["password"], S.CFG["desk_pin"])

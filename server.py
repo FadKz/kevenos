@@ -1386,7 +1386,9 @@ def updated_clock(clock, el, a, b):
     c = dict(clock)
     now, rounds = time.time(), CFG["rounds"]
     if a == "start":
-        c.update(running=True, started=now, ended=False)
+        # A repeated start (double tap, retry, second device) keeps the time already run.
+        if not (c["running"] and c["started"] is not None):
+            c.update(running=True, started=now, ended=False)
     elif a == "pause":
         c.update(running=False, elapsed=el, started=None)
     elif a == "reset":

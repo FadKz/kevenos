@@ -38,8 +38,8 @@ def join_origin(s, host):
         try:
             parts = urlsplit(configured)
             usable = (parts.scheme in ('http', 'https') and parts.hostname and parts.port != 0
-                      and not (parts.query or parts.fragment or parts.username or parts.password)
-                      and not re.search(r'\s', configured))
+                      and not (parts.username or parts.password)
+                      and not re.search(r'[\s?#]', configured))
         except ValueError:          # an invalid port or bracketed host
             usable = False
         if not usable:

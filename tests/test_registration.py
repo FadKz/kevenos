@@ -92,7 +92,8 @@ class Registration(unittest.TestCase):
             for value in ('event.example.com', 'ftp://event.example.com', 'https://', 'javascript:alert(1)',
                           'https://event.example.com/path?x#y', 'https://event.example.com?x=1', 'https://event.example.com#top',
                           'https://user:secret@event.example.com', 'https://event.example.com:99999',
-                          'https://event.example.com:abc', 'https://event .example.com', 'https://event.example.com\nx'):
+                          'https://event.example.com:abc', 'https://event .example.com', 'https://event.example.com\nx',
+                          'https://event.example.com#', 'https://event.example.com?', 'https://event.example.com/#'):
                 os.environ['KEVENOS_PUBLIC_URL'] = value
                 with self.assertRaises(registration_desk.Conflict, msg=value):
                     origin(hosted, 'event.example.com')
